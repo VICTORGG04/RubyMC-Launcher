@@ -1,0 +1,20 @@
+source 'https://rubygems.org'
+
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+ruby ">= 3.0"
+
+gem "httparty",                "~> 0.24"   # Requisições HTTP (OAuth Microsoft, API Mojang e Discord)
+gem "tty-prompt",              "~> 0.23"   # Menus interativos no terminal
+gem "tty-spinner",             "~> 0.9"    # Animações de carregamento
+gem "tty-box",                 "~> 0.7"    # Caixas de texto estilizadas
+gem "pastel",                  "~> 0.8"    # Cores no terminal
+gem "json",                    "~> 2.19"   # Parsing de JSON
+gem "websocket-client-simple", "~> 0.7"    # Gateway WebSocket do Discord (bot de boas-vindas)
+
+
+
+gem "webrick", "~> 1.9"
+gem "rubyzip", "~> 2.3"

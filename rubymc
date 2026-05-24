@@ -1,0 +1,200 @@
+#!/usr/bin/env bash
+set -e
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+HOST="127.0.0.1"
+PORT="4567"
+URL="http://${HOST}:${PORT}"
+RUN_DIR="$ROOT/tmp/rubymc"
+PID_FILE="$RUN_DIR/web.pid"
+LOG_FILE="$RUN_DIR/web.log"
+
+mkdir -p "$RUN_DIR"
+
+say() {
+  echo "[RubyMC] $*"
+}
+
+ok() {
+  echo "[OK] $*"
+}
+
+ensure_gemfile() {
+  say "Verificando Gemfile..."
+
+  touch Gemfile
+
+  if ! grep -q '^source ' Gemfile; then
+    tmpfile="$(mktemp)"
+    {
+      echo 'source "https://rubygems.org"'
+      echo
+      cat Gemfile
+    } > "$tmpfile"
+    mv "$tmpfile" Gemfile
+  fi
+
+  sed -i "/^[[:space:]]*gem[[:space:]]['\"]webrick['\"]/d" Gemfile
+  sed -i "/^[[:space:]]*gem[[:space:]]['\"]rubyzip['\"]/d" Gemfile
+  sed -i "/glimmer-dsl-tk/d" Gemfile
+  sed -i "/glimmer-dsl-libui/d" Gemfile
+
+  printf '\ngem "webrick", "~> 1.9"\n' >> Gemfile
+  printf 'gem "rubyzip", "~> 2.3"\n' >> Gemfile
+}
+
+install_deps() {
+  ensure_gemfile
+
+  if bundle check >/dev/null 2>&1; then
+    ok "Dependências já instaladas."
+  else
+    say "Instalando dependências..."
+    bundle install
+  fi
+}
+
+free_port() {
+  if command -v fuser >/dev/null 2>&1; then
+    fuser -k "${PORT}/tcp" >/dev/null 2>&1 || true
+  elif command -v lsof >/dev/null 2>&1; then
+    pid="$(lsof -t -iTCP:${PORT} -sTCP:LISTEN 2>/dev/null || true)"
+    if [ -n "$pid" ]; then
+      kill -9 $pid >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
+stop_server() {
+  say "Parando servidor web antigo, se existir..."
+
+  if [ -f "$PID_FILE" ]; then
+    old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [ -n "$old_pid" ]; then
+      kill "$old_pid" >/dev/null 2>&1 || true
+      sleep 1
+      kill -9 "$old_pid" >/dev/null 2>&1 || true
+    fi
+    rm -f "$PID_FILE"
+  fi
+
+  pkill -f "launcher_gui.rb" >/dev/null 2>&1 || true
+  free_port
+
+  ok "Servidor parado/liberado."
+}
+
+start_server() {
+  install_deps
+  stop_server
+
+  say "Iniciando RubyMC Launcher em ${URL}"
+
+  nohup bundle exec ruby launcher_gui.rb > "$LOG_FILE" 2>&1 &
+  new_pid="$!"
+  echo "$new_pid" > "$PID_FILE"
+
+  sleep 2
+
+  if ! kill -0 "$new_pid" >/dev/null 2>&1; then
+    echo "[ERRO] O servidor não iniciou. Últimos logs:"
+    tail -n 80 "$LOG_FILE" || true
+    exit 1
+  fi
+
+  ok "Servidor iniciado. PID: $new_pid"
+
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "${URL}/?v=one-command" >/dev/null 2>&1 || true
+  fi
+
+  echo
+  say "Acesse: ${URL}/?v=one-command"
+  say "Use './rubymc logs' para ver logs."
+  say "Use './rubymc stop' para parar."
+}
+
+status_server() {
+  echo "Projeto: $ROOT"
+  echo "URL: ${URL}"
+
+  if [ -f "$PID_FILE" ]; then
+    pid="$(cat "$PID_FILE")"
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      echo "Status: rodando"
+      echo "PID: $pid"
+    else
+      echo "Status: PID salvo, mas processo morto"
+    fi
+  else
+    echo "Status: sem PID salvo"
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    echo
+    lsof -nP -iTCP:${PORT} -sTCP:LISTEN || true
+  fi
+}
+
+show_logs() {
+  touch "$LOG_FILE"
+  tail -f "$LOG_FILE"
+}
+
+run_tests() {
+  install_deps
+  echo "[RubyMC] Verificando sintaxe Ruby..."
+  ruby -c launcher_gui.rb
+  ruby -c launcher.rb
+  ruby -c lib/web_launcher_app.rb
+  echo "[RubyMC] Verificando bundle..."
+  bundle check
+  ok "Testes básicos concluídos."
+}
+
+open_classic() {
+  install_deps
+  ruby launcher.rb
+}
+
+organize_project() {
+  if [ -f scripts/organize_project_root.rb ]; then
+    ruby scripts/organize_project_root.rb --apply
+  else
+    echo "[AVISO] scripts/organize_project_root.rb não encontrado."
+  fi
+}
+
+case "${1:-start}" in
+  start)
+    start_server
+    ;;
+  stop)
+    stop_server
+    ;;
+  restart)
+    stop_server
+    start_server
+    ;;
+  status)
+    status_server
+    ;;
+  logs)
+    show_logs
+    ;;
+  test)
+    run_tests
+    ;;
+  classic)
+    open_classic
+    ;;
+  organize)
+    organize_project
+    ;;
+  *)
+    echo "Uso: ./rubymc [start|stop|restart|status|logs|test|classic|organize]"
+    exit 1
+    ;;
+esac
