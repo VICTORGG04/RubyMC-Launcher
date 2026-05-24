@@ -40,7 +40,7 @@ O RubyMC Launcher possui uma interface Web local com tema visual **RubyMC Neon**
 A tela inicial concentra o status do launcher, versão do Ruby, status do servidor, seletor de perfil e atalhos principais.
 
 <p align="center">
-  <img src="docs/assets/screenshots/rubymc-inicio.png" alt="Tela inicial do RubyMC Launcher" width="900">
+  <img src="https://raw.githubusercontent.com/VICTORGG04/RubyMC-Launcher/main/docs/assets/screenshots/rubymc-inicio.png" alt="Tela inicial do RubyMC Launcher" width="900">
 </p>
 
 ---
@@ -50,7 +50,7 @@ A tela inicial concentra o status do launcher, versão do Ruby, status do servid
 A aba **Modpacks** permite importar arquivos `.mrpack` e `.zip`, registrar perfis e atualizar a lista de modpacks disponíveis no launcher.
 
 <p align="center">
-  <img src="docs/assets/screenshots/rubymc-modpacks.png" alt="Aba de modpacks do RubyMC Launcher" width="900">
+  <img src="https://raw.githubusercontent.com/VICTORGG04/RubyMC-Launcher/main/docs/assets/screenshots/rubymc-modpacks.png" alt="Aba de modpacks do RubyMC Launcher" width="900">
 </p>
 
 ---
@@ -60,7 +60,7 @@ A aba **Modpacks** permite importar arquivos `.mrpack` e `.zip`, registrar perfi
 A aba **Servidor** permite visualizar o endereço configurado do servidor Minecraft, testar conexão e iniciar entrada no servidor.
 
 <p align="center">
-  <img src="docs/assets/screenshots/rubymc-servidor.png" alt="Aba de servidor da comunidade do RubyMC Launcher" width="900">
+  <img src="https://raw.githubusercontent.com/VICTORGG04/RubyMC-Launcher/main/docs/assets/screenshots/rubymc-servidor.png" alt="Aba de servidor da comunidade do RubyMC Launcher" width="900">
 </p>
 
 ---
@@ -70,7 +70,7 @@ A aba **Servidor** permite visualizar o endereço configurado do servidor Minecr
 A aba **Discord** valida os canais, cargos, token do bot, servidor Discord e canal de logs usando backend Ruby integrado à Discord API.
 
 <p align="center">
-  <img src="docs/assets/screenshots/rubymc-discord.png" alt="Aba Discord Bot do RubyMC Launcher" width="900">
+  <img src="https://raw.githubusercontent.com/VICTORGG04/RubyMC-Launcher/main/docs/assets/screenshots/rubymc-discord.png" alt="Aba Discord Bot do RubyMC Launcher" width="900">
 </p>
 
 ---
@@ -80,7 +80,7 @@ A aba **Discord** valida os canais, cargos, token do bot, servidor Discord e can
 O **Display interno** mostra ações do backend, testes, erros, comandos executados, validações do Discord e status do servidor sem sair do launcher.
 
 <p align="center">
-  <img src="docs/assets/screenshots/rubymc-display.png" alt="Display interno de logs do RubyMC Launcher" width="900">
+  <img src="https://raw.githubusercontent.com/VICTORGG04/RubyMC-Launcher/main/docs/assets/screenshots/rubymc-display.png" alt="Display interno de logs do RubyMC Launcher" width="900">
 </p>
 
 ---
@@ -90,7 +90,7 @@ O **Display interno** mostra ações do backend, testes, erros, comandos executa
 A aba **Projeto** centraliza ações de organização da raiz e abertura do launcher clássico.
 
 <p align="center">
-  <img src="docs/assets/screenshots/rubymc-projeto.png" alt="Aba de projeto do RubyMC Launcher" width="900">
+  <img src="https://raw.githubusercontent.com/VICTORGG04/RubyMC-Launcher/main/docs/assets/screenshots/rubymc-projeto.png" alt="Aba de projeto do RubyMC Launcher" width="900">
 </p>
 
 ---
