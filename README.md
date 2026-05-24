@@ -1,804 +1,858 @@
-# 💎 RubyMC Launcher — Minecraft Ruby Launcher
+# 🎮 Minecraft Ruby Launcher — RubyMC
 
-> Launcher para **Minecraft Java Edition** feito em **Ruby**, com interface Web local, tema RubyMC Neon, modo clássico via terminal, autenticação Microsoft, modo offline, modpacks, servidor público da comunidade, integração com Discord e comando único de execução.
+Launcher para **Minecraft Java Edition** desenvolvido em **Ruby**, com interface Web local, tema visual RubyMC Neon, suporte a modpacks, servidor público/comunidade, integração com Discord Bot, Display interno de logs e automação por comando único.
 
-![RubyMC](web/assets/img/rubymc-server-strip.png)
+> Projeto focado em criar um launcher próprio, visual, organizado e extensível para jogar Minecraft, gerenciar modpacks, validar servidor da comunidade e integrar ações com Discord.
 
 ---
 
-## 📌 Visão geral
+## 📌 Status atual
 
-O **RubyMC Launcher** é um launcher personalizado para Minecraft Java Edition desenvolvido em Ruby.
+✅ Launcher clássico em Ruby funcionando  
+✅ Launcher Web local funcionando em `http://127.0.0.1:4567`  
+✅ Tema RubyMC Neon com CSS e imagens  
+✅ Display interno com logs, testes, erros e ações do backend  
+✅ Comando único `./rubymc` para iniciar/parar/reiniciar/testar  
+✅ Suporte inicial a importação de modpacks `.mrpack` e `.zip`  
+✅ Aba de servidor da comunidade  
+✅ Validação backend de Discord Bot  
+✅ Validação de canais e cargos do Discord  
+✅ Teste de envio para canal de logs do Discord  
+✅ Organização da raiz do projeto com `scripts/organize_project_root.rb`
 
-O projeto começou como um launcher terminal em Ruby puro e evoluiu para um sistema com:
+---
 
-- launcher clássico via terminal;
-- launcher Web local com CSS real;
-- comando único `./rubymc`;
-- display interno para logs, testes e ações;
-- suporte inicial a modpacks;
-- integração com servidor público da comunidade;
-- integração com Discord Rich Presence e bot de convites;
-- organização de raiz do projeto;
-- scripts de manutenção, teste e diagnóstico.
+## 🖼️ Visual do Launcher
 
-A interface Web roda localmente em:
+O launcher Web usa um tema visual próprio chamado **RubyMC Neon**, inspirado em painéis futuristas, Minecraft, Ruby e Discord Bot.
+
+Arquivos principais do visual:
 
 ```text
-http://127.0.0.1:4567
-```
-
-O comando recomendado para iniciar tudo é:
-
-```bash
-./rubymc
+web/
+├── index.html
+└── assets/
+    ├── css/
+    │   └── launcher.css
+    ├── js/
+    │   └── launcher.js
+    └── img/
+        ├── rubymc-control-panel.png
+        ├── rubymc-discord-bot-icon.png
+        ├── rubymc-discord-overlay.png
+        ├── rubymc-discord-panel.png
+        ├── rubymc-server-icon.png
+        ├── rubymc-server-large.png
+        └── rubymc-server-strip.png
 ```
 
 ---
 
-## ⚠️ Aviso importante
+## 🚀 Funcionalidades principais
 
-Este projeto **não é oficial da Mojang, Microsoft ou Discord**.
+### 🎮 Minecraft
 
-Ele é um launcher comunitário/pessoal para estudo, automação e integração com Minecraft Java Edition.
+- Escolha de perfil para jogar.
+- Execução do launcher clássico pelo painel Web.
+- Modo offline com nickname.
+- Alocação de memória RAM.
+- Uso de versão padrão configurada em `config/settings.yml`.
+- Verificação básica de ambiente.
 
-Use com responsabilidade, mantenha tokens e credenciais privados, e não publique arquivos sensíveis como:
+### 🌐 Launcher Web
+
+- Interface Web local.
+- CSS real.
+- Tema RubyMC Neon.
+- Abas organizadas:
+  - Início
+  - Modpacks
+  - Servidor
+  - Discord
+  - Display
+  - Projeto
+- Backend Ruby com WEBrick.
+- Comunicação frontend/backend via rotas HTTP.
+- Display interno para acompanhar tudo sem sair do painel.
+
+### 📦 Modpacks
+
+- Aba própria para modpacks.
+- Importação de modpack pelo navegador.
+- Suporte inicial a:
+  - `.mrpack`
+  - `.zip`
+- Lista de modpacks instalados.
+- Atualização do seletor de perfil.
+- Registro de ações no Display interno.
+
+### 🌍 Servidor da comunidade
+
+- Configuração de servidor Minecraft público ou local.
+- Teste de conexão TCP.
+- Botão para entrar no servidor.
+- Endereço configurável em `config/settings.yml`.
+
+### 🤖 Discord Bot
+
+- Configuração por `config/settings.yml`.
+- Validação local dos IDs.
+- Validação remota com Discord API.
+- Teste de autenticação do bot.
+- Teste do servidor Discord.
+- Teste de envio de mensagem no canal de logs.
+- Suporte a canais e cargos configurados.
+- Display interno com logs reais da integração.
+
+### 🖥️ Display interno
+
+O Display interno mostra eventos como:
 
 ```text
-config/settings.yml
-~/.minecraft_ruby_launcher/accounts.json
-~/.minecraft_ruby_launcher/discord_invites.json
-.env
+[00:57:21] COMMAND $ bundle check
+[00:57:21] OK      Rodar testes concluído.
+[00:57:37] ACTION  Validação Discord solicitada pelo painel.
+[00:57:38] OK      Bot autenticado: BOT RUBYMC
+[00:57:38] OK      Servidor Discord validado: LanServer
+[00:58:59] OK      Mensagem de teste enviada ao Discord no canal configurado.
 ```
 
 ---
 
-## ✅ Status atual do projeto
+## 🧰 Tecnologias utilizadas
 
-| Área | Status |
+| Tecnologia | Uso |
 |---|---|
-| Launcher clássico terminal | ✅ Funcional |
-| Login Microsoft Device Code Flow | ✅ Implementado no projeto base |
-| Modo offline | ✅ Implementado |
-| Download de Minecraft/libraries/assets | ✅ Implementado no projeto base |
-| Discord Rich Presence | ✅ Implementado no projeto base |
-| Bot Discord de convites | ✅ Implementado/ajustável |
-| Launcher Web local | ✅ Implementado |
-| Tema RubyMC Neon | ✅ Implementado via CSS |
-| Display interno de logs/testes | ✅ Implementado |
-| Comando único `./rubymc` | ✅ Implementado |
-| Organização da raiz | ✅ Script disponível |
-| Modpacks `.mrpack`/Modrinth | 🟡 Suporte inicial |
-| Modpacks CurseForge | 🟡 Importação parcial/estrutura pendente |
-| Servidor público da comunidade | 🟡 Configurável |
-| Instalador final `.deb`/`.AppImage` | 🔵 Planejado |
+| Ruby | Linguagem principal do launcher |
+| WEBrick | Servidor Web local |
+| HTTParty | Requisições HTTP para APIs |
+| RubyZip | Importação e leitura de modpacks `.zip` / `.mrpack` |
+| YAML | Configurações do projeto |
+| HTML | Estrutura do launcher Web |
+| CSS | Tema RubyMC Neon |
+| JavaScript | Eventos da interface Web |
+| Discord API | Validação do bot, canais, cargos e envio de logs |
 
-Legenda:
+---
+
+## 📋 Pré-requisitos
+
+### Sistema
+
+- Linux, macOS ou Windows com Ruby configurado.
+- Testado em Ubuntu 24.04.
+
+### Ruby
+
+```bash
+ruby -v
+```
+
+Recomendado:
 
 ```text
-✅ pronto
-🟡 funcional/parcial, pode exigir ajuste
-🔵 planejado
+Ruby 3.2+
+```
+
+### Java
+
+Para Minecraft moderno, use Java compatível com a versão escolhida.
+
+Para Minecraft 1.21.4, recomenda-se Java 21+:
+
+```bash
+java -version
+```
+
+Ubuntu/Debian:
+
+```bash
+sudo apt update
+sudo apt install openjdk-21-jdk -y
 ```
 
 ---
 
-## 🧱 Estrutura recomendada do projeto
+## 📦 Instalação
 
-A raiz deve ficar limpa, com apenas os arquivos principais:
+Clone o projeto:
 
-```text
-MinecraftLauncher/
-├── bin/
-│   └── rubymc
-├── config/
-│   ├── settings.yml
-│   └── config.rb
-├── docs/
-│   ├── WEB_LAUNCHER_FUNCTIONAL_FIX.md
-│   ├── WEB_LAUNCHER_ORGANIZACAO.md
-│   ├── TEMA_RUBYMC_NEON.md
-│   └── INTEGRACAO_MODPACKS_GUI.md
-├── lib/
-│   ├── account_bank.rb
-│   ├── auto_updater.rb
-│   ├── community_server.rb
-│   ├── discord_integration.rb
-│   ├── launcher_cli.rb
-│   ├── launcher_extensions.rb
-│   ├── microsoft_auth.rb
-│   ├── minecraft_manager.rb
-│   ├── modpack_manager.rb
-│   ├── session_manager.rb
-│   └── web_launcher_app.rb
-├── scripts/
-│   ├── organize_project_root.rb
-│   ├── setup_channels.rb
-│   ├── setup_discord_forum.rb
-│   └── setup_discord_welcome.rb
-├── test/
-│   ├── test_discord_bot.rb
-│   └── test_discord_invite.rb
-├── tmp/
-│   └── rubymc/
-│       ├── web.pid
-│       └── web.log
-├── vendor/
-│   └── bundle/
-├── web/
-│   ├── index.html
-│   └── assets/
-│       ├── css/
-│       │   └── launcher.css
-│       ├── img/
-│       │   ├── rubymc-control-panel.png
-│       │   ├── rubymc-discord-bot-icon.png
-│       │   ├── rubymc-discord-overlay.png
-│       │   ├── rubymc-discord-panel.png
-│       │   ├── rubymc-server-icon.png
-│       │   ├── rubymc-server-large.png
-│       │   └── rubymc-server-strip.png
-│       └── js/
-│           └── launcher.js
-├── bot_daemon.rb
-├── Gemfile
-├── Gemfile.lock
-├── launcher.rb
-├── launcher_gui.rb
-├── README.md
-├── rubymc
-└── .gitignore
+```bash
+git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
+cd MinecraftLauncher
+```
+
+Instale o Bundler se necessário:
+
+```bash
+gem install bundler
+```
+
+Instale as dependências:
+
+```bash
+bundle install
 ```
 
 ---
 
-## 🚀 Início rápido
+## ⚡ Comando único
 
-### 1. Entrar na pasta do projeto
-
-```bash
-cd ~/RubymineProjects/MinecraftLauncher
-```
-
-### 2. Dar permissão ao comando principal
-
-```bash
-chmod +x rubymc bin/rubymc
-```
-
-### 3. Iniciar o launcher
+O projeto possui o comando principal:
 
 ```bash
 ./rubymc
 ```
 
-### 4. Abrir no navegador
+Ele automatiza:
 
-O comando tenta abrir automaticamente, mas você também pode acessar manualmente:
-
-```text
-http://127.0.0.1:4567
-```
-
----
-
-## 🧠 Comando único `./rubymc`
-
-O arquivo `rubymc` é o comando principal do projeto.
-
-Ele centraliza:
-
-- verificação do `Gemfile`;
-- instalação de dependências;
-- correção de gems conflitantes;
-- liberação da porta `4567`;
-- inicialização do servidor Web;
-- abertura do navegador;
-- logs;
-- testes;
-- modo clássico;
-- organização da raiz.
+- Verificação do `Gemfile`.
+- Instalação de dependências.
+- Liberação da porta `4567`.
+- Inicialização do launcher Web.
+- Abertura do navegador.
+- Registro de logs e PID.
 
 ### Comandos disponíveis
 
 ```bash
+./rubymc start      # inicia o launcher Web
+./rubymc stop       # para o launcher Web
+./rubymc restart    # reinicia o launcher Web
+./rubymc status     # mostra status, PID e porta
+./rubymc logs       # acompanha logs do servidor Web
+./rubymc test       # roda testes básicos
+./rubymc classic    # abre o launcher clássico
+./rubymc organize   # organiza a raiz do projeto
+```
+
+Atalho equivalente:
+
+```bash
+bin/rubymc
+```
+
+---
+
+## 🌐 Como iniciar o Launcher Web
+
+Use:
+
+```bash
 ./rubymc
 ```
 
-Inicia o launcher Web.
-
-```bash
-./rubymc start
-```
-
-Também inicia o launcher Web.
-
-```bash
-./rubymc stop
-```
-
-Para o servidor Web local.
+Ou:
 
 ```bash
 ./rubymc restart
 ```
 
-Para e inicia novamente.
-
-```bash
-./rubymc status
-```
-
-Mostra status, PID e porta usada.
-
-```bash
-./rubymc logs
-```
-
-Mostra os logs em tempo real.
-
-```bash
-./rubymc test
-```
-
-Executa testes básicos de sintaxe e dependências.
-
-```bash
-./rubymc classic
-```
-
-Abre o launcher clássico no terminal.
-
-```bash
-./rubymc organize
-```
-
-Organiza a raiz do projeto usando o script de organização.
-
----
-
-## 🖥️ Launcher Web
-
-O launcher Web é iniciado por:
-
-```bash
-./rubymc
-```
-
-ou diretamente por:
-
-```bash
-bundle exec ruby launcher_gui.rb
-```
-
-O recomendado é usar sempre:
-
-```bash
-./rubymc
-```
-
-A interface Web roda em:
+Depois abra:
 
 ```text
 http://127.0.0.1:4567
 ```
 
-### Arquivos principais da interface Web
-
-```text
-launcher_gui.rb
-lib/web_launcher_app.rb
-web/index.html
-web/assets/css/launcher.css
-web/assets/js/launcher.js
-web/assets/img/
-```
-
-### Responsabilidade de cada arquivo
-
-| Arquivo | Função |
-|---|---|
-| `launcher_gui.rb` | Ponto de entrada do launcher Web |
-| `lib/web_launcher_app.rb` | Backend Web em Ruby/WEBrick |
-| `web/index.html` | Estrutura visual da página |
-| `web/assets/css/launcher.css` | Tema visual RubyMC Neon |
-| `web/assets/js/launcher.js` | Comunicação com backend, botões e display |
-| `web/assets/img/` | Imagens do tema |
-
----
-
-## 🎨 Tema RubyMC Neon
-
-O tema visual foi pensado para seguir um estilo:
-
-```text
-Minecraft + Ruby + Neon + painel futurista + servidor de comunidade
-```
-
-Características:
-
-- fundo escuro;
-- destaque em vermelho/rubi;
-- detalhes em ciano neon;
-- cards com brilho;
-- display interno estilo terminal;
-- imagens customizadas em `web/assets/img/`;
-- layout organizado por painéis e abas.
-
-### Editar CSS
-
-Arquivo principal:
-
-```text
-web/assets/css/launcher.css
-```
-
-Depois de editar, reinicie:
-
-```bash
-./rubymc restart
-```
-
-E force atualização no navegador:
+Para forçar atualização de CSS/JS:
 
 ```text
 Ctrl + F5
 ```
 
-ou acesse com parâmetro novo:
+Ou abra com parâmetro de cache:
 
 ```text
-http://127.0.0.1:4567/?v=novo-tema
+http://127.0.0.1:4567/?v=latest-update
 ```
 
 ---
 
-## 📺 Display interno
+## 🖥️ Launcher clássico
 
-O launcher Web possui um display interno para mostrar:
-
-- status do sistema;
-- logs;
-- testes;
-- erros;
-- comandos executados;
-- ações de botões;
-- resposta do backend;
-- processos iniciados;
-- status do servidor;
-- resultado de importação de modpacks.
-
-Exemplo de saída:
-
-```text
-[22:02:46] SYSTEM  Display limpo. Aguardando novos eventos...
-[22:02:49] ACTION  Launcher clássico iniciado...
-[22:02:49] COMMAND $ /usr/bin/ruby3.2 launcher.rb
-```
-
-### Observação importante
-
-O `launcher.rb` clássico é interativo. Por isso, quando aberto pelo launcher Web, o ideal é que ele rode em terminal externo ou via comando:
-
-```bash
-./rubymc classic
-```
-
----
-
-## 🕹️ Launcher clássico
-
-O launcher clássico é o modo terminal original.
-
-Execute com:
+O launcher clássico continua disponível em:
 
 ```bash
 bundle exec ruby launcher.rb
 ```
 
-ou:
+Ou pelo comando:
 
 ```bash
 ./rubymc classic
 ```
 
-Ele permite:
+Ele é usado para executar o fluxo tradicional no terminal:
 
-- escolher versão do Minecraft;
-- baixar versão;
-- selecionar login Microsoft;
-- jogar offline;
-- definir username;
-- configurar RAM;
-- iniciar Minecraft.
-
-Exemplo do menu:
-
-```text
-╔════════════════════════════════════════════════╗
-║            MINECRAFT RUBY LAUNCHER             ║
-║            Versão 1.0.0 — Puro Ruby            ║
-╚════════════════════════════════════════════════╝
-
-Escolha a versão do Minecraft que deseja jogar:
-  ❯ 1.21.4 (Instalada localmente)
-    ✨ Baixar última versão estável oficial
-    🔍 Digitar uma versão específica
-
-Como você deseja entrar no jogo?
-  ❯ 🔑 Adicionar nova conta Microsoft (Online)
-    🔌 Jogar Offline (Sem conta / Pirata)
-```
+- Escolha de versão.
+- Login/modo offline.
+- Nickname.
+- Memória RAM.
+- Inicialização do Minecraft.
 
 ---
 
-## 🔐 Login Microsoft
+## ⚙️ Configuração principal
 
-O projeto base possui autenticação Microsoft por **OAuth 2.0 Device Code Flow**.
-
-Fluxo:
-
-1. O usuário escolhe login Microsoft.
-2. O launcher exibe um código.
-3. O usuário acessa a página indicada.
-4. Digita o código.
-5. O launcher autentica via Microsoft/Xbox/XSTS/Minecraft.
-6. A conta é salva localmente.
-7. Em execuções futuras, o token é renovado automaticamente quando possível.
-
-Arquivo responsável:
-
-```text
-lib/microsoft_auth.rb
-```
-
-As contas ficam salvas em:
-
-```text
-~/.minecraft_ruby_launcher/accounts.json
-```
-
-Permissão recomendada:
-
-```bash
-chmod 600 ~/.minecraft_ruby_launcher/accounts.json
-```
-
----
-
-## 🔌 Modo offline
-
-O modo offline permite iniciar o Minecraft sem autenticação Microsoft.
-
-Ele solicita apenas um username:
-
-```text
-Digite o apelido (Username) para o jogo: Victor
-```
-
-Uso recomendado:
-
-- testes locais;
-- desenvolvimento;
-- ambientes sem internet;
-- servidores que aceitam modo offline.
-
-Atenção: servidores oficiais/online-mode exigem conta autenticada.
-
----
-
-## 🧩 Modpacks
-
-O projeto possui suporte inicial a modpacks.
-
-Arquivos relacionados:
-
-```text
-lib/modpack_manager.rb
-lib/launcher_extensions.rb
-docs/INTEGRACAO_MODPACKS_GUI.md
-```
-
-### Suporte planejado/implementado
-
-| Formato | Status |
-|---|---|
-| `.mrpack` Modrinth | 🟡 Suporte inicial |
-| CurseForge zip | 🟡 Estrutura parcial |
-| Overrides | 🟡 Suporte inicial |
-| Download automático de mods | 🟡 Depende do manifesto |
-| Verificação SHA1 | 🟡 Quando disponível no manifesto |
-
-### Pastas recomendadas
-
-```text
-~/.minecraft_ruby_launcher/modpacks/
-~/.minecraft_ruby_launcher/instances/
-```
-
-### Fluxo esperado
-
-1. Usuário seleciona um `.mrpack`.
-2. O launcher lê o manifesto.
-3. Cria uma instância local.
-4. Baixa arquivos quando houver URLs no manifesto.
-5. Aplica overrides.
-6. Configura versão/loader.
-7. Disponibiliza a instância para jogar.
-
----
-
-## 🌍 Servidor público da comunidade
-
-O launcher possui área para servidor público/comunidade.
-
-Arquivo relacionado:
-
-```text
-lib/community_server.rb
-```
-
-Configuração sugerida em `config/settings.yml`:
-
-```yaml
-community_server:
-  enabled: true
-  name: "RubyMC Community"
-  address: "play.seuservidor.com"
-  port: 25565
-  version: "1.21.4"
-  description: "Servidor público da comunidade RubyMC"
-  discord_invite: "https://discord.gg/SEU_CONVITE"
-```
-
-### Funcionalidades esperadas
-
-- mostrar endereço do servidor;
-- copiar IP;
-- testar conexão;
-- abrir Minecraft apontando para o servidor;
-- exibir status no display;
-- integrar convite Discord.
-
----
-
-## 🤖 Discord Rich Presence
-
-O launcher pode mostrar no Discord que o usuário está jogando Minecraft.
-
-Arquivo relacionado:
-
-```text
-lib/discord_integration.rb
-```
-
-Configuração:
-
-```yaml
-discord:
-  rich_presence: true
-  client_id: "SEU_DISCORD_CLIENT_ID"
-```
-
-Requisitos:
-
-- criar uma aplicação no Discord Developer Portal;
-- copiar o Application ID;
-- deixar o cliente Discord aberto na máquina.
-
----
-
-## 📩 Bot Discord de convites
-
-O bot Discord pode criar convites e enviar por DM ao jogador.
-
-Configuração sugerida:
-
-```yaml
-discord:
-  bot_enabled: true
-  bot_token: "SEU_BOT_TOKEN"
-  invite_channel_id: "ID_DO_CANAL"
-  invite_max_age_seconds: 86400
-  invite_max_uses: 1
-  invite_store_path: "~/.minecraft_ruby_launcher/discord_invites.json"
-  server_address: "play.seuservidor.com:25565"
-```
-
-Executar daemon:
-
-```bash
-bundle exec ruby bot_daemon.rb
-```
-
-ou:
-
-```bash
-./rubymc bot
-```
-
-se esse subcomando estiver presente no seu script.
-
-### Permissões necessárias do bot
-
-- criar convite;
-- enviar mensagens;
-- ler canais;
-- enviar DM quando possível;
-- visualizar membros, se necessário.
-
----
-
-## ⚙️ Configuração completa
-
-Arquivo principal:
+O arquivo principal de configuração é:
 
 ```text
 config/settings.yml
+```
+
+Caso ele não exista, crie:
+
+```bash
+mkdir -p config
+nano config/settings.yml
 ```
 
 Exemplo completo:
 
 ```yaml
 launcher:
+  name: "Minecraft Ruby Launcher"
   version: "1.0.0"
-  name: "RubyMC Launcher"
   update_url: "https://api.github.com/repos/SEU_USUARIO/SEU_REPO/releases/latest"
+  web_host: "127.0.0.1"
+  web_port: 4567
 
 minecraft:
   default_version: "1.21.4"
   ram_mb: 2048
   java_path: ""
   game_dir: "~/.minecraft"
-  launcher_dir: "~/.minecraft_ruby_launcher"
-
-web:
-  host: "127.0.0.1"
-  port: 4567
-  auto_open_browser: true
-  theme: "rubymc-neon"
-
-community_server:
-  enabled: true
-  name: "RubyMC Community"
-  address: "play.seuservidor.com"
-  port: 25565
-  version: "1.21.4"
-  description: "Servidor público da comunidade RubyMC"
-  discord_invite: "https://discord.gg/SEU_CONVITE"
-
-discord:
-  rich_presence: true
-  client_id: "SEU_DISCORD_CLIENT_ID"
-  bot_enabled: false
-  bot_token: "SEU_BOT_TOKEN"
-  invite_channel_id: "ID_DO_CANAL"
-  invite_max_age_seconds: 86400
-  invite_max_uses: 1
-  invite_store_path: "~/.minecraft_ruby_launcher/discord_invites.json"
-  server_address: "play.seuservidor.com:25565"
 
 modpacks:
   enabled: true
-  install_dir: "~/.minecraft_ruby_launcher/modpacks"
-  instances_dir: "~/.minecraft_ruby_launcher/instances"
+  directory: "~/.minecraft_ruby_launcher/modpacks"
+  profiles_path: "~/.minecraft_ruby_launcher/modpacks/profiles.json"
+  imports_path: "~/.minecraft_ruby_launcher/modpacks/imports"
+  allow_mrpack: true
+  allow_zip: true
+
+community_server:
+  enabled: true
+  name: "LanServer"
+  address: "127.0.0.1"
+  port: 25565
+  auto_connect: false
+
+discord:
+  rich_presence: true
+  client_id: "COLE_AQUI_O_APPLICATION_ID"
+
+  bot_enabled: true
+  bot_token: "COLE_AQUI_O_BOT_TOKEN"
+  guild_id: "COLE_AQUI_O_ID_DO_SERVIDOR"
+
+  server_address: "127.0.0.1:25565"
+
+  invite_channel_id: "COLE_AQUI_O_ID_DO_CANAL_DE_CONVITE"
+  invite_max_age_seconds: 86400
+  invite_max_uses: 1
+  invite_store_path: "~/.minecraft_ruby_launcher/discord_invites.json"
+
+  channels:
+    welcome_channel_id: ""
+    rules_channel_id: ""
+    announcements_channel_id: ""
+    updates_channel_id: ""
+    new_members_channel_id: ""
+
+    general_channel_id: ""
+    rubymc_channel_id: ""
+    community_channel_id: ""
+    forum_channel_id: ""
+
+    bugs_channel_id: ""
+    ban_channel_id: ""
+    suggestions_channel_id: ""
+
+    support_channel_id: ""
+    logs_channel_id: ""
+
+    modpacks_channel_id: ""
+
+  roles:
+    member_role_id: ""
+    player_role_id: ""
+    staff_role_id: ""
+    admin_role_id: ""
+    bot_role_id: ""
+
+web:
+  theme: "rubymc-neon"
+  display_enabled: true
+  auto_open_browser: true
 ```
 
 ---
 
-## 💎 Gemfile recomendado
+## 🔐 Importante sobre tokens
 
-O projeto Web não deve depender mais de Tk/Glimmer.
+Não suba `bot_token` no GitHub público.
 
-Evite:
+Recomendação:
 
-```ruby
-gem "glimmer-dsl-tk"
-gem "glimmer-dsl-libui"
+```gitignore
+config/settings.yml
 ```
 
-Gemfile recomendado:
+Mantenha um exemplo versionado:
 
-```ruby
-source "https://rubygems.org"
-
-gem "httparty", "~> 0.24"
-gem "tty-prompt"
-gem "tty-spinner"
-gem "tty-box"
-gem "pastel"
-gem "json"
-gem "rubyzip", "~> 2.3"
-gem "webrick", "~> 1.9"
+```text
+config/settings.example.yml
 ```
 
-Depois de alterar:
+Também é possível usar variável de ambiente:
 
 ```bash
-rm -f Gemfile.lock
-bundle install
+export RUBYMC_DISCORD_BOT_TOKEN="SEU_TOKEN_DO_BOT"
+./rubymc restart
 ```
 
 ---
 
-## ☕ Java e compatibilidade
+## 🌍 Configurando o servidor Minecraft
 
-Minecraft moderno exige versões específicas de Java.
-
-| Minecraft | Java recomendado |
-|---|---|
-| 1.21.x | Java 21 |
-| 1.20.x | Java 17 ou 21 |
-| 1.18–1.19 | Java 17 |
-| 1.17 | Java 16 |
-| 1.16 ou menor | Java 8 |
-
-Verificar Java:
-
-```bash
-java -version
-which java
-```
-
-Configurar Java no Ubuntu:
-
-```bash
-sudo update-alternatives --config java
-```
-
-Configurar caminho manual em `config/settings.yml`:
+O campo:
 
 ```yaml
-minecraft:
-  java_path: "/usr/lib/jvm/java-21-openjdk-amd64/bin/java"
+community_server:
+  address: "..."
+  port: 25565
 ```
 
----
-
-## 🧨 Erro: UnsupportedClassVersionError
-
-Erro exemplo:
+deve ser o endereço que o jogador colocaria no Minecraft em:
 
 ```text
-UnsupportedClassVersionError:
-Main has been compiled by a more recent version of the Java Runtime
-class file version 69.0
-this version only recognizes class file versions up to 65.0
+Multiplayer → Add Server → Server Address
 ```
 
-Significado:
+### Servidor local na mesma máquina
 
-```text
-O Minecraft/mod/loader foi compilado para Java mais novo
-do que o Java usado para iniciar o jogo.
+```yaml
+community_server:
+  enabled: true
+  name: "LanServer"
+  address: "127.0.0.1"
+  port: 25565
+
+discord:
+  server_address: "127.0.0.1:25565"
 ```
 
-Solução:
+### Servidor na rede local
 
-1. Verificar versão do Java:
+Descubra o IP local:
 
 ```bash
-java -version
-```
-
-2. Instalar Java adequado.
-3. Selecionar versão correta do Minecraft.
-4. Remover versões suspeitas em:
-
-```text
-~/.minecraft/versions/
+hostname -I
 ```
 
 Exemplo:
 
-```bash
-rm -rf ~/.minecraft/versions/26.1.2
+```yaml
+community_server:
+  address: "192.168.1.50"
+  port: 25565
+
+discord:
+  server_address: "192.168.1.50:25565"
 ```
 
-Use uma versão oficial estável, como:
+### Servidor público
+
+Use domínio, IP público ou túnel:
+
+```yaml
+community_server:
+  address: "play.rubymc.com"
+  port: 25565
+
+discord:
+  server_address: "play.rubymc.com:25565"
+```
+
+Não use:
 
 ```text
-1.21.4
+http://
+https://
+minecraft://
+```
+
+Correto:
+
+```yaml
+address: "play.rubymc.com"
+```
+
+---
+
+## 🤖 Configurando o Discord Bot
+
+### 1. Ativar modo desenvolvedor no Discord
+
+No Discord:
+
+```text
+Configurações do usuário
+→ Avançado
+→ Modo desenvolvedor
+→ Ativar
+```
+
+### 2. Onde pegar cada ID
+
+| Campo | Onde pegar |
+|---|---|
+| `client_id` | Discord Developer Portal → Aplicação → General Information → Application ID |
+| `bot_token` | Discord Developer Portal → Aplicação → Bot → Token |
+| `guild_id` | Botão direito no servidor → Copiar ID do servidor |
+| `invite_channel_id` | Botão direito no canal de convite → Copiar ID do canal |
+| `logs_channel_id` | Botão direito no canal de logs → Copiar ID do canal |
+| `welcome_channel_id` | Botão direito no canal de boas-vindas → Copiar ID |
+| `rules_channel_id` | Botão direito no canal de regras → Copiar ID |
+| `announcements_channel_id` | Botão direito no canal de notícias/anúncios → Copiar ID |
+| `updates_channel_id` | Botão direito no canal de comunicados/atualizações → Copiar ID |
+| `general_channel_id` | Botão direito no canal geral/chat → Copiar ID |
+| `rubymc_channel_id` | Botão direito no canal RubyMC → Copiar ID |
+| `community_channel_id` | Botão direito no canal comunidade → Copiar ID |
+| `forum_channel_id` | Botão direito no fórum → Copiar ID |
+| `bugs_channel_id` | Botão direito no canal de bugs → Copiar ID |
+| `ban_channel_id` | Botão direito no canal de banimentos → Copiar ID |
+| `suggestions_channel_id` | Botão direito no canal de sugestões → Copiar ID |
+| `modpacks_channel_id` | Botão direito no canal de modpacks → Copiar ID |
+
+### 3. Onde pegar IDs de cargos
+
+```text
+Configurações do servidor
+→ Cargos
+→ botão direito no cargo
+→ Copiar ID
+```
+
+---
+
+## 🧩 Cargos do Discord
+
+No `settings.yml`:
+
+```yaml
+roles:
+  member_role_id: ""
+  player_role_id: ""
+  staff_role_id: ""
+  admin_role_id: ""
+  bot_role_id: ""
+```
+
+### `member_role_id`
+
+Cargo de membro comum.
+
+Permissões recomendadas:
+
+- Ver canais públicos.
+- Enviar mensagens.
+- Ler histórico de mensagens.
+- Adicionar reações.
+- Entrar em canais de voz.
+- Falar em canais de voz.
+
+Não recomendado:
+
+- Administrador.
+- Gerenciar servidor.
+- Gerenciar canais.
+- Gerenciar cargos.
+- Banir membros.
+- Expulsar membros.
+
+### `player_role_id`
+
+Cargo de jogador.
+
+Uso:
+
+- Liberar áreas de Minecraft.
+- Liberar canais de modpacks.
+- Liberar canais do servidor.
+- Identificar quem joga no RubyMC.
+
+Permissões:
+
+- Tudo que o membro comum tem.
+- Acesso a categorias/canais de Minecraft.
+- Acesso a modpacks e voz do jogo.
+
+### `staff_role_id`
+
+Cargo de equipe.
+
+Uso:
+
+- Suporte.
+- Moderação.
+- Acesso a canais privados.
+- Acesso a logs.
+
+Permissões recomendadas:
+
+- Ver canais privados de staff.
+- Gerenciar mensagens.
+- Silenciar membros.
+- Mover membros em voz.
+- Gerenciar apelidos.
+- Responder suporte.
+- Ver canal de logs.
+
+Evite dar `Administrador` para staff comum.
+
+### `admin_role_id`
+
+Cargo de administrador.
+
+Uso:
+
+- Controle total do servidor.
+- Configuração de canais.
+- Configuração de cargos.
+- Permissões administrativas.
+
+Permissões:
+
+- Administrador.
+- Gerenciar servidor.
+- Gerenciar canais.
+- Gerenciar cargos.
+- Banir/expulsar membros.
+- Gerenciar webhooks.
+- Ver logs de auditoria.
+
+### `bot_role_id`
+
+Cargo do bot RubyMC.
+
+Uso:
+
+- Permitir que o bot envie mensagens.
+- Criar convites.
+- Escrever logs.
+- Futuramente atribuir cargos automaticamente.
+
+Permissões recomendadas:
+
+- Ver canais.
+- Enviar mensagens.
+- Ler histórico.
+- Incorporar links.
+- Anexar arquivos.
+- Criar convites.
+- Usar comandos de aplicativo.
+- Criar threads.
+- Gerenciar cargos, se o bot for entregar cargos.
+
+O cargo do bot deve ficar acima dos cargos que ele vai entregar.
+
+Ordem recomendada:
+
+```text
+👑 Admin
+🧑‍💻 Staff
+🤖 RubyMC Bot
+🎮 Jogador
+👤 Membro
+@everyone
+```
+
+---
+
+## ✅ Validando Discord pelo Launcher
+
+Inicie:
+
+```bash
+./rubymc restart
+```
+
+Abra:
+
+```text
+http://127.0.0.1:4567
+```
+
+Vá em:
+
+```text
+Discord → Validar Discord
+```
+
+O Display deve mostrar algo como:
+
+```text
+CHECK   Discord bot_enabled=true guild=true token=true
+CHECK   Canais configurados: 15/15
+CHECK   Cargos configurados: 5/5
+OK      Bot autenticado: BOT RUBYMC
+OK      Servidor Discord validado: LanServer
+OK      Discord remoto: 21 canais e 6 cargos encontrados.
+```
+
+Para testar canal de logs:
+
+```text
+Discord → Testar canal de logs
+```
+
+Resultado esperado:
+
+```text
+OK Mensagem de teste enviada ao Discord no canal ...
+```
+
+---
+
+## 📦 Modpacks
+
+A aba **Modpacks** permite importar modpacks.
+
+Formatos aceitos:
+
+```text
+.mrpack
+.zip
+```
+
+Fluxo:
+
+1. Abra o launcher Web.
+2. Vá na aba **Modpacks**.
+3. Informe o nome do perfil.
+4. Selecione o arquivo `.mrpack` ou `.zip`.
+5. Clique em **Importar modpack**.
+6. Acompanhe o Display interno.
+7. Volte à aba Início e escolha o perfil.
+
+Pastas usadas:
+
+```text
+~/.minecraft_ruby_launcher/modpacks
+~/.minecraft_ruby_launcher/modpacks/imports
+~/.minecraft_ruby_launcher/modpacks/profiles.json
+```
+
+---
+
+## 🧪 Testes
+
+Pelo painel:
+
+```text
+Rodar testes
+```
+
+Pelo terminal:
+
+```bash
+./rubymc test
+```
+
+O teste básico verifica:
+
+- Sintaxe Ruby.
+- `launcher_gui.rb`.
+- `launcher.rb`.
+- `lib/web_launcher_app.rb`.
+- `bundle check`.
+
+---
+
+## 🧹 Organização da raiz
+
+Use:
+
+```bash
+./rubymc organize
+```
+
+Ou:
+
+```bash
+ruby scripts/organize_project_root.rb --apply
+```
+
+Estrutura recomendada:
+
+```text
+MinecraftLauncher/
+├── bin/
+│   ├── launcher-web
+│   ├── rubymc
+│   └── run_launcher_checks.rb
+├── config/
+│   ├── settings.yml
+│   └── settings.example.yml
+├── docs/
+├── lib/
+├── scripts/
+├── test/
+├── tmp/
+├── web/
+├── launcher.rb
+├── launcher_gui.rb
+├── rubymc
+├── Gemfile
+├── Gemfile.lock
+├── README.md
+└── .gitignore
+```
+
+---
+
+## 📁 Estrutura do projeto
+
+```text
+MinecraftLauncher/
+├── launcher.rb                    # launcher clássico no terminal
+├── launcher_gui.rb                # entrada do launcher Web
+├── rubymc                         # comando único
+├── Gemfile                        # dependências Ruby
+├── config.ru                      # integração Rack/opcional
+├── config/
+│   └── settings.yml               # configuração local
+├── lib/
+│   ├── web_launcher_app.rb        # backend Web
+│   ├── discord_config.rb          # leitura/validação config Discord
+│   ├── discord_bot_service.rb     # integração Discord API
+│   ├── rubymc_settings.rb         # helper de configuração
+│   ├── modpack_manager.rb         # gerenciamento de modpacks
+│   ├── community_server.rb        # servidor da comunidade
+│   ├── minecraft_manager.rb       # lógica Minecraft
+│   ├── microsoft_auth.rb          # autenticação Microsoft
+│   ├── account_bank.rb            # contas salvas
+│   ├── session_manager.rb         # sessão ativa
+│   ├── auto_updater.rb            # atualização
+│   └── discord_integration.rb     # integração Discord antiga/base
+├── web/
+│   ├── index.html
+│   └── assets/
+│       ├── css/launcher.css
+│       ├── js/launcher.js
+│       └── img/
+├── scripts/
+│   ├── organize_project_root.rb
+│   ├── validate_discord_settings.rb
+│   ├── setup_channels.rb
+│   ├── setup_discord_forum.rb
+│   └── setup_discord_welcome.rb
+├── test/
+│   ├── test_discord_bot.rb
+│   └── test_discord_invite.rb
+└── docs/
 ```
 
 ---
@@ -813,431 +867,213 @@ Erro:
 Address already in use - bind(2) for 127.0.0.1:4567
 ```
 
-Resolver:
+Corrija:
 
 ```bash
 ./rubymc stop
-```
-
-ou:
-
-```bash
 sudo fuser -k 4567/tcp
+./rubymc restart
 ```
 
-Verificar:
+Ou:
 
 ```bash
 sudo lsof -nP -iTCP:4567 -sTCP:LISTEN
 ```
 
----
+### Botões não funcionam
 
-### Display fica em “Conectando display...”
-
-Soluções:
-
-```bash
-./rubymc restart
-```
-
-Depois:
+Aplique cache novo:
 
 ```text
 Ctrl + F5
 ```
 
-ou acesse:
+Ou abra:
 
 ```text
-http://127.0.0.1:4567/?v=novo
+http://127.0.0.1:4567/?v=buttons-fix
 ```
 
----
+Veja logs:
 
-### CSS não atualiza
+```bash
+./rubymc logs
+```
 
-Forçar cache:
+### CSS não atualizou
+
+Force cache:
 
 ```text
 Ctrl + F5
 ```
 
-Remover CSS antigo e aplicar de novo:
+Ou altere o parâmetro:
 
-```bash
-rm -f web/assets/css/launcher.css
-cp -rf rubymc_clean_web_theme_patch/* .
-./rubymc restart
+```text
+http://127.0.0.1:4567/?v=novo-css
 ```
 
----
+Confirme o CSS:
 
-### Gemfile com `webrick` duplicado
+```bash
+grep -n "RUBYMC" web/assets/css/launcher.css
+```
+
+### Imagem de fundo sumiu
+
+Verifique se existe:
+
+```bash
+ls web/assets/img/rubymc-discord-panel.png
+```
+
+Se existir, confira se o CSS usa:
+
+```css
+url("/assets/img/rubymc-discord-panel.png")
+```
+
+### WEBrick duplicado no Gemfile
 
 Erro:
 
 ```text
-You cannot specify the same gem twice with different version requirements.
+You cannot specify the same gem twice
 ```
 
-Resolver:
+Corrija:
 
 ```bash
 sed -i '/webrick/d' Gemfile
-printf '\ngem "webrick", "~> 1.9"\n' >> Gemfile
-rm -f Gemfile.lock
+echo 'gem "webrick", "~> 1.9"' >> Gemfile
 bundle install
 ```
 
----
+### Java incompatível
 
-### Tk/Glimmer quebrando no Ubuntu
-
-Erro típico:
+Erro:
 
 ```text
-Can't find "tcl.h".
-Can't find "tk.h".
-At present, Tcl/Tk8.6 is not supported.
+UnsupportedClassVersionError
 ```
 
-Solução atual do projeto:
+Significa que a versão do Minecraft/modpack exige Java mais novo.
+
+Verifique:
+
+```bash
+java -version
+```
+
+Configure:
+
+```yaml
+minecraft:
+  java_path: "/caminho/para/java/bin/java"
+```
+
+### Servidor não respondeu
+
+Erro:
 
 ```text
-Não usar glimmer-dsl-tk.
-Usar interface Web local com WEBrick.
+Servidor não respondeu: execution expired
 ```
 
-Remova do Gemfile:
+Verifique:
 
-```ruby
-gem "glimmer-dsl-tk"
-gem "glimmer-dsl-libui"
+```yaml
+community_server:
+  address: "ENDERECO_REAL"
+  port: 25565
 ```
 
----
-
-### `./rubymc` com erro de sintaxe
-
-Recrie o arquivo `rubymc` com a versão limpa do script do projeto.
-
-Depois:
-
-```bash
-chmod +x rubymc bin/rubymc
-./rubymc restart
-```
-
----
-
-## 🧪 Testes
-
-Rodar testes básicos:
-
-```bash
-./rubymc test
-```
-
-O teste deve verificar:
-
-- sintaxe do `launcher_gui.rb`;
-- sintaxe do `launcher.rb`;
-- sintaxe do `lib/web_launcher_app.rb`;
-- dependências com `bundle check`.
-
-Também é possível rodar manualmente:
-
-```bash
-ruby -c launcher.rb
-ruby -c launcher_gui.rb
-ruby -c lib/web_launcher_app.rb
-bundle check
-```
-
----
-
-## 🧹 Organizar raiz do projeto
-
-Rodar:
-
-```bash
-./rubymc organize
-```
-
-ou:
-
-```bash
-ruby scripts/organize_project_root.rb --apply
-```
-
-Arquivos movidos:
+Teste no Minecraft usando:
 
 ```text
-setup_channels.rb        -> scripts/setup_channels.rb
-setup_discord_forum.rb   -> scripts/setup_discord_forum.rb
-setup_discord_welcome.rb -> scripts/setup_discord_welcome.rb
-test_discord_bot.rb      -> test/test_discord_bot.rb
-test_discord_invite.rb   -> test/test_discord_invite.rb
-PATCH_SUMMARY.md         -> docs/PATCH_SUMMARY.md
+ENDERECO_REAL:25565
 ```
 
 ---
 
 ## 🔒 Segurança
 
-Nunca envie para GitHub:
+Não versionar:
 
 ```text
-accounts.json
-discord_invites.json
-.env
-config/settings.local.yml
-tokens
-refresh_tokens
-bot_token
-client_secret
+config/settings.yml
+.rubymc/
+tmp/
+vendor/
+.bundle/
+.idea/
 ```
 
-Adicione ao `.gitignore`:
+Exemplo de `.gitignore`:
 
 ```gitignore
-vendor/bundle/
+.bundle/
+vendor/
 tmp/
-log/
-.env
+.rubymc/
+.idea/
 *.log
+*.pid
+config/settings.yml
+```
 
-.minecraft_ruby_launcher/
-config/settings.local.yml
+Versionar apenas:
 
-accounts.json
-discord_invites.json
-
-rubymc_*_patch/
-minecraft_ruby_launcher_*_patch/
+```text
+config/settings.example.yml
 ```
 
 ---
 
-## 🧬 Arquitetura
+## 🧾 Commit recomendado para esta atualização
 
-Fluxo Web:
-
-```text
-./rubymc
-   ↓
-launcher_gui.rb
-   ↓
-lib/web_launcher_app.rb
-   ↓
-WEBrick local
-   ↓
-web/index.html
-   ↓
-web/assets/js/launcher.js
-   ↓
-web/assets/css/launcher.css
+```bash
+git add .
+git commit -m "feat: integra Discord, modpacks e painel web RubyMC"
 ```
 
-Fluxo clássico:
+Ou mais específico:
 
-```text
-./rubymc classic
-   ↓
-launcher.rb
-   ↓
-lib/launcher_cli.rb
-   ↓
-lib/minecraft_manager.rb
-   ↓
-Minecraft Java Edition
-```
-
-Fluxo de autenticação:
-
-```text
-launcher_cli.rb
-   ↓
-microsoft_auth.rb
-   ↓
-Microsoft OAuth
-   ↓
-Xbox Live
-   ↓
-XSTS
-   ↓
-Minecraft profile
-   ↓
-account_bank.rb
-```
-
-Fluxo Discord:
-
-```text
-launcher.rb / launcher_gui.rb
-   ↓
-discord_integration.rb
-   ↓
-Discord Rich Presence / Bot
-   ↓
-bot_daemon.rb
+```bash
+git commit -m "feat: adiciona validação backend de canais e cargos do Discord"
 ```
 
 ---
 
-## 📁 Diretórios de dados
+## 🛣️ Roadmap
 
-Dados locais do launcher:
+Próximos passos sugeridos:
 
-```text
-~/.minecraft_ruby_launcher/
-```
-
-Possíveis arquivos:
-
-```text
-accounts.json
-discord_invites.json
-modpacks/
-instances/
-logs/
-```
-
-Minecraft padrão:
-
-```text
-~/.minecraft/
-```
-
-Versões:
-
-```text
-~/.minecraft/versions/
-```
-
-Assets:
-
-```text
-~/.minecraft/assets/
-```
-
-Libraries:
-
-```text
-~/.minecraft/libraries/
-```
+- Autenticação Microsoft integrada ao painel Web.
+- Seleção visual de contas salvas.
+- Instalação completa de modpacks Modrinth.
+- Suporte avançado a CurseForge.
+- Auto-detecção de Java por versão do Minecraft.
+- Tela de configuração dentro do launcher.
+- Editor visual do `settings.yml`.
+- Integração completa com Discord Slash Commands.
+- Sistema de atualização automática do launcher.
+- Empacotamento para `.deb`, `.AppImage` e Windows.
 
 ---
 
-## 🛠️ Desenvolvimento
+## 📄 Licença
 
-### Rodar servidor Web manualmente
-
-```bash
-bundle exec ruby launcher_gui.rb
-```
-
-### Rodar clássico manualmente
-
-```bash
-bundle exec ruby launcher.rb
-```
-
-### Ver logs
-
-```bash
-./rubymc logs
-```
-
-### Ver status
-
-```bash
-./rubymc status
-```
-
-### Reiniciar tudo
-
-```bash
-./rubymc restart
-```
+MIT — livre para estudar, modificar e distribuir.
 
 ---
 
-## 🧭 Roadmap
+## 💎 RubyMC
 
-Ideias futuras:
+Projeto desenvolvido para criar um launcher Minecraft próprio, com Ruby, Web UI, Discord, modpacks, servidor da comunidade e automação.
 
-- instalador `.deb`;
-- AppImage;
-- auto-update completo da interface Web;
-- seleção visual de versões;
-- painel de instâncias;
-- instalação completa de Fabric/Forge/Quilt;
-- busca de modpacks Modrinth pela interface;
-- importador CurseForge completo;
-- status real do servidor por ping Minecraft;
-- login Microsoft direto pela interface Web;
-- sistema de perfis;
-- tela de configurações avançadas;
-- empacotamento com ícone;
-- logs persistentes por sessão;
-- botão de reparo automático do Java;
-- suporte a múltiplos servidores da comunidade.
-
----
-
-## 🧾 Licença
-
-MIT.
-
-Você pode usar, modificar e distribuir este projeto, mantendo os créditos e respeitando os termos das APIs e serviços integrados.
-
----
-
-## 💎 Créditos
-
-Projeto desenvolvido como **RubyMC Launcher / Minecraft Ruby Launcher**.
-
-Tecnologias principais:
-
-- Ruby
-- WEBrick
-- HTML
-- CSS
-- JavaScript
-- Minecraft Java Edition
-- Microsoft OAuth
-- Discord API
-- RubyZip
-- HTTParty
-
----
-
-## ✅ Comando mais importante
-
-Para usar o projeto no dia a dia:
-
-```bash
-cd ~/RubymineProjects/MinecraftLauncher
-./rubymc
+```text
+Ruby + Minecraft + Discord + Web UI = RubyMC Launcher
 ```
-
-Para parar:
-
-```bash
-./rubymc stop
-```
-
-Para reiniciar:
-
-```bash
-./rubymc restart
-```
-
-Para logs:
-
-```bash
-./rubymc logs
-```
-
