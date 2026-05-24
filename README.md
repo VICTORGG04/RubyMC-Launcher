@@ -1,6 +1,15 @@
 # 🎮 Minecraft Ruby Launcher — RubyMC
 
-Launcher para **Minecraft Java Edition** desenvolvido em **Ruby**, com interface Web local, tema visual RubyMC Neon, suporte a modpacks, servidor público/comunidade, integração com Discord Bot, Display interno de logs e automação por comando único.
+<div align="center">
+
+![Ruby](https://img.shields.io/badge/Ruby-3.2+-CC342D?style=for-the-badge&logo=ruby&logoColor=white)
+![Minecraft](https://img.shields.io/badge/Minecraft-Java%20Edition-62B47A?style=for-the-badge&logo=minecraft&logoColor=white)
+![Discord](https://img.shields.io/badge/Discord-Bot%20Integration-5865F2?style=for-the-badge&logo=discord&logoColor=white)
+![Status](https://img.shields.io/badge/status-em%20desenvolvimento-00E0FF?style=for-the-badge)
+
+</div>
+
+Launcher para **Minecraft Java Edition** desenvolvido em **Ruby**, com interface Web local, tema visual **RubyMC Neon**, suporte a modpacks, servidor público/comunidade, integração com Discord Bot, Display interno de logs e automação por comando único.
 
 > Projeto focado em criar um launcher próprio, visual, organizado e extensível para jogar Minecraft, gerenciar modpacks, validar servidor da comunidade e integrar ações com Discord.
 
@@ -22,29 +31,67 @@ Launcher para **Minecraft Java Edition** desenvolvido em **Ruby**, com interface
 
 ---
 
-## 🖼️ Visual do Launcher
+## 🖼️ Interface do RubyMC Launcher
 
-O launcher Web usa um tema visual próprio chamado **RubyMC Neon**, inspirado em painéis futuristas, Minecraft, Ruby e Discord Bot.
+O RubyMC Launcher possui uma interface Web local com tema visual **RubyMC Neon**, painel lateral, display interno de logs, integração com Discord, suporte a modpacks e gerenciamento do servidor da comunidade.
 
-Arquivos principais do visual:
+### 🏠 Tela inicial
 
-```text
-web/
-├── index.html
-└── assets/
-    ├── css/
-    │   └── launcher.css
-    ├── js/
-    │   └── launcher.js
-    └── img/
-        ├── rubymc-control-panel.png
-        ├── rubymc-discord-bot-icon.png
-        ├── rubymc-discord-overlay.png
-        ├── rubymc-discord-panel.png
-        ├── rubymc-server-icon.png
-        ├── rubymc-server-large.png
-        └── rubymc-server-strip.png
-```
+A tela inicial concentra o status do launcher, versão do Ruby, status do servidor, seletor de perfil e atalhos principais.
+
+<p align="center">
+  <img src="docs/assets/screenshots/rubymc-inicio.png" alt="Tela inicial do RubyMC Launcher" width="900">
+</p>
+
+---
+
+### 📦 Importação de Modpacks
+
+A aba **Modpacks** permite importar arquivos `.mrpack` e `.zip`, registrar perfis e atualizar a lista de modpacks disponíveis no launcher.
+
+<p align="center">
+  <img src="docs/assets/screenshots/rubymc-modpacks.png" alt="Aba de modpacks do RubyMC Launcher" width="900">
+</p>
+
+---
+
+### 🌍 Servidor da comunidade
+
+A aba **Servidor** permite visualizar o endereço configurado do servidor Minecraft, testar conexão e iniciar entrada no servidor.
+
+<p align="center">
+  <img src="docs/assets/screenshots/rubymc-servidor.png" alt="Aba de servidor da comunidade do RubyMC Launcher" width="900">
+</p>
+
+---
+
+### 🤖 Integração Discord Bot
+
+A aba **Discord** valida os canais, cargos, token do bot, servidor Discord e canal de logs usando backend Ruby integrado à Discord API.
+
+<p align="center">
+  <img src="docs/assets/screenshots/rubymc-discord.png" alt="Aba Discord Bot do RubyMC Launcher" width="900">
+</p>
+
+---
+
+### 🖥️ Display interno de logs
+
+O **Display interno** mostra ações do backend, testes, erros, comandos executados, validações do Discord e status do servidor sem sair do launcher.
+
+<p align="center">
+  <img src="docs/assets/screenshots/rubymc-display.png" alt="Display interno de logs do RubyMC Launcher" width="900">
+</p>
+
+---
+
+### 🗂️ Organização do projeto
+
+A aba **Projeto** centraliza ações de organização da raiz e abertura do launcher clássico.
+
+<p align="center">
+  <img src="docs/assets/screenshots/rubymc-projeto.png" alt="Aba de projeto do RubyMC Launcher" width="900">
+</p>
 
 ---
 
@@ -58,6 +105,7 @@ web/
 - Alocação de memória RAM.
 - Uso de versão padrão configurada em `config/settings.yml`.
 - Verificação básica de ambiente.
+- Entrada no servidor da comunidade pelo painel.
 
 ### 🌐 Launcher Web
 
@@ -132,6 +180,7 @@ O Display interno mostra eventos como:
 | CSS | Tema RubyMC Neon |
 | JavaScript | Eventos da interface Web |
 | Discord API | Validação do bot, canais, cargos e envio de logs |
+| Java | Execução do Minecraft Java Edition |
 
 ---
 
@@ -152,6 +201,12 @@ Recomendado:
 
 ```text
 Ruby 3.2+
+```
+
+### Bundler
+
+```bash
+gem install bundler
 ```
 
 ### Java
@@ -178,14 +233,8 @@ sudo apt install openjdk-21-jdk -y
 Clone o projeto:
 
 ```bash
-git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
-cd MinecraftLauncher
-```
-
-Instale o Bundler se necessário:
-
-```bash
-gem install bundler
+git clone https://github.com/VICTORGG04/RubyMC-Launcher.git
+cd RubyMC-Launcher
 ```
 
 Instale as dependências:
@@ -300,10 +349,13 @@ O arquivo principal de configuração é:
 config/settings.yml
 ```
 
+> Por segurança, `config/settings.yml` não deve ser enviado para o GitHub se contiver `bot_token` ou dados privados. Use `config/settings.example.yml` como modelo público.
+
 Caso ele não exista, crie:
 
 ```bash
 mkdir -p config
+cp config/settings.example.yml config/settings.yml
 nano config/settings.yml
 ```
 
@@ -313,7 +365,7 @@ Exemplo completo:
 launcher:
   name: "Minecraft Ruby Launcher"
   version: "1.0.0"
-  update_url: "https://api.github.com/repos/SEU_USUARIO/SEU_REPO/releases/latest"
+  update_url: "https://api.github.com/repos/VICTORGG04/RubyMC-Launcher/releases/latest"
   web_host: "127.0.0.1"
   web_port: 4567
 
@@ -393,7 +445,7 @@ web:
 
 Não suba `bot_token` no GitHub público.
 
-Recomendação:
+Recomendação no `.gitignore`:
 
 ```gitignore
 config/settings.yml
@@ -823,7 +875,8 @@ MinecraftLauncher/
 ├── Gemfile                        # dependências Ruby
 ├── config.ru                      # integração Rack/opcional
 ├── config/
-│   └── settings.yml               # configuração local
+│   ├── settings.yml               # configuração local privada
+│   └── settings.example.yml       # exemplo público
 ├── lib/
 │   ├── web_launcher_app.rb        # backend Web
 │   ├── discord_config.rb          # leitura/validação config Discord
@@ -843,6 +896,9 @@ MinecraftLauncher/
 │       ├── css/launcher.css
 │       ├── js/launcher.js
 │       └── img/
+├── docs/
+│   └── assets/
+│       └── screenshots/
 ├── scripts/
 │   ├── organize_project_root.rb
 │   ├── validate_discord_settings.rb
@@ -1036,13 +1092,13 @@ config/settings.example.yml
 
 ```bash
 git add .
-git commit -m "feat: integra Discord, modpacks e painel web RubyMC"
+git commit -m "docs: adiciona capturas de tela e documentação completa do RubyMC"
 ```
 
-Ou mais específico:
+Ou:
 
 ```bash
-git commit -m "feat: adiciona validação backend de canais e cargos do Discord"
+git commit -m "feat: integra Discord, modpacks e painel web RubyMC"
 ```
 
 ---
