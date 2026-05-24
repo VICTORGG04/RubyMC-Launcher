@@ -1,0 +1,56 @@
+discord:
+  # Discord Rich Presence
+  rich_presence: true
+
+  # ID do aplicativo criado no Discord Developer Portal
+  client_id: " ID "
+
+  # Bot Discord
+  bot_enabled: true
+  bot_token: " ID "
+
+  # ID do servidor Discord
+  guild_id: " ID "
+
+  # Endereço do servidor Minecraft exibido no Discord/Launcher
+  server_address: "ID_DO_SERVIDOR_MINECRAFT:25565"
+
+  # Convites
+  invite_channel_id: "ID"
+  invite_max_age_seconds: 86400
+  invite_max_uses: 1
+  invite_store_path: "~/.minecraft_ruby_launcher/discord_invites.json"
+
+  # Canais principais do Discord
+  channels:
+    # Comunicação
+    welcome_channel_id: "ID"          # #bem-vindos
+    rules_channel_id: "ID"             # #canal de regras
+    announcements_channel_id: "ID"   # #notícias
+    updates_channel_id: "ID"      # #comunicados
+    new_members_channel_id: "ID" # #novos-membros
+
+    # Comunidade RubyMC
+    general_channel_id: "ID"  # #chat-com-rubymc
+    community_channel_id: "ID"        # comunidade
+    forum_channel_id: "ID"            # discussão/fórum
+
+    # Reportes
+    bugs_channel_id: "ID"             # #reporte-de-bugs
+    ban_channel_id: "ID"              # #reporte-de-banimento
+    suggestions_channel_id: "ID"      # #sugestoes-para-implementacao
+
+    # Suporte
+    support_channel_id: "ID"          # #suporte-especializado
+    logs_channel_id: "ID"         # #logs-bot privado
+
+    # Modpacks
+    modpacks_channel_id: "ID"         # #modpacks-ativos
+
+  # Cargos opcionais
+  roles:
+    member_role_id: "ID"
+    player_role_id: "ID"
+    staff_role_id: "ID"
+    admin_role_id: "ID"
+    bot_role_id: "ID"

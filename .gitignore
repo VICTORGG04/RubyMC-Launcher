@@ -1,1 +1,8 @@
-config/settings.yml
+.bundle/
+vendor/
+tmp/
+.rubymc/
+.idea/
+*.log
+*.pid
+.DS_Store

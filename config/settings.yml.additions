@@ -1,0 +1,20 @@
+# Adicione estes blocos ao config/settings.yml existente.
+
+modpacks:
+  enabled: true
+  path: "~/.minecraft_ruby_launcher/modpacks"
+  default_loader: "vanilla"
+  allow_modrinth_downloads: true
+  allow_curseforge_manifest_import: true
+
+community_server:
+  enabled: true
+  name: "Servidor Público da Comunidade Ruby"
+  address: "play.seuservidor.com:25565"
+  description: "Servidor oficial da comunidade do launcher. Ao clicar em Entrar, o Minecraft abre direto no servidor."
+  discord_url: "https://discord.gg/SEU_CONVITE"
+  website_url: "https://seusite.com"
+
+gui:
+  enabled: true
+  toolkit: "glimmer-dsl-tk"

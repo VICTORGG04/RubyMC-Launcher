@@ -4,8 +4,8 @@ set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT"
 
-HOST="127.0.0.1"
-PORT="4567"
+HOST="${RUBYMC_HOST:-127.0.0.1}"
+PORT="${RUBYMC_PORT:-4567}"
 URL="http://${HOST}:${PORT}"
 RUN_DIR="$ROOT/tmp/rubymc"
 PID_FILE="$RUN_DIR/web.pid"
@@ -13,17 +13,12 @@ LOG_FILE="$RUN_DIR/web.log"
 
 mkdir -p "$RUN_DIR"
 
-say() {
-  echo "[RubyMC] $*"
-}
-
-ok() {
-  echo "[OK] $*"
-}
+say() { echo "[RubyMC] $*"; }
+ok() { echo "[OK] $*"; }
+warn() { echo "[AVISO] $*"; }
 
 ensure_gemfile() {
   say "Verificando Gemfile..."
-
   touch Gemfile
 
   if ! grep -q '^source ' Gemfile; then
@@ -38,14 +33,23 @@ ensure_gemfile() {
 
   sed -i "/^[[:space:]]*gem[[:space:]]['\"]webrick['\"]/d" Gemfile
   sed -i "/^[[:space:]]*gem[[:space:]]['\"]rubyzip['\"]/d" Gemfile
+  sed -i "/^[[:space:]]*gem[[:space:]]['\"]json['\"]/d" Gemfile
   sed -i "/glimmer-dsl-tk/d" Gemfile
   sed -i "/glimmer-dsl-libui/d" Gemfile
+  sed -i "/^[[:space:]]*gem[[:space:]]['\"]tk['\"]/d" Gemfile
+  sed -i "/^[[:space:]]*gem[[:space:]]['\"]libui['\"]/d" Gemfile
 
   printf '\ngem "webrick", "~> 1.9"\n' >> Gemfile
   printf 'gem "rubyzip", "~> 2.3"\n' >> Gemfile
+  printf 'gem "json"\n' >> Gemfile
 }
 
 install_deps() {
+  if ! command -v bundle >/dev/null 2>&1; then
+    say "Bundler não encontrado. Instalando..."
+    gem install bundler
+  fi
+
   ensure_gemfile
 
   if bundle check >/dev/null 2>&1; then
@@ -107,11 +111,11 @@ start_server() {
   ok "Servidor iniciado. PID: $new_pid"
 
   if command -v xdg-open >/dev/null 2>&1; then
-    xdg-open "${URL}/?v=one-command" >/dev/null 2>&1 || true
+    xdg-open "${URL}/?v=latest-update" >/dev/null 2>&1 || true
   fi
 
   echo
-  say "Acesse: ${URL}/?v=one-command"
+  say "Acesse: ${URL}/?v=latest-update"
   say "Use './rubymc logs' para ver logs."
   say "Use './rubymc stop' para parar."
 }
@@ -146,9 +150,10 @@ show_logs() {
 run_tests() {
   install_deps
   echo "[RubyMC] Verificando sintaxe Ruby..."
-  ruby -c launcher_gui.rb
-  ruby -c launcher.rb
-  ruby -c lib/web_launcher_app.rb
+  [ -f launcher_gui.rb ] && ruby -c launcher_gui.rb
+  [ -f launcher.rb ] && ruby -c launcher.rb
+  [ -f lib/web_launcher_app.rb ] && ruby -c lib/web_launcher_app.rb
+  [ -f bin/run_launcher_checks.rb ] && ruby bin/run_launcher_checks.rb || true
   echo "[RubyMC] Verificando bundle..."
   bundle check
   ok "Testes básicos concluídos."
@@ -168,7 +173,7 @@ organize_project() {
 }
 
 case "${1:-start}" in
-  start)
+  start|web)
     start_server
     ;;
   stop)
@@ -193,8 +198,11 @@ case "${1:-start}" in
   organize)
     organize_project
     ;;
+  install)
+    install_deps
+    ;;
   *)
-    echo "Uso: ./rubymc [start|stop|restart|status|logs|test|classic|organize]"
+    echo "Uso: ./rubymc [start|web|stop|restart|status|logs|test|classic|organize|install]"
     exit 1
     ;;
 esac

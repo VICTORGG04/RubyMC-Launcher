@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Minecraft Ruby Launcher</title>
+  <link rel="stylesheet" href="/assets/css/launcher.css?v=buttons-fix-1">
+  <script defer src="/assets/js/launcher.js?v=buttons-fix-1"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="/assets/img/rubymc-server-icon.png" alt="" class="brand-icon" onerror="this.style.display='none'">
+        <div>
+          <strong>Minecraft Ruby</strong>
+          <span>Launcher Web</span>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <button type="button" class="nav-item active" data-tab-target="home">🏠 Início</button>
+        <button type="button" class="nav-item" data-tab-target="modpacks">📦 Modpacks</button>
+        <button type="button" class="nav-item" data-tab-target="server">🌐 Servidor</button>
+        <button type="button" class="nav-item" data-tab-target="discord">🤖 Discord</button>
+        <button type="button" class="nav-item" data-tab-target="display">▣ Display</button>
+        <button type="button" class="nav-item" data-tab-target="project">▰ Projeto</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <span class="status-dot"></span>
+        <span id="connectionStatus">Conectando display...</span>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="hero">
+        <div>
+          <span class="eyebrow">PAINEL LOCAL</span>
+          <h1>Minecraft Ruby Launcher</h1>
+        </div>
+        <img src="/assets/img/rubymc-control-panel.png" alt="" class="hero-art" onerror="this.style.display='none'">
+        <div class="hero-actions">
+          <button type="button" data-action="refresh_status">Atualizar</button>
+          <button type="button" class="primary" data-action="run_tests">Rodar testes</button>
+        </div>
+      </header>
+
+      <section class="panel active" id="home" data-panel="home">
+        <div class="summary-card">
+          <div>
+            <span class="eyebrow">INTERFACE WEB COM CSS REAL</span>
+            <h2>Launcher organizado, com logs no próprio painel</h2>
+            <p>Use as abas para importar modpacks, testar servidor, iniciar o Minecraft e organizar a raiz do projeto sem sair da tela.</p>
+          </div>
+
+          <div class="stats">
+            <div><strong id="rubyVersion">--</strong><span>Ruby</span></div>
+            <div><strong id="modpacksCount">0</strong><span>Modpacks</span></div>
+            <div><strong id="serverStatus">---</strong><span>Servidor</span></div>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <article class="card">
+            <span class="ruby-pin"></span>
+            <h3>Jogar</h3>
+            <p>Escolha um perfil e inicie o Minecraft pelo launcher existente.</p>
+            <label for="profileSelect">Perfil</label>
+            <select id="profileSelect">
+              <option value="vanilla">Vanilla / sem modpack</option>
+            </select>
+            <div class="button-row">
+              <button type="button" class="primary" data-action="play">Jogar</button>
+              <button type="button" data-action="enter_server">Entrar no servidor</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="ruby-pin"></span>
+            <h3>Display interno</h3>
+            <p>Tudo que for executado aparece no display: testes, erros, imports, servidor e comandos.</p>
+            <div class="button-row">
+              <button type="button" data-tab-target="display">Abrir display</button>
+              <button type="button" data-action="clear_logs">Limpar</button>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="modpacks" data-panel="modpacks" hidden>
+        <div class="grid two modpack-grid">
+          <article class="card">
+            <span class="ruby-pin"></span>
+            <span class="eyebrow">IMPORTAÇÃO</span>
+            <h2>Importar Modpack</h2>
+            <p>Selecione um arquivo <strong>.mrpack</strong> do Modrinth ou <strong>.zip</strong> do CurseForge/pack genérico. O resultado aparece no Display interno.</p>
+
+            <form id="modpackImportForm" class="modpack-form">
+              <label for="modpackName">Nome do perfil</label>
+              <input id="modpackName" name="name" type="text" placeholder="Ex.: RubyMC Survival" autocomplete="off">
+
+              <label for="modpackFile">Arquivo do modpack</label>
+              <label class="file-picker" for="modpackFile">
+                <input id="modpackFile" name="modpack" type="file" accept=".mrpack,.zip" required>
+                <span id="modpackFileName">Clique para escolher um .mrpack ou .zip</span>
+              </label>
+
+              <div class="button-row">
+                <button class="primary" type="submit">Importar modpack</button>
+                <button type="button" data-action="refresh_modpacks">Atualizar lista</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="card">
+            <span class="ruby-pin"></span>
+            <span class="eyebrow">PERFIS INSTALADOS</span>
+            <h2>Modpacks disponíveis</h2>
+            <p>Os perfis importados aparecem aqui e também no seletor da aba Início.</p>
+            <div id="modpackList" class="modpack-list">
+              <div class="empty-state">Nenhum modpack carregado ainda.</div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="server" data-panel="server" hidden>
+        <article class="card wide">
+          <h2>Servidor da comunidade</h2>
+          <p>Endereço configurado: <strong id="serverAddress">--</strong></p>
+          <div class="button-row">
+            <button type="button" data-action="test_server">Testar servidor</button>
+            <button type="button" class="primary" data-action="enter_server">Entrar no servidor</button>
+          </div>
+        </article>
+      </section>
+
+
+      <section class="panel" id="discord" data-panel="discord" hidden>
+        <div class="grid two discord-grid">
+          <article class="card">
+            <span class="ruby-pin"></span>
+            <span class="eyebrow">DISCORD BOT</span>
+            <h2>Canais e cargos</h2>
+            <p>Valide os IDs configurados em <strong>config/settings.yml</strong> sem expor o token do bot.</p>
+
+            <div class="discord-stats">
+              <div><strong id="discordBotStatus">--</strong><span>Bot</span></div>
+              <div><strong id="discordChannelsCount">0/0</strong><span>Canais</span></div>
+              <div><strong id="discordRolesCount">0/0</strong><span>Cargos</span></div>
+            </div>
+
+            <div class="button-row">
+              <button type="button" class="primary" data-action="validate_discord_config">Validar Discord</button>
+              <button type="button" data-action="test_discord_log">Testar canal de logs</button>
+            </div>
+          </article>
+
+          <article class="card">
+            <span class="ruby-pin"></span>
+            <span class="eyebrow">PERMISSÕES</span>
+            <h2>Uso dos cargos</h2>
+            <p><strong>Membro</strong> acessa canais públicos. <strong>Jogador</strong> libera áreas do Minecraft. <strong>Staff/Admin</strong> liberam suporte e moderação. <strong>RubyMC Bot</strong> precisa ficar acima dos cargos que ele entrega.</p>
+            <p>Canal de logs: <strong id="discordLogsChannel">--</strong></p>
+            <p>Status: <strong id="discordConfigStatus">--</strong></p>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel" id="display" data-panel="display" hidden>
+        <article class="card wide terminal-card">
+          <div class="card-header">
+            <div>
+              <span class="eyebrow">DISPLAY INTERNO</span>
+              <h2>Logs, testes e erros</h2>
+            </div>
+            <div class="button-row">
+              <button type="button" data-action="run_tests">Rodar testes</button>
+              <button type="button" data-action="clear_logs">Limpar</button>
+            </div>
+          </div>
+          <pre id="displayLog" class="display-log">[Display] Conectando ao backend...</pre>
+        </article>
+      </section>
+
+      <section class="panel" id="project" data-panel="project" hidden>
+        <article class="card wide">
+          <h2>Projeto</h2>
+          <p>Organize a raiz do projeto movendo scripts, testes e documentos para suas pastas corretas.</p>
+          <div class="button-row">
+            <button type="button" data-action="organize_project">Organizar raiz</button>
+            <button type="button" data-action="launch_classic">Abrir clássico</button>
+          </div>
+        </article>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

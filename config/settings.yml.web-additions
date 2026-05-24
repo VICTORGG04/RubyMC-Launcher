@@ -1,0 +1,16 @@
+# Cole este bloco no final de config/settings.yml e ajuste os valores.
+
+community_server:
+  enabled: true
+  name: "Servidor Público da Comunidade"
+  address: "play.seuservidor.com:25565"
+  description: "Servidor oficial da comunidade do Minecraft Ruby Launcher."
+  discord_url: ""
+  website_url: ""
+
+modpacks:
+  path: "~/.minecraft_ruby_launcher/modpacks"
+
+web_launcher:
+  host: "127.0.0.1"
+  port: 4567

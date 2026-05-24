@@ -1,0 +1,5 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+root = File.expand_path('..', __dir__)
+load File.join(root, 'launcher_gui.rb')
