@@ -6,3 +6,4 @@ tmp/
 *.log
 *.pid
 .DS_Store
+config/settings.yml

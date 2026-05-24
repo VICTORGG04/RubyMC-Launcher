@@ -3,20 +3,20 @@ discord:
   rich_presence: true
 
   # ID do aplicativo criado no Discord Developer Portal
-  client_id: " ID "
+  client_id: "COLE_AQUI_O_APPLICATION_ID"
 
   # Bot Discord
   bot_enabled: true
-  bot_token: " ID "
+  bot_token: "COLE_AQUI_O_BOT_TOKEN"
 
   # ID do servidor Discord
-  guild_id: " ID "
+  guild_id: "COLE_AQUI_O_ID_DO_SERVIDOR"
 
   # Endereço do servidor Minecraft exibido no Discord/Launcher
   server_address: "ID_DO_SERVIDOR_MINECRAFT:25565"
 
   # Convites
-  invite_channel_id: "ID"
+  invite_channel_id: "1507957700930175150"
   invite_max_age_seconds: 86400
   invite_max_uses: 1
   invite_store_path: "~/.minecraft_ruby_launcher/discord_invites.json"
@@ -24,33 +24,33 @@ discord:
   # Canais principais do Discord
   channels:
     # Comunicação
-    welcome_channel_id: "ID"          # #bem-vindos
-    rules_channel_id: "ID"             # #canal de regras
-    announcements_channel_id: "ID"   # #notícias
-    updates_channel_id: "ID"      # #comunicados
-    new_members_channel_id: "ID" # #novos-membros
+    welcome_channel_id: "1367812492734234735"          # #bem-vindos
+    rules_channel_id: "1507943865586421861"             # crie ou use um canal de regras
+    announcements_channel_id: "1367810664613150811"   # #notícias
+    updates_channel_id: "1367758525841018880"      # #comunicados
+    new_members_channel_id: "1507698366992093284" # #novos-membros
 
     # Comunidade RubyMC
-    general_channel_id: "ID"  # #chat-com-rubymc
-    community_channel_id: "ID"        # comunidade
-    forum_channel_id: "ID"            # discussão/fórum
+    general_channel_id: "1367780246690070559"  # #chat-com-rubymc
+    community_channel_id: "1507939654194823229"        # comunidade
+    forum_channel_id: "1507866311584256151"            # discussão/fórum
 
     # Reportes
-    bugs_channel_id: "ID"             # #reporte-de-bugs
-    ban_channel_id: "ID"              # #reporte-de-banimento
-    suggestions_channel_id: "ID"      # #sugestoes-para-implementacao
+    bugs_channel_id: "1507940348268122152"             # #reporte-de-bugs
+    ban_channel_id: "1507940745871626260"              # #reporte-de-banimento
+    suggestions_channel_id: "1507941686079389716"      # #sugestoes-para-implementacao
 
     # Suporte
-    support_channel_id: "ID"          # #suporte-especializado
-    logs_channel_id: "ID"         # #logs-bot privado
+    support_channel_id: "1507942772458655956"          # #suporte-especializado
+    logs_channel_id: "1507944432429699212"         # recomendo criar #logs-bot privado
 
     # Modpacks
-    modpacks_channel_id: "ID"         # #modpacks-ativos
+    modpacks_channel_id: "1507941536334086274"         # #modpacks-ativos
 
   # Cargos opcionais
   roles:
-    member_role_id: "ID"
-    player_role_id: "ID"
-    staff_role_id: "ID"
-    admin_role_id: "ID"
-    bot_role_id: "ID"
+    member_role_id: "1507945902562738288"
+    player_role_id: "1507947203996422226"
+    staff_role_id: "1507947505827057714"
+    admin_role_id: "1507948380717056060"
+    bot_role_id: "1367799344144711724"
