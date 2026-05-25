@@ -21,13 +21,49 @@ require "httparty"
 require "json"
 require "yaml"
 require_relative "lib/discord_integration"
+require_relative "lib/discord_config"
+require_relative 'lib/rubymc_bot_config_bridge'
+# RubyMC Discord channel aliases
+# Compatibilidade entre nomes antigos do bot_daemon.rb e nomes novos do settings.yml.
+RUBYMC_CHANNEL_ALIASES = {
+  'bem_vindos' => 'welcome_channel_id',
+  'welcome' => 'welcome_channel_id',
+  'welcome_channel' => 'welcome_channel_id',
+  'novos_membros' => 'new_members_channel_id',
+  'new_members' => 'new_members_channel_id',
+  'new_members_channel' => 'new_members_channel_id',
+  'noticias' => 'announcements_channel_id',
+  'announcements' => 'announcements_channel_id',
+  'announcements_channel' => 'announcements_channel_id',
+  'comunicados' => 'updates_channel_id',
+  'updates' => 'updates_channel_id',
+  'updates_channel' => 'updates_channel_id',
+  'chat_rubymc' => 'general_channel_id',
+  'general' => 'general_channel_id',
+  'general_channel' => 'general_channel_id',
+  'logs' => 'logs_channel_id',
+  'logs_channel' => 'logs_channel_id',
+  'modpacks' => 'modpacks_channel_id',
+  'modpacks_channel' => 'modpacks_channel_id',
+  'suporte' => 'support_channel_id',
+  'support' => 'support_channel_id',
+  'support_channel' => 'support_channel_id'
+}.freeze
+
+def rubymc_channel_id(channels, key)
+  return nil unless channels
+  key = key.to_s
+  canonical = RUBYMC_CHANNEL_ALIASES.fetch(key, key)
+  channels[canonical] || channels[canonical.to_sym] || channels[key] || channels[key.to_sym]
+end
+
 
 CONFIG    = YAML.load_file(File.join(__dir__, "config/settings.yml"))
 BOT_TOKEN = CONFIG.dig("discord", "bot_token").to_s
 
 CHANNELS = {
-  bem_vindos:    CONFIG.dig("discord", "channel_bem_vindos").to_s,
-  novos_membros: CONFIG.dig("discord", "channel_novos_membros").to_s,
+  bem_vindos:    CONFIG.dig("discord", "welcome_channel_id").to_s,
+  novos_membros: CONFIG.dig("discord", "new_members_channel_id").to_s,
   noticias:      CONFIG.dig("discord", "channel_noticias").to_s,
   comunicados:   CONFIG.dig("discord", "channel_comunicados").to_s,
   chat_rubymc:   CONFIG.dig("discord", "channel_chat_rubymc").to_s
@@ -458,6 +494,28 @@ end
 puts "\e[35m╔══════════════════════════════════════════╗\e[0m"
 puts "\e[35m║      RubyMC Bot Daemon — Iniciando       ║\e[0m"
 puts "\e[35m╚══════════════════════════════════════════╝\e[0m"
+
+# RubyMC BotConfigBridge safe settings fix
+settings =
+  if defined?(settings) && settings
+    settings
+  elsif defined?(@settings) && @settings
+    @settings
+  elsif defined?(config) && config.is_a?(Hash)
+    config
+  elsif defined?(discord) && discord.is_a?(Hash)
+    { 'discord' => discord }
+  else
+    settings_path = File.expand_path('config/settings.yml', __dir__)
+    YAML.load_file(settings_path) || {}
+  end
+
+rubymc_bot_config = RubyMC::BotConfigBridge.new(settings)
+token = rubymc_bot_config.bot_token
+guild_id = rubymc_bot_config.guild_id
+channels = rubymc_bot_config.channels_for_daemon
+# End RubyMC BotConfigBridge safe settings fix
+
 puts "Token  : #{BOT_TOKEN[0..9]}..."
 puts "Canais :"
 CHANNELS.each do |k, v|

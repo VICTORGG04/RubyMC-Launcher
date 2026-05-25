@@ -31,6 +31,24 @@ rescue LoadError
   # O launcher continua funcionando mesmo sem o gerenciador avançado de modpacks.
 end
 
+begin
+  require_relative 'rubymc_backend_actions'
+begin
+  require_relative 'ai_support_service'
+begin
+  require_relative 'rubymc_discord_panel_actions'
+rescue LoadError => e
+  warn "RubyMC Discord panel actions não carregado: #{e.message}"
+end
+
+rescue LoadError => e
+  warn "RubyMC AI support não carregado: #{e.message}"
+end
+
+rescue LoadError => e
+  warn "RubyMC backend actions não carregado: #{e.message}"
+end
+
 module RubyMC
   class WebLauncherApp
     MIME_TYPES = {
@@ -46,6 +64,10 @@ module RubyMC
     }.freeze
 
     attr_reader :root, :host, :port, :log_file
+
+    # Alias para compatibilidade com rubymc_backend_actions.rb e helpers inline
+    # que chamam project_root — ambos apontam para o mesmo diretório raiz.
+    alias project_root root
 
     def initialize(root:, host: '127.0.0.1', port: 4567)
       @root = File.expand_path(root)
@@ -95,6 +117,16 @@ module RubyMC
         json(res, { ok: true, logs: read_logs })
       when '/api/server/status', '/api/server/live'
         json(res, live_server_status_payload)
+      when '/api/ai/support'
+        request_body = req.body.to_s
+        payload = request_body.empty? ? {} : JSON.parse(request_body)
+        service = RubyMC::AISupportService.new(root: project_root)
+        json(res, service.support_answer(payload['message'], context: payload['context']))
+
+      when '/api/ai/health'
+        service = RubyMC::AISupportService.new(root: project_root)
+        json(res, service.health)
+
       when '/api/action'
         handle_action(req, res)
       when '/api/modpacks'
@@ -151,43 +183,77 @@ module RubyMC
       log('ACTION', "Botão recebido pelo backend: #{action}") unless action == 'clear_logs'
 
       case action
-      when 'clear_display', 'display_clear', 'validate_discord', 'test_discord_logs', 'open_docs', 'check_updates', 'join_server'
+
+      # ── Painel UI: ações inline (rubymc_handle_ui_action) ────────────────
+      when 'clear_display', 'display_clear',
+           'validate_discord', 'discord_validate', 'validate_discord_settings',
+           'test_discord_logs', 'discord_test_logs', 'test_logs_channel',
+           'open_docs', 'open_documentation',
+           'check_updates', 'update_check',
+           'join_server', 'server_join'
         json(res, rubymc_handle_ui_action(action))
+
+      # ── Log interno ───────────────────────────────────────────────────────
       when 'clear_logs'
         File.write(log_file, '')
         log('SYSTEM', 'Display limpo. Aguardando novos eventos...')
         json(res, { ok: true, message: 'Display limpo.' })
+
+      # ── Status e modpacks ─────────────────────────────────────────────────
       when 'refresh_status'
         log('ACTION', 'Status atualizado pelo painel.')
         json(res, { ok: true, message: 'Status atualizado.', status: status_payload })
-      when 'refresh_modpacks'
+
+      when 'refresh_modpacks', 'update_modpacks', 'list_modpacks'
         log('ACTION', 'Lista de modpacks atualizada pelo painel.')
         json(res, { ok: true, message: 'Modpacks atualizados.', modpacks: list_modpack_payloads })
+
+      # ── Testes e organização ──────────────────────────────────────────────
       when 'run_tests'
         run_async('Rodar testes') { run_project_checks }
         json(res, { ok: true, message: 'Testes iniciados. Veja o Display.' })
-      when 'launch_classic', 'play'
-        pid = open_classic_launcher
-        json(res, { ok: true, message: "Launcher clássico aberto em terminal externo. PID: #{pid}", pid: pid })
-      when 'enter_server'
-        pid = open_classic_launcher(extra_env: { 'RUBYMC_HINT' => 'server' })
-        json(res, { ok: true, message: "Launcher clássico aberto para entrar no servidor. PID: #{pid}", pid: pid })
-      when 'test_server'
-        run_async('Testar servidor') { test_community_server }
-        json(res, { ok: true, message: 'Teste do servidor iniciado.' })
-      when 'organize_project'
+
+      when 'organize_project', 'organize'
         run_async('Organizar raiz') { organize_project }
         json(res, { ok: true, message: 'Organização iniciada.' })
+
+      when 'open_project_folder', 'project_folder'
+        target = project_root
+        log('ACTION', "Abrindo pasta do projeto: #{target}")
+        system('xdg-open', target, out: File::NULL, err: File::NULL)
+        log('OK', 'Pasta do projeto aberta.')
+        json(res, { ok: true, message: 'Pasta do projeto aberta.', path: target })
+
+      # ── Launcher Minecraft ────────────────────────────────────────────────
+      when 'launch_classic', 'play', 'start_minecraft', 'launch_minecraft'
+        pid = open_classic_launcher
+        json(res, { ok: true, message: "Launcher clássico aberto. PID: #{pid}", pid: pid })
+
+      when 'enter_server'
+        pid = open_classic_launcher(extra_env: { 'RUBYMC_HINT' => 'server' })
+        json(res, { ok: true, message: "Launcher aberto para o servidor. PID: #{pid}", pid: pid })
+
+      when 'test_server', 'server_test', 'check_server'
+        run_async('Testar servidor') { test_community_server }
+        json(res, { ok: true, message: 'Teste do servidor iniciado. Veja o Display.' })
+
+      # ── Discord avançado (via módulos opcionais) ──────────────────────────
       when 'validate_discord_config'
         report = validate_discord_config(remote: true)
-        json(res, { ok: report[:errors].empty?, message: report[:errors].empty? ? 'Validação Discord concluída.' : 'Discord precisa de ajustes.', report: report })
+        json(res, {
+          ok: report[:errors].empty?,
+          message: report[:errors].empty? ? 'Validação Discord concluída.' : 'Discord precisa de ajustes.',
+          report: report
+        })
+
       when 'test_discord_log'
         result = test_discord_log
         json(res, { ok: true, message: 'Teste de log enviado ao Discord.', result: result })
+
+      # ── Ação desconhecida ─────────────────────────────────────────────────
       else
-      if ['clear_display', 'display_clear', 'validate_discord', 'discord_validate', 'validate_discord_settings', 'test_discord_logs', 'discord_test_logs', 'test_logs_channel', 'open_docs', 'open_documentation', 'check_updates', 'update_check', 'join_server', 'server_join'].include?(action.to_s)
-        return json(res, rubymc_handle_ui_action(action))
-      end
+              discord_panel_result = rubymc_handle_discord_panel_action(action) if respond_to?(:rubymc_handle_discord_panel_action)
+      return json(res, discord_panel_result) if discord_panel_result
 
 log('WARN', "Ação desconhecida recebida: #{action.inspect}")
         json(res, { ok: false, error: "Ação desconhecida: #{action}" })
@@ -392,9 +458,10 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
 
     def server_info
       settings = load_settings
-      address = settings.dig('community_server', 'address') ||
+      # Prioridade: discord.server_address é onde o settings.yml padrão armazena o endereço.
+      address = settings.dig('discord', 'server_address') ||
+                settings.dig('community_server', 'address') ||
                 settings.dig('minecraft', 'server_address') ||
-                settings.dig('discord', 'server_address') ||
                 'não configurado'
 
       { address: address, status: address == 'não configurado' ? 'pendente' : 'configurado' }
@@ -581,7 +648,7 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       info = respond_to?(:server_info) ? server_info : {}
       address = (info[:address] || info['address'] || '').to_s.strip
 
-      if address.empty? || address =~ /ID_DO|não configurado/i
+      if address.empty? || address =~ /ID_DO_SERVIDOR|SERVIDOR_MINECRAFT|não configurado/i
         log('WARN', 'Servidor não configurado. Configure o endereço real em config/settings.yml.') if respond_to?(:log)
         return { ok: false, message: 'Servidor não configurado.' }
       end
@@ -590,6 +657,36 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       system('xdg-open', "minecraft://?addExternalServer=RubyMC|#{address}", out: File::NULL, err: File::NULL)
       log('OK', "Comando para entrar no servidor enviado: #{address}") if respond_to?(:log)
       { ok: true, message: "Abrindo servidor #{address}.", address: address }
+    end
+
+
+
+    # RubyMC Discord + IA Final Integration
+    def rubymc_discord_panel_service
+      RubyMC::DiscordPanelActions.new(root: project_root)
+    end
+
+    def rubymc_handle_discord_panel_action(action)
+      case action.to_s
+      when 'validate_discord', 'discord_validate', 'validate_discord_settings'
+        result = rubymc_discord_panel_service.validate
+        log(result[:ok] ? 'OK' : 'ERROR', result[:message]) if respond_to?(:log)
+        Array(result[:problems]).each { |problem| log('WARN', problem) } if respond_to?(:log)
+        result
+      when 'test_discord_logs', 'discord_test_logs', 'test_logs_channel'
+        result = rubymc_discord_panel_service.test_logs_channel
+        log(result[:ok] ? 'OK' : 'ERROR', result[:message]) if respond_to?(:log)
+        result
+      when 'discord_bot_status', 'bot_status'
+        result = rubymc_discord_panel_service.bot_status
+        log(result[:ok] ? 'OK' : 'ERROR', result[:message]) if respond_to?(:log)
+        result
+      else
+        nil
+      end
+    rescue StandardError => e
+      log('ERROR', "#{e.class}: #{e.message}") if respond_to?(:log)
+      { ok: false, message: e.message, error: e.class.name }
     end
 
 

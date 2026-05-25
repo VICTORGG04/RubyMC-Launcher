@@ -200,3 +200,114 @@
     }
   });
 })();
+
+
+/* RubyMC AI Support Frontend */
+(() => {
+  const $ = (selector, root = document) => root.querySelector(selector);
+
+  function ensurePanel() {
+    if ($("#ai-support-card")) return;
+
+    const target = $("#tab-project") || $("#tab-discord") || $("#tab-home") || document.body;
+    const card = document.createElement("section");
+    card.id = "ai-support-card";
+    card.className = "ai-support-card";
+    card.innerHTML = `
+      <h3>Suporte IA RubyMC</h3>
+      <p>Assistente local usando Ollama + qwen3.5:9b para ajudar com Discord, modpacks, servidor Minecraft e erros do projeto.</p>
+      <textarea id="ai-support-input" class="ai-support-input" placeholder="Digite sua dúvida sobre o RubyMC..."></textarea>
+      <div class="ai-support-actions">
+        <button class="btn btn-red" id="ai-support-send" type="button">Perguntar à IA</button>
+        <button class="btn btn-dark" id="ai-support-health" type="button">Verificar IA</button>
+      </div>
+      <div id="ai-support-output" class="ai-support-output">Aguardando pergunta...</div>
+    `;
+    target.appendChild(card);
+
+    $("#ai-support-send")?.addEventListener("click", askAI);
+    $("#ai-support-health")?.addEventListener("click", checkAI);
+  }
+
+  async function askAI() {
+    const input = $("#ai-support-input");
+    const output = $("#ai-support-output");
+    const message = input?.value?.trim();
+
+    if (!message) {
+      output.textContent = "Digite uma pergunta para o suporte IA.";
+      return;
+    }
+
+    output.textContent = "Consultando IA local...";
+
+    try {
+      const response = await fetch("/api/ai/support", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({ message })
+      });
+      const data = await response.json();
+      output.textContent = data.answer || data.message || "Sem resposta.";
+    } catch (error) {
+      output.textContent = `Erro ao consultar IA: ${error.message}`;
+    }
+  }
+
+  async function checkAI() {
+    const output = $("#ai-support-output");
+    output.textContent = "Verificando Ollama/modelo...";
+
+    try {
+      const response = await fetch("/api/ai/health", { headers: { "Accept": "application/json" } });
+      const data = await response.json();
+      output.textContent = data.ok ? `IA pronta: ${data.model}` : `IA não pronta: ${data.message}`;
+    } catch (error) {
+      output.textContent = `Erro ao verificar IA: ${error.message}`;
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", ensurePanel);
+})();
+
+
+/* RubyMC Discord + IA Final Frontend Guard */
+(() => {
+  const guarded = new Set(["validate_discord","discord_validate","test_discord_logs","discord_test_logs","test_logs_channel","join_server","server_join"]);
+  const active = new Set();
+
+  function log(type, message) {
+    const display = document.getElementById("display-log");
+    if (!display) return;
+    const time = new Date().toLocaleTimeString("pt-BR", { hour12: false });
+    display.textContent += `\n[${time}] ${String(type).padEnd(7)} ${message}`;
+    display.scrollTop = display.scrollHeight;
+  }
+
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action]");
+    if (!button) return;
+    const action = button.dataset.action;
+    if (!guarded.has(action)) return;
+
+    if (active.has(action)) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      log("WARN", `Ação ${action} já está em execução.`);
+      return;
+    }
+
+    active.add(action);
+    const old = button.textContent;
+    button.disabled = true;
+    button.classList.add("is-loading");
+    button.textContent = "Processando...";
+
+    setTimeout(() => {
+      active.delete(action);
+      button.disabled = false;
+      button.classList.remove("is-loading");
+      button.textContent = old;
+    }, 8000);
+  }, true);
+})();

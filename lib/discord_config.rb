@@ -30,7 +30,7 @@ module RubyMC
       'bot_role_id' => 'RubyMC Bot'
     }.freeze
 
-    PLACEHOLDER_PATTERN = /\A(?:ID_DO_|COLE_AQUI|SEU_|TOKEN|APPLICATION|GUILD|CANAL|CARGO)/i
+    PLACEHOLDER_PATTERN = /\A(?:\$\{|ID_DO_|COLE_AQUI|SEU_|TOKEN|APPLICATION|GUILD|CANAL|CARGO)/i
     DISCORD_ID_PATTERN = /\A\d{15,25}\z/
 
     attr_reader :settings
@@ -60,7 +60,16 @@ module RubyMC
     def raw_token
       env_token = ENV['RUBYMC_DISCORD_BOT_TOKEN'].to_s.strip
       return env_token unless env_token.empty?
-      discord['bot_token'].to_s.strip
+
+      resolve_env_reference(discord['bot_token']).to_s.strip
+    end
+
+    def resolve_env_reference(value)
+      text = value.to_s.strip
+      match = text.match(/\A\$\{([A-Z0-9_]+)\}\z/)
+      return text unless match
+
+      ENV[match[1]].to_s.strip
     end
 
     def bot_token
