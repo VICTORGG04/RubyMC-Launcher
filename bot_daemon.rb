@@ -496,7 +496,7 @@ puts "\e[35m║      RubyMC Bot Daemon — Iniciando       ║\e[0m"
 puts "\e[35m╚══════════════════════════════════════════╝\e[0m"
 
 # RubyMC BotConfigBridge safe settings fix
-settings =
+rubymc_settings =
   if defined?(settings) && settings
     settings
   elsif defined?(@settings) && @settings
@@ -506,11 +506,10 @@ settings =
   elsif defined?(discord) && discord.is_a?(Hash)
     { 'discord' => discord }
   else
-    settings_path = File.expand_path('config/settings.yml', __dir__)
-    YAML.load_file(settings_path) || {}
+    RubyMC::BotConfigBridge.load_settings(Dir.pwd)
   end
 
-rubymc_bot_config = RubyMC::BotConfigBridge.new(settings)
+rubymc_bot_config = RubyMC::BotConfigBridge.new(rubymc_settings)
 token = rubymc_bot_config.bot_token
 guild_id = rubymc_bot_config.guild_id
 channels = rubymc_bot_config.channels_for_daemon
