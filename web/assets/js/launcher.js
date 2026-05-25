@@ -1,472 +1,202 @@
+(()=>{const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>Array.from(r.querySelectorAll(s));let busy=false;const ROUTES={status:["/api/status","/status"],logs:["/api/logs","/logs"],modpackImport:["/api/modpacks/import","/api/import_modpack","/api/modpack/import"],modpacks:["/api/modpacks","/api/modpacks/list"]};const ACTION_ALIASES={play:["play","start_minecraft","launch_minecraft"],update_modpacks:["update_modpacks","refresh_modpacks","list_modpacks"],validate_discord:["validate_discord","discord_validate","validate_discord_settings"],test_discord_logs:["test_discord_logs","discord_test_logs","test_logs_channel"],test_server:["test_server","server_test","check_server"],join_server:["join_server","server_join"],clear_display:["clear_display","display_clear"],run_tests:["run_tests","test"],organize_project:["organize_project","organize"],open_project_folder:["open_project_folder","project_folder"],open_docs:["open_docs","docs"],check_updates:["check_updates","update_check"],refresh_status:["refresh_status","status"]};function time(){return new Date().toLocaleTimeString("pt-BR",{hour12:false})}function log(t,m){const d=$("#display-log");if(!d)return;d.textContent+=`\n[${time()}] ${String(t).padEnd(7)} ${m}`;d.scrollTop=d.scrollHeight}function activateTab(tab){document.body.dataset.currentTab=tab;$$('.tab-link').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$$('.tab-panel').forEach(p=>p.classList.toggle('active',p.id===`tab-${tab}`));const p=$(`#tab-${tab}`);if(p)document.title=`RubyMC Launcher — ${p.dataset.panelTitle||tab}`}async function fetchJson(url,opt={}){const r=await fetch(url,{headers:{Accept:'application/json',...(opt.headers||{})},...opt});if(!r.ok){const b=await r.text().catch(()=>"");throw new Error(`${r.status} ${r.statusText}${b?` — ${b.slice(0,160)}`:""}`)}return r.json()}async function postJson(url,payload={}){return fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}async function firstGet(urls){let e;for(const u of urls){try{return await fetchJson(u)}catch(err){e=err}}throw e}function payload(action){return{action,profile:$('#profile-select')?.value||'vanilla',modpack_name:$('#modpack-name')?.value||'',server_address:$('#server-address')?.value||'',settings:{version:$('#settings-version')?.value||'',ram:$('#settings-ram')?.value||''}}}async function backendAction(action){let e;for(const a of ACTION_ALIASES[action]||[action]){try{return await postJson('/api/action',payload(a))}catch(err){e=err}try{return await postJson(`/api/${a}`,payload(a))}catch(err){e=err}}throw e}async function runAction(action){if(!action||busy)return;busy=true;log('ACTION',`Executando: ${action}`);try{if(action==='import_modpack')await importModpack();else if(action==='update_modpacks')await updateModpacks();else if(action==='clear_display'){clearDisplay();try{applyResult(await backendAction(action),action)}catch(_){}}else applyResult(await backendAction(action),action)}catch(e){log('ERROR',`${action}: ${e.message}`)}finally{busy=false}}async function importModpack(){const input=$('#modpack-file'),nameInput=$('#modpack-name');if(!input?.files?.length){log('WARN','Selecione um arquivo .mrpack ou .zip.');activateTab('modpacks');return}const file=input.files[0],profileName=nameInput?.value?.trim()||file.name.replace(/\.(mrpack|zip)$/i,'');const form=new FormData();form.append('file',file);form.append('modpack',file);form.append('profile_name',profileName);form.append('name',profileName);let last;for(const url of ROUTES.modpackImport){try{applyResult(await fetchJson(url,{method:'POST',body:form}),'import_modpack');await updateModpacks(false);return}catch(e){last=e}}try{applyResult(await backendAction('import_modpack'),'import_modpack');await updateModpacks(false)}catch(_){throw last}}async function updateModpacks(show=true){if(show)log('ACTION','Atualizando lista de modpacks...');for(const url of ROUTES.modpacks){try{const r=await fetchJson(url),m=r.modpacks||r.data||r;renderModpacks(Array.isArray(m)?m:[]);if(show)log('OK','Lista de modpacks atualizada.');return}catch(_){}}applyResult(await backendAction('update_modpacks'),'update_modpacks')}function clearDisplay(){const d=$('#display-log');if(d)d.textContent=`[${time()}] SYSTEM  Display limpo. Aguardando novos eventos...`;activateTab('display')}function applyResult(r,action){if(!r){log('OK',`${action} concluído.`);return}if(typeof r==='string'){log('OK',r);return}if(r.message)log(r.ok===false?'ERROR':'OK',r.message);if(Array.isArray(r.logs))r.logs.forEach(i=>typeof i==='string'?log('LOG',i):log(i.type||'LOG',i.message||JSON.stringify(i)));if(r.display)updateDisplay(r.display);if(r.status)applyStatus(r.status);else applyStatus(r);if(r.modpacks)renderModpacks(r.modpacks);if(r.discord)applyStatus({discord:r.discord});if(action==='test_server'&&r.ok!==undefined){setText('server-test-state',r.ok?'Online':'Offline');setText('server-test-detail',r.message||'')}}function setText(id,v){const e=document.getElementById(id);if(e&&v!==undefined&&v!==null&&v!=='')e.textContent=v}function setValue(id,v){const e=document.getElementById(id);if(e&&v!==undefined&&v!==null&&v!=='')e.value=v}function applyStatus(s={}){setText('minecraft-version',s.minecraft_version||s.default_version||s.version);setText('active-profile',s.active_profile||s.profile);setText('server-state',s.server_status||s.server_state||s.server);setText('server-players',s.server_players||s.players);setText('launcher-state',s.launcher_status||s.status);setText('launcher-version',s.launcher_version||s.version);setValue('server-address',s.server_address||s.community_server||s.address);if(s.server_test){setText('server-test-state',s.server_test.ok?'Online':'Offline');setText('server-test-detail',s.server_test.message||'')}const d=s.discord||{};if(Object.keys(d).length){const on=d.bot_enabled===true||d.bot===true||d.status==='ativo'||d.bot_state==='ativo';setText('discord-bot-state',on?'Ativo':(d.bot_state||'Inativo'));setText('discord-channel-count',d.channels||d.channel_count||d.channels_count);setText('discord-role-count',d.roles||d.role_count||d.roles_count);setText('logs-channel-state',d.logs_channel||d.logs_channel_id?'configurado':'pendente');setText('discord-config-state',d.configured===false?'pendente':'configurado')}}function renderModpacks(m){const list=$('#modpack-list'),select=$('#profile-select');if(!list)return;if(!Array.isArray(m)||!m.length){list.textContent='Nenhum modpack importado ainda.';return}list.innerHTML=m.map(i=>{const n=typeof i==='string'?i:(i.name||i.profile||i.title||'Modpack'),v=typeof i==='object'&&i.version?i.version:'';return `<div class="modpack-row"><strong>${esc(n)}</strong><span>${esc(v)}</span></div>`}).join('');if(select){const cur=select.value;select.innerHTML='<option value="vanilla">Vanilla / sem modpack</option>'+m.map(i=>{const n=typeof i==='string'?i:(i.name||i.profile||i.title||'Modpack');return `<option value="${esc(n)}">${esc(n)}</option>`}).join('');if([...select.options].some(o=>o.value===cur))select.value=cur}}function updateDisplay(c){const d=$('#display-log');if(!d)return;d.textContent=Array.isArray(c)?c.join('\n'):String(c);d.scrollTop=d.scrollHeight}function esc(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}async function refreshStatus(){try{applyStatus((await firstGet(ROUTES.status)).status||await firstGet(ROUTES.status))}catch(_){try{applyResult(await backendAction('refresh_status'),'refresh_status')}catch(_){log('WARN','Status será atualizado quando o backend responder.')}}}async function pollLogs(){try{const d=await firstGet(ROUTES.logs);if(d.display)updateDisplay(d.display);else if(d.logs)updateDisplay(d.logs)}catch(_){}}function bind(){ $$('.tab-link').forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.tab)));$$('[data-action]').forEach(b=>b.addEventListener('click',()=>runAction(b.dataset.action)));$$('.toggle').forEach(t=>t.addEventListener('click',()=>{t.classList.toggle('active');log('ACTION',`Configuração alterada: ${t.dataset.toggle}`)}));const f=$('#modpack-file'),l=$('#modpack-file-label');if(f&&l)f.addEventListener('change',()=>{l.textContent=f.files&&f.files[0]?f.files[0].name:'Clique para escolher ou arraste o arquivo aqui'})}document.addEventListener('DOMContentLoaded',()=>{document.body.dataset.currentTab='home';bind();log('SYSTEM','Aba Configurações atualizada no estilo RubyMC. Interface pronta.');refreshStatus();updateModpacks(false).catch(()=>{});setInterval(pollLogs,4000)})})();
+
+
+/* =========================================================
+   RubyMC Server Live Status Patch
+   Consulta /api/server/status e atualiza a aba Servidor.
+   ========================================================= */
 (() => {
-  'use strict';
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
+  const ROUTES = ["/api/server/status", "/api/server/live"];
+  let serverPollTimer = null;
 
-  const API = {
-    status: '/api/status',
-    logs: '/api/logs',
-    action: '/api/action',
-    modpacks: '/api/modpacks',
-    importModpack: '/api/modpacks/import',
-    discordStatus: '/api/discord/status',
-    discordValidate: '/api/discord/validate',
-    discordTestLog: '/api/discord/test-log',
-    ping: '/api/ping'
-  };
-
-  const state = {
-    busy: false,
-    activeTab: 'home',
-    lastLogText: '',
-    modpacks: [],
-    bootedAt: new Date()
-  };
-
-  const ACTION_ALIASES = {
-    clear: 'clear_logs',
-    clear_log: 'clear_logs',
-    clear_logs: 'clear_logs',
-    limpar: 'clear_logs',
-    refresh: 'refresh_status',
-    atualizar: 'refresh_status',
-    refresh_status: 'refresh_status',
-    run_tests: 'run_tests',
-    tests: 'run_tests',
-    test: 'run_tests',
-    refresh_modpacks: 'refresh_modpacks',
-    update_modpacks: 'refresh_modpacks',
-    play: 'play',
-    jogar: 'play',
-    enter_server: 'enter_server',
-    test_server: 'test_server',
-    organize_project: 'organize_project',
-    launch_classic: 'launch_classic',
-    classic: 'launch_classic',
-    validate_discord_config: 'validate_discord_config',
-    validate_discord: 'validate_discord_config',
-    test_discord_log: 'test_discord_log',
-    discord_test_log: 'test_discord_log'
-  };
-
-  function $(selector, root = document) {
-    return root.querySelector(selector);
+  function time() {
+    return new Date().toLocaleTimeString("pt-BR", { hour12: false });
   }
 
-  function $all(selector, root = document) {
-    return Array.from(root.querySelectorAll(selector));
+  function log(type, message) {
+    const display = $("#display-log");
+    if (!display) return;
+    display.textContent += `\n[${time()}] ${String(type).padEnd(7)} ${message}`;
+    display.scrollTop = display.scrollHeight;
   }
 
-  function logConsole(...args) {
-    // Ajuda a diagnosticar se o JS carregou no DevTools.
-    console.log('[RubyMC Web]', ...args);
+  function setText(id, value) {
+    const element = document.getElementById(id);
+    if (element && value !== undefined && value !== null && value !== "") element.textContent = value;
   }
 
-  function normalizeAction(action) {
-    const key = String(action || '').trim().toLowerCase().replace(/-/g, '_');
-    return ACTION_ALIASES[key] || key;
+  function setClass(id, className, enabled) {
+    const element = document.getElementById(id);
+    if (element) element.classList.toggle(className, enabled);
   }
 
-  function normalizeTab(tab) {
-    const key = String(tab || '').trim().toLowerCase().replace(/-/g, '_');
-    if (key === 'inicio' || key === 'início') return 'home';
-    if (key === 'servidor') return 'server';
-    if (key === 'projeto') return 'project';
-    return key;
+  async function fetchJson(url) {
+    const response = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    return response.json();
   }
 
-  async function requestJSON(url, options = {}) {
-    const isFormData = options.body instanceof FormData;
-    const requestOptions = {
-      cache: 'no-store',
-      credentials: 'same-origin',
-      ...options,
-      headers: {
-        ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-        ...(options.headers || {})
+  async function getServerLiveStatus() {
+    let lastError;
+    for (const route of ROUTES) {
+      try {
+        return await fetchJson(`${route}?t=${Date.now()}`);
+      } catch (error) {
+        lastError = error;
       }
+    }
+    throw lastError;
+  }
+
+  function normalize(payload) {
+    const live = payload.server_live || payload.live || payload.status || payload;
+    const players = live.players || {};
+    return {
+      ok: live.ok === true || live.online === true,
+      online: live.online === true,
+      address: live.address || payload.server?.address || "",
+      latency: live.latency_ms,
+      version: live.version?.name || live.version_name || "",
+      description: live.description || "",
+      checkedAt: live.checked_at || payload.time || time(),
+      error: live.error || payload.error || "",
+      playersOnline: Number(players.online || live.players_online || live.online_players || 0),
+      playersMax: Number(players.max || live.players_max || live.max_players || 0),
+      sample: Array.isArray(players.sample) ? players.sample : []
     };
-
-    const response = await fetch(url, requestOptions);
-    const text = await response.text();
-    let data = {};
-
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch (_) {
-      data = { ok: false, error: text || `Resposta inválida de ${url}` };
-    }
-
-    if (!response.ok || data.ok === false) {
-      const message = data.error || data.message || `HTTP ${response.status} em ${url}`;
-      const error = new Error(message);
-      error.payload = data;
-      throw error;
-    }
-
-    return data;
   }
 
-  function setText(selectors, value) {
-    for (const selector of selectors) {
-      const node = $(selector);
-      if (node) node.textContent = value ?? '--';
-    }
+  function playerRatio(status) {
+    if (!status.playersMax) return `${status.playersOnline || 0} jogadores`;
+    return `${status.playersOnline}/${status.playersMax} jogadores`;
   }
 
-  function findDisplayNode() {
-    return $('#displayLog') ||
-      $('#display-log') ||
-      $('#displayOutput') ||
-      $('[data-display-log]') ||
-      $('.display-log') ||
-      $('.display-output') ||
-      $('.terminal-output') ||
-      $('.console-output') ||
-      $('pre');
-  }
-
-  function localTimestamp() {
-    return new Date().toLocaleTimeString('pt-BR', { hour12: false });
-  }
-
-  function appendLocalLog(line) {
-    const display = findDisplayNode();
-    const current = display ? display.textContent : state.lastLogText;
-    const prefix = current && !current.includes('Conectando ao backend') ? current.split('\n') : [];
-    prefix.push(`[${localTimestamp()}] JS      ${line}`);
-    renderLogs(prefix.slice(-250));
-  }
-
-  function renderLogs(lines) {
-    const node = findDisplayNode();
-    if (!node) return;
-
-    const text = (lines || []).join('\n');
-    if (text === state.lastLogText) return;
-
-    state.lastLogText = text;
-    node.textContent = text || '[Display] Aguardando eventos...';
-    node.scrollTop = node.scrollHeight;
-  }
-
-  function setStatusLabel(message, ok = true) {
-    setText(['#connectionStatus', '#displayStatus', '[data-field="display_status"]', '.display-status'], message);
-    const badge = $('#connectionStatus') || $('#displayStatus') || $('[data-field="display_status"]') || $('.display-status');
-    if (badge) {
-      badge.classList.toggle('is-ok', ok);
-      badge.classList.toggle('is-error', !ok);
-    }
-  }
-
-  function escapeHTML(value) {
-    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#39;'
-    }[char]));
-  }
-
-  function renderModpacks(modpacks) {
-    state.modpacks = Array.isArray(modpacks) ? modpacks : [];
-
-    const list = $('#modpackList');
-    if (list) {
-      if (state.modpacks.length === 0) {
-        list.innerHTML = '<div class="empty-state">Nenhum modpack importado ainda.</div>';
-      } else {
-        list.innerHTML = state.modpacks.map((pack) => `
-          <div class="modpack-item">
-            <div>
-              <strong>${escapeHTML(pack.name || pack.id || 'Modpack')}</strong>
-              <span>${escapeHTML([pack.minecraft_version, pack.loader].filter(Boolean).join(' • ') || 'perfil local')}</span>
-            </div>
-            <small>${escapeHTML(pack.source || 'local')}</small>
-          </div>
-        `).join('');
-      }
-    }
-
-    const select = $('#profileSelect');
-    if (select) {
-      const current = select.value;
-      select.innerHTML = '<option value="vanilla">Vanilla / sem modpack</option>' + state.modpacks.map((pack) => {
-        const value = escapeHTML(pack.id || pack.name || 'modpack');
-        const label = escapeHTML(pack.name || pack.id || 'Modpack');
-        return `<option value="${value}">${label}</option>`;
-      }).join('');
-      if ([...select.options].some((option) => option.value === current)) select.value = current;
-    }
-
-    setText(['#modpacksCount', '[data-field="modpacks_count"]', '.modpacks-count'], String(state.modpacks.length));
-  }
-
-  function renderDiscord(discord) {
-    if (!discord) return;
-    setText(['#discordBotStatus'], discord.bot_enabled ? 'ativo' : 'inativo');
-    setText(['#discordChannelsCount'], `${discord.channels_configured ?? 0}/${discord.channels_total ?? 0}`);
-    setText(['#discordRolesCount'], `${discord.roles_configured ?? 0}/${discord.roles_total ?? 0}`);
-    setText(['#discordConfigStatus'], discord.status || '--');
-    setText(['#discordLogsChannel'], discord.logs_channel_configured ? 'configurado' : 'pendente');
-  }
-
-  async function refreshStatus() {
-    try {
-      const data = await requestJSON(API.status);
-      setStatusLabel('Display conectado', true);
-
-      setText(['#rubyVersion', '[data-field="ruby_version"]', '.ruby-version'], data.ruby_version || '--');
-      setText(['#javaVersion', '[data-field="java_version"]', '.java-version'], data.java_version || '--');
-      setText(['#serverStatus', '[data-field="server_status"]', '.server-status'], data.server?.status || '--');
-      setText(['#serverAddress', '[data-field="server_address"]', '.server-address'], data.server?.address || '--');
-
-      renderDiscord(data.discord);
-
-      if (Array.isArray(data.modpacks)) renderModpacks(data.modpacks);
-    } catch (error) {
-      setStatusLabel('Display desconectado', false);
-      appendLocalLog(`ERRO   Backend não respondeu: ${error.message}`);
-    }
-  }
-
-  async function refreshLogs() {
-    try {
-      const data = await requestJSON(API.logs);
-      renderLogs(data.logs || []);
-    } catch (error) {
-      appendLocalLog(`ERRO   Não foi possível ler logs: ${error.message}`);
-    }
-  }
-
-  async function refreshModpacks(logAction = true) {
-    try {
-      const data = await requestJSON(API.modpacks);
-      renderModpacks(data.modpacks || []);
-      if (logAction) await refreshLogs();
-    } catch (error) {
-      appendLocalLog(`ERRO   Não foi possível atualizar modpacks: ${error.message}`);
-    }
-  }
-
-  function setBusy(isBusy) {
-    state.busy = isBusy;
-    $all('[data-action], #modpackImportForm button').forEach((button) => {
-      const action = normalizeAction(button.dataset.action);
-      if (!['clear_logs', 'refresh_status', 'refresh_modpacks'].includes(action)) {
-        button.disabled = isBusy;
-      }
-    });
-  }
-
-  async function runAction(rawAction) {
-    const action = normalizeAction(rawAction);
-    if (!action) return;
-
-    if (state.busy && !['clear_logs', 'refresh_status', 'refresh_modpacks'].includes(action)) {
-      appendLocalLog('WARN   Aguarde a ação atual terminar.');
+  function renderPlayers(names) {
+    const target = $("#server-player-tags");
+    if (!target) return;
+    if (!names || names.length === 0) {
+      target.innerHTML = '<span class="server-player-tag">Nenhum nome público retornado</span>';
       return;
     }
+    target.innerHTML = names.slice(0, 12).map(name => `<span class="server-player-tag">${escapeHtml(name)}</span>`).join("");
+  }
 
+  function updateServerUi(status) {
+    const online = status.online;
+    setText("server-test-state", online ? "Online" : "Offline");
+    setText("server-test-detail", online
+      ? `Servidor respondeu em ${status.latency ?? "--"} ms. ${playerRatio(status)}.`
+      : (status.error || "Servidor não respondeu ou não está configurado.")
+    );
+    setText("server-live-online", online ? `${status.playersOnline}` : "0");
+    setText("server-live-max", status.playersMax ? `${status.playersMax}` : "--");
+    setText("server-live-latency", status.latency ? `${status.latency} ms` : "--");
+    setText("server-live-version", status.version || "--");
+    setText("server-live-checked", status.checkedAt || "--");
+    setText("server-overlay-status", online ? "Online" : "Offline");
+    setText("server-overlay-players", playerRatio(status));
+    setText("server-overlay-ping", status.latency ? `${status.latency} ms` : "--");
+    setText("server-state", online ? "Online" : "Offline");
+    setText("server-players", playerRatio(status));
+    setClass("server-test-state", "server-live-error", !online);
+
+    const motd = $("#server-motd");
+    if (motd) motd.textContent = status.description || (online ? "Servidor online." : "Sem descrição disponível.");
+
+    renderPlayers(status.sample);
+
+    if (online) {
+      log("OK", `Servidor online: ${playerRatio(status)} | ping ${status.latency ?? "--"} ms`);
+    } else {
+      log("WARN", `Servidor offline/indisponível: ${status.error || "sem resposta"}`);
+    }
+  }
+
+  function setLoading() {
+    setText("server-test-state", "Consultando...");
+    setText("server-test-detail", "Buscando status, versão, ping e jogadores online.");
+  }
+
+  async function refreshServerLiveStatus() {
+    setLoading();
     try {
-      setBusy(true);
-      logConsole('Ação acionada:', action);
-
-      if (action === 'refresh_modpacks') {
-        appendLocalLog('ACTION Atualizando lista de modpacks...');
-        await requestJSON(API.action, { method: 'POST', body: JSON.stringify({ action }) });
-        await refreshModpacks(false);
-        await refreshLogs();
-        return;
-      }
-
-      if (action === 'validate_discord_config') {
-        showTab('display');
-        appendLocalLog('ACTION Validando Discord pelo backend...');
-        await requestJSON(API.discordValidate, { method: 'POST', body: JSON.stringify({ action }) });
-        await refreshStatus();
-        await refreshLogs();
-        return;
-      }
-
-      if (action === 'test_discord_log') {
-        showTab('display');
-        appendLocalLog('ACTION Enviando mensagem de teste para o Discord...');
-        await requestJSON(API.discordTestLog, { method: 'POST', body: JSON.stringify({ action }) });
-        await refreshStatus();
-        await refreshLogs();
-        return;
-      }
-
-      await requestJSON(API.action, {
-        method: 'POST',
-        body: JSON.stringify({ action })
+      const data = await getServerLiveStatus();
+      updateServerUi(normalize(data));
+    } catch (error) {
+      updateServerUi({
+        online: false,
+        playersOnline: 0,
+        playersMax: 0,
+        sample: [],
+        error: `API de status indisponível: ${error.message}`,
+        checkedAt: time()
       });
-
-      if (action === 'clear_logs') renderLogs([]);
-      await refreshStatus();
-      await refreshLogs();
-    } catch (error) {
-      appendLocalLog(`ERRO   ${error.message}`);
-      showTab('display');
-    } finally {
-      setBusy(false);
     }
   }
 
-  async function importModpack(event) {
-    event.preventDefault();
+  function isServerTabActive() {
+    const activeButton = $(".side-link.active, .tab-link.active");
+    return activeButton?.dataset?.tab === "server" || $("#tab-server")?.classList.contains("active");
+  }
 
-    const form = event.currentTarget;
-    const fileInput = $('#modpackFile', form);
-    const file = fileInput?.files?.[0];
-
-    if (!file) {
-      appendLocalLog('WARN   Selecione um arquivo .mrpack ou .zip antes de importar.');
-      showTab('display');
-      return;
-    }
-
-    if (!/\.(mrpack|zip)$/i.test(file.name)) {
-      appendLocalLog(`WARN   Formato não suportado: ${file.name}. Use .mrpack ou .zip.`);
-      showTab('display');
-      return;
-    }
-
-    const formData = new FormData(form);
-
-    try {
-      setBusy(true);
-      appendLocalLog(`ACTION Importando modpack: ${file.name}`);
-      showTab('display');
-
-      await requestJSON(API.importModpack, {
-        method: 'POST',
-        body: formData
+  function bindTabState() {
+    $$(".side-link, .tab-link").forEach(button => {
+      button.addEventListener("click", () => {
+        if (button.dataset.tab) {
+          document.body.dataset.currentTab = button.dataset.tab;
+          if (button.dataset.tab === "server") setTimeout(refreshServerLiveStatus, 120);
+        }
       });
+    });
 
-      form.reset();
-      updateSelectedFileName();
-      await refreshStatus();
-      await refreshModpacks(false);
-      await refreshLogs();
-    } catch (error) {
-      appendLocalLog(`ERRO   Falha ao importar modpack: ${error.message}`);
-    } finally {
-      setBusy(false);
+    const active = $(".side-link.active, .tab-link.active");
+    if (active?.dataset?.tab) document.body.dataset.currentTab = active.dataset.tab;
+  }
+
+  function bindServerButtons() {
+    $$('[data-action="test_server"]').forEach(button => {
+      button.addEventListener("click", () => setTimeout(refreshServerLiveStatus, 500));
+    });
+  }
+
+  function startPolling() {
+    if (serverPollTimer) clearInterval(serverPollTimer);
+    serverPollTimer = setInterval(() => {
+      if (isServerTabActive()) refreshServerLiveStatus();
+    }, 15000);
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    bindTabState();
+    bindServerButtons();
+    startPolling();
+    if (isServerTabActive()) setTimeout(refreshServerLiveStatus, 400);
+  });
+})();
+
+
+/* =========================================================
+   RubyMC Backend Unknown Actions Frontend Guard
+   ========================================================= */
+(() => {
+  document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-action='clear_display']");
+    if (!button) return;
+
+    const display = document.getElementById("display-log");
+    if (display) {
+      display.textContent = "[SYSTEM] Display limpo. Aguardando novos eventos...";
     }
-  }
-
-  function updateSelectedFileName() {
-    const fileInput = $('#modpackFile');
-    const label = $('#modpackFileName');
-    if (!label) return;
-    const file = fileInput?.files?.[0];
-    label.textContent = file ? file.name : 'Clique para escolher um .mrpack ou .zip';
-  }
-
-  function showTab(rawTab) {
-    const tabName = normalizeTab(rawTab || 'home');
-    state.activeTab = tabName;
-
-    $all('[data-tab-target], [data-tab], .nav-item, .tab-button').forEach((button) => {
-      const target = normalizeTab(button.dataset.tabTarget || button.dataset.tab || inferTabFromText(button.textContent));
-      const active = target === tabName;
-      button.classList.toggle('active', active);
-      button.classList.toggle('is-active', active);
-    });
-
-    $all('[data-panel], .panel').forEach((panel) => {
-      const panelName = normalizeTab(panel.dataset.panel || panel.id);
-      const active = panelName === tabName || panel.id === `${tabName}-panel`;
-      panel.classList.toggle('active', active);
-      panel.classList.toggle('is-active', active);
-      if (panel.classList.contains('panel')) panel.hidden = !active;
-    });
-  }
-
-  function inferTabFromText(text) {
-    const normalized = String(text || '').toLowerCase();
-    if (normalized.includes('início') || normalized.includes('inicio')) return 'home';
-    if (normalized.includes('modpack')) return 'modpacks';
-    if (normalized.includes('servidor')) return 'server';
-    if (normalized.includes('discord')) return 'discord';
-    if (normalized.includes('display')) return 'display';
-    if (normalized.includes('projeto')) return 'project';
-    return '';
-  }
-
-  function inferActionFromButton(button) {
-    const explicit = button.dataset.action;
-    if (explicit) return explicit;
-
-    const text = String(button.textContent || '').trim().toLowerCase();
-    if (text.includes('rodar testes')) return 'run_tests';
-    if (text.includes('atualizar modpacks') || text.includes('atualizar lista')) return 'refresh_modpacks';
-    if (text.includes('atualizar')) return 'refresh_status';
-    if (text.includes('limpar')) return 'clear_logs';
-    if (text.includes('jogar')) return 'play';
-    if (text.includes('entrar no servidor')) return 'enter_server';
-    if (text.includes('testar servidor')) return 'test_server';
-    if (text.includes('validar discord')) return 'validate_discord_config';
-    if (text.includes('canal de logs')) return 'test_discord_log';
-    if (text.includes('organizar')) return 'organize_project';
-    if (text.includes('clássico') || text.includes('classico')) return 'launch_classic';
-    return null;
-  }
-
-  function bindDelegatedEvents() {
-    document.addEventListener('click', (event) => {
-      const clickable = event.target.closest('button, a, [role="button"], [data-action], [data-tab-target], [data-tab]');
-      if (!clickable) return;
-
-      const targetTab = clickable.dataset.tabTarget || clickable.dataset.tab;
-      const action = clickable.dataset.action || inferActionFromButton(clickable);
-
-      if (targetTab && !action) {
-        event.preventDefault();
-        showTab(targetTab);
-        return;
-      }
-
-      if (action) {
-        event.preventDefault();
-        runAction(action);
-      }
-    }, true);
-
-    const form = $('#modpackImportForm');
-    if (form) form.addEventListener('submit', importModpack);
-
-    const fileInput = $('#modpackFile');
-    if (fileInput) fileInput.addEventListener('change', updateSelectedFileName);
-  }
-
-  function fixButtonTypes() {
-    $all('button').forEach((button) => {
-      if (!button.hasAttribute('type')) button.type = 'button';
-      const action = button.dataset.action || inferActionFromButton(button);
-      if (action) button.dataset.action = normalizeAction(action);
-    });
-  }
-
-  async function boot() {
-    logConsole('launcher.js carregado. Boot iniciado.');
-    fixButtonTypes();
-    bindDelegatedEvents();
-    showTab('home');
-    appendLocalLog('SYSTEM JS conectado. Botões habilitados.');
-
-    await refreshStatus();
-    await refreshLogs();
-    await refreshModpacks(false);
-
-    setInterval(refreshStatus, 2500);
-    setInterval(refreshLogs, 1000);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
+  });
 })();

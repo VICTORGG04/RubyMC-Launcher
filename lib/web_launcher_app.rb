@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'json'
+require 'shellwords'
 require 'webrick'
 require 'open3'
 require 'fileutils'
@@ -8,6 +9,12 @@ require 'rbconfig'
 require 'socket'
 require 'timeout'
 require 'yaml'
+
+begin
+  require_relative 'minecraft_server_status'
+rescue LoadError
+  # Status live do servidor fica indisponível se o helper não estiver presente.
+end
 require 'securerandom'
 
 begin
@@ -86,6 +93,8 @@ module RubyMC
         json(res, status_payload)
       when '/api/logs'
         json(res, { ok: true, logs: read_logs })
+      when '/api/server/status', '/api/server/live'
+        json(res, live_server_status_payload)
       when '/api/action'
         handle_action(req, res)
       when '/api/modpacks'
@@ -142,6 +151,8 @@ module RubyMC
       log('ACTION', "Botão recebido pelo backend: #{action}") unless action == 'clear_logs'
 
       case action
+      when 'clear_display', 'display_clear', 'validate_discord', 'test_discord_logs', 'open_docs', 'check_updates', 'join_server'
+        json(res, rubymc_handle_ui_action(action))
       when 'clear_logs'
         File.write(log_file, '')
         log('SYSTEM', 'Display limpo. Aguardando novos eventos...')
@@ -174,7 +185,11 @@ module RubyMC
         result = test_discord_log
         json(res, { ok: true, message: 'Teste de log enviado ao Discord.', result: result })
       else
-        log('WARN', "Ação desconhecida recebida: #{action.inspect}")
+              if ['clear_display', 'display_clear', 'validate_discord', 'discord_validate', 'validate_discord_settings', 'test_discord_logs', 'discord_test_logs', 'test_logs_channel', 'open_docs', 'open_documentation', 'check_updates', 'update_check', 'join_server', 'server_join'].include?(action.to_s)
+        return json(res, rubymc_handle_ui_action(action))
+      end
+
+log('WARN', "Ação desconhecida recebida: #{action.inspect}")
         json(res, { ok: false, error: "Ação desconhecida: #{action}" })
       end
     end
@@ -421,6 +436,162 @@ module RubyMC
     rescue StandardError => e
       { configured: false, status: 'erro', error: e.message }
     end
+
+
+    def live_server_status_payload
+      info = server_info
+      address = info[:address].to_s
+
+      if defined?(RubyMC::MinecraftServerStatus)
+        live = RubyMC::MinecraftServerStatus.query(address, timeout: 5)
+      else
+        live = {
+          ok: false,
+          online: false,
+          address: address,
+          players: { online: 0, max: 0, sample: [] },
+          error: 'RubyMC::MinecraftServerStatus não carregado.'
+        }
+      end
+
+      if live[:online]
+        players = live.dig(:players, :online).to_i
+        max_players = live.dig(:players, :max).to_i
+        latency = live[:latency_ms] || '--'
+        log('CHECK', "Servidor online: #{players}/#{max_players} jogadores | ping #{latency} ms")
+      else
+        log('WARN', "Servidor offline/indisponível: #{live[:error]}")
+      end
+
+      {
+        ok: live[:online] == true,
+        server: info,
+        server_live: live,
+        server_status: live[:online] ? 'Online' : 'Offline',
+        server_players: live[:online] ? "#{live.dig(:players, :online).to_i}/#{live.dig(:players, :max).to_i} jogadores" : '0 jogadores',
+        time: Time.now.strftime('%H:%M:%S')
+      }
+    end
+
+
+
+
+    # RubyMC Backend Actions Final Fix
+    def rubymc_handle_ui_action(action)
+      normalized = action.to_s.strip
+
+      case normalized
+      when 'clear_display', 'display_clear'
+        @logs.clear if defined?(@logs) && @logs.respond_to?(:clear)
+        log('OK', 'Display limpo pelo painel.') if respond_to?(:log)
+        { ok: true, message: 'Display limpo.' }
+
+      when 'validate_discord', 'discord_validate', 'validate_discord_settings'
+        rubymc_validate_discord_final
+
+      when 'test_discord_logs', 'discord_test_logs', 'test_logs_channel'
+        rubymc_test_discord_logs_final
+
+      when 'open_docs', 'open_documentation'
+        rubymc_open_docs_final
+
+      when 'check_updates', 'update_check'
+        rubymc_check_updates_final
+
+      when 'join_server', 'server_join'
+        rubymc_join_server_final
+
+      else
+        nil
+      end
+    rescue StandardError => e
+      log('ERROR', "#{e.class}: #{e.message}") if respond_to?(:log)
+      { ok: false, message: e.message }
+    end
+
+    def rubymc_validate_discord_final
+      log('ACTION', 'Validação Discord solicitada pelo painel.') if respond_to?(:log)
+
+      script = File.join(project_root, 'scripts', 'validate_discord_settings.rb')
+      unless File.exist?(script)
+        log('WARN', 'Script scripts/validate_discord_settings.rb não encontrado.') if respond_to?(:log)
+        return { ok: false, message: 'Script de validação Discord não encontrado.' }
+      end
+
+      ok = system(RbConfig.ruby, script)
+      if ok
+        log('OK', 'Configuração Discord validada com sucesso.') if respond_to?(:log)
+        { ok: true, message: 'Configuração Discord validada com sucesso.' }
+      else
+        log('ERROR', 'Validação Discord retornou erro. Veja o terminal para detalhes.') if respond_to?(:log)
+        { ok: false, message: 'Validação Discord retornou erro.' }
+      end
+    end
+
+    def rubymc_test_discord_logs_final
+      log('ACTION', 'Teste de canal de logs Discord solicitado pelo painel.') if respond_to?(:log)
+
+      begin
+        if defined?(RubyMC::DiscordBotService)
+          service = RubyMC::DiscordBotService.new
+          [:send_log_test, :test_logs_channel, :send_test_log].each do |method_name|
+            if service.respond_to?(method_name)
+              result = service.public_send(method_name)
+              log('OK', 'Mensagem de teste enviada ao canal de logs Discord.') if respond_to?(:log)
+              return { ok: true, message: 'Mensagem de teste enviada ao canal de logs Discord.', result: result }
+            end
+          end
+        end
+      rescue StandardError => e
+        log('ERROR', "Falha ao enviar mensagem ao canal de logs: #{e.message}") if respond_to?(:log)
+        return { ok: false, message: e.message }
+      end
+
+      result = rubymc_validate_discord_final
+      if result[:ok]
+        log('WARN', 'Configuração Discord válida, mas método de envio de teste não foi encontrado no serviço Discord.') if respond_to?(:log)
+      end
+      result
+    end
+
+    def rubymc_open_docs_final
+      docs_path = File.join(project_root, 'docs')
+      target = File.directory?(docs_path) ? docs_path : project_root
+      log('ACTION', "Abrindo documentação: #{target}") if respond_to?(:log)
+      system('xdg-open', target, out: File::NULL, err: File::NULL)
+      log('OK', 'Comando para abrir documentação executado.') if respond_to?(:log)
+      { ok: true, message: 'Documentação aberta.' }
+    end
+
+    def rubymc_check_updates_final
+      log('ACTION', 'Verificação de atualizações solicitada pelo painel.') if respond_to?(:log)
+
+      unless File.directory?(File.join(project_root, '.git'))
+        log('WARN', 'Projeto não parece ser um repositório Git.') if respond_to?(:log)
+        return { ok: false, message: 'Projeto não parece ser um repositório Git.' }
+      end
+
+      system('git', '-C', project_root, 'fetch', '--all', '--prune', out: File::NULL, err: File::NULL)
+      status = `git -C #{Shellwords.escape(project_root)} status -sb 2>&1`.strip
+      log('OK', "Status Git: #{status}") if respond_to?(:log)
+      { ok: true, message: 'Atualizações verificadas.', git_status: status }
+    end
+
+    def rubymc_join_server_final
+      info = respond_to?(:server_info) ? server_info : {}
+      address = (info[:address] || info['address'] || '').to_s.strip
+
+      if address.empty? || address =~ /ID_DO|não configurado/i
+        log('WARN', 'Servidor não configurado. Configure o endereço real em config/settings.yml.') if respond_to?(:log)
+        return { ok: false, message: 'Servidor não configurado.' }
+      end
+
+      log('ACTION', "Abrindo servidor Minecraft: #{address}") if respond_to?(:log)
+      system('xdg-open', "minecraft://?addExternalServer=RubyMC|#{address}", out: File::NULL, err: File::NULL)
+      log('OK', "Comando para entrar no servidor enviado: #{address}") if respond_to?(:log)
+      { ok: true, message: "Abrindo servidor #{address}.", address: address }
+    end
+
 
     def read_logs
       return [] unless File.file?(log_file)

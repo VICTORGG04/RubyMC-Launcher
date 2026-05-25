@@ -2,199 +2,176 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Minecraft Ruby Launcher</title>
-  <link rel="stylesheet" href="/assets/css/launcher.css?v=buttons-fix-1">
-  <script defer src="/assets/js/launcher.js?v=buttons-fix-1"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RubyMC Launcher</title>
+  <link rel="stylesheet" href="/assets/css/launcher.css?v=rubymc-actions-final-fix-1">
 </head>
 <body>
-  <div class="app-shell">
-    <aside class="sidebar">
-      <div class="brand">
-        <img src="/assets/img/rubymc-server-icon.png" alt="" class="brand-icon" onerror="this.style.display='none'">
+  <div class="rubymc-shell">
+    <section class="brand-strip">
+      <div class="brand-left">
+        <img src="/assets/img/rubymc-logo-banner.png" alt="RubyMC Launcher">
         <div>
-          <strong>Minecraft Ruby</strong>
-          <span>Launcher Web</span>
+          <span>MINECRAFT</span><strong>RUBY</strong><em>LAUNCHER</em>
+          <p>Sua experiência Minecraft, elevada.</p>
         </div>
       </div>
-
-      <nav class="nav">
-        <button type="button" class="nav-item active" data-tab-target="home">🏠 Início</button>
-        <button type="button" class="nav-item" data-tab-target="modpacks">📦 Modpacks</button>
-        <button type="button" class="nav-item" data-tab-target="server">🌐 Servidor</button>
-        <button type="button" class="nav-item" data-tab-target="discord">🤖 Discord</button>
-        <button type="button" class="nav-item" data-tab-target="display">▣ Display</button>
-        <button type="button" class="nav-item" data-tab-target="project">▰ Projeto</button>
-      </nav>
-
-      <div class="sidebar-footer">
-        <span class="status-dot"></span>
-        <span id="connectionStatus">Conectando display...</span>
+      <div class="feature-strip">
+        <div><b>🛡️</b><span>Autenticação<br>Microsoft</span></div>
+        <div><b>📦</b><span>Gerenciamento<br>de Modpacks</span></div>
+        <div><b>🎮</b><span>Discord<br>Integrado</span></div>
+        <div><b>🔄</b><span>Atualizações<br>Automáticas</span></div>
+        <div><b>⛶</b><span>Modo<br>Offline</span></div>
       </div>
-    </aside>
-
-    <main class="main">
-      <header class="hero">
-        <div>
-          <span class="eyebrow">PAINEL LOCAL</span>
-          <h1>Minecraft Ruby Launcher</h1>
-        </div>
-        <img src="/assets/img/rubymc-control-panel.png" alt="" class="hero-art" onerror="this.style.display='none'">
-        <div class="hero-actions">
-          <button type="button" data-action="refresh_status">Atualizar</button>
-          <button type="button" class="primary" data-action="run_tests">Rodar testes</button>
-        </div>
-      </header>
-
-      <section class="panel active" id="home" data-panel="home">
-        <div class="summary-card">
-          <div>
-            <span class="eyebrow">INTERFACE WEB COM CSS REAL</span>
-            <h2>Launcher organizado, com logs no próprio painel</h2>
-            <p>Use as abas para importar modpacks, testar servidor, iniciar o Minecraft e organizar a raiz do projeto sem sair da tela.</p>
+    </section>
+    <section class="launcher-window app-window">
+      <aside class="app-sidebar">
+        <div class="app-title"><span>💎</span><strong>RUBYMC LAUNCHER</strong></div>
+        <nav class="tab-nav" aria-label="Abas do RubyMC Launcher">
+          <button class="tab-link active" data-tab="home">🏠 <span>Início</span></button>
+          <button class="tab-link" data-tab="modpacks"><img class="nav-modpack-icon" src="/assets/img/rubymc-modpack-box-icon.png" alt=""> <span>Modpacks</span></button>
+          <button class="tab-link" data-tab="server">🌐 <span>Servidor</span></button>
+          <button class="tab-link" data-tab="discord"><img class="nav-discord-icon" src="/assets/img/rubymc-discord-ruby-icon-64.png" alt=""> <span>Discord</span></button>
+          <button class="tab-link" data-tab="display">▣ <span>Display</span></button>
+          <button class="tab-link" data-tab="project">🧪 <span>Projeto</span></button>
+        </nav>
+        <button class="tab-link settings-link" data-tab="settings">⚙️ <span>Configurações</span></button>
+        <footer class="sidebar-status"><span></span><small id="connection-status">Você está conectado</small></footer>
+      </aside>
+      <main class="app-content">
+        <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+        <section id="tab-home" class="tab-panel active" data-panel-title="Início">
+          <div class="panel-grid hero-grid">
+            <article class="panel-copy">
+              <span class="cyan-label">BEM-VINDO(A)!</span>
+              <h1>Pronto para jogar?</h1>
+              <p>Gerencie suas contas, modpacks, servidores e muito mais com o RubyMC Launcher.</p>
+              <label for="profile-select">Perfil ativo</label>
+              <select id="profile-select"><option value="vanilla">Vanilla / sem modpack</option></select>
+              <div class="actions"><button class="btn btn-red" data-action="play">Jogar Minecraft</button><button class="btn btn-dark" data-action="join_server">Entrar no servidor</button></div>
+              <div class="hero-stats"><div><span>VERSÃO</span><strong id="minecraft-version">1.21.4</strong><em>Instalada</em></div><div><span>PERFIL ATIVO</span><strong id="active-profile">Vanilla</strong><em>Online</em></div><div><span>SERVIDOR</span><strong id="server-state">Online</strong><em id="server-players">0 jogadores</em></div><div><span>STATUS</span><strong id="launcher-state">Tudo certo!</strong><em>Pronto para jogar</em></div></div>
+            </article>
           </div>
-
-          <div class="stats">
-            <div><strong id="rubyVersion">--</strong><span>Ruby</span></div>
-            <div><strong id="modpacksCount">0</strong><span>Modpacks</span></div>
-            <div><strong id="serverStatus">---</strong><span>Servidor</span></div>
-          </div>
-        </div>
-
-        <div class="grid two">
-          <article class="card">
-            <span class="ruby-pin"></span>
-            <h3>Jogar</h3>
-            <p>Escolha um perfil e inicie o Minecraft pelo launcher existente.</p>
-            <label for="profileSelect">Perfil</label>
-            <select id="profileSelect">
-              <option value="vanilla">Vanilla / sem modpack</option>
-            </select>
-            <div class="button-row">
-              <button type="button" class="primary" data-action="play">Jogar</button>
-              <button type="button" data-action="enter_server">Entrar no servidor</button>
-            </div>
-          </article>
-
-          <article class="card">
-            <span class="ruby-pin"></span>
-            <h3>Display interno</h3>
-            <p>Tudo que for executado aparece no display: testes, erros, imports, servidor e comandos.</p>
-            <div class="button-row">
-              <button type="button" data-tab-target="display">Abrir display</button>
-              <button type="button" data-action="clear_logs">Limpar</button>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="panel" id="modpacks" data-panel="modpacks" hidden>
-        <div class="grid two modpack-grid">
-          <article class="card">
-            <span class="ruby-pin"></span>
-            <span class="eyebrow">IMPORTAÇÃO</span>
-            <h2>Importar Modpack</h2>
-            <p>Selecione um arquivo <strong>.mrpack</strong> do Modrinth ou <strong>.zip</strong> do CurseForge/pack genérico. O resultado aparece no Display interno.</p>
-
-            <form id="modpackImportForm" class="modpack-form">
-              <label for="modpackName">Nome do perfil</label>
-              <input id="modpackName" name="name" type="text" placeholder="Ex.: RubyMC Survival" autocomplete="off">
-
-              <label for="modpackFile">Arquivo do modpack</label>
-              <label class="file-picker" for="modpackFile">
-                <input id="modpackFile" name="modpack" type="file" accept=".mrpack,.zip" required>
-                <span id="modpackFileName">Clique para escolher um .mrpack ou .zip</span>
-              </label>
-
-              <div class="button-row">
-                <button class="primary" type="submit">Importar modpack</button>
-                <button type="button" data-action="refresh_modpacks">Atualizar lista</button>
+        </section>
+        <section id="tab-modpacks" class="tab-panel" data-panel-title="Modpacks">
+          <header class="panel-heading"><h2><img class="title-modpack-icon" src="/assets/img/rubymc-modpack-box-icon.png" alt="">Modpacks</h2><p>Importe e gerencie seus perfis de modpack em uma única tela.</p></header>
+          <div class="panel-grid"><article class="panel-copy"><div class="modpack-box-badge">
+                <img src="/assets/img/rubymc-modpack-box-icon.png" alt="Caixa 3D RubyMC para modpacks">
+                <div>
+                  <strong>RubyMC Modpack Box</strong>
+                  <small>Pacotes, perfis e imports organizados no padrão visual RubyMC.</small>
+                </div>
               </div>
-            </form>
-          </article>
 
-          <article class="card">
-            <span class="ruby-pin"></span>
-            <span class="eyebrow">PERFIS INSTALADOS</span>
-            <h2>Modpacks disponíveis</h2>
-            <p>Os perfis importados aparecem aqui e também no seletor da aba Início.</p>
-            <div id="modpackList" class="modpack-list">
-              <div class="empty-state">Nenhum modpack carregado ainda.</div>
+              <h3>Importar Modpack</h3><p>Selecione um arquivo <strong>.mrpack</strong> ou <strong>.zip</strong>.</p><label for="modpack-name">Nome do perfil</label><input id="modpack-name" type="text" placeholder="Ex.: RubyMC Survival"><label for="modpack-file">Arquivo do modpack</label><label class="dropzone modpack-dropzone" for="modpack-file"><span id="modpack-file-label">Clique para escolher ou arraste o arquivo aqui</span><small>Formatos suportados: .mrpack, .zip</small><input id="modpack-file" type="file" accept=".mrpack,.zip" hidden></label><div class="actions"><button class="btn btn-red" data-action="import_modpack">Importar modpack</button><button class="btn btn-dark" data-action="update_modpacks">Atualizar lista</button></div><h3 class="section-subtitle">Modpacks disponíveis</h3><div id="modpack-list" class="list-box">Nenhum modpack importado ainda.</div></article></div>
+        </section>
+        <section id="tab-server" class="tab-panel" data-panel-title="Servidor">
+          <header class="panel-heading"><h2>🌐 Servidor da Comunidade</h2><p>Teste conexão e entre diretamente no servidor configurado.</p></header>
+          <div class="panel-grid"><article class="panel-copy"><h3>Servidor da comunidade</h3><p>Endereço configurado:</p><input id="server-address" type="text" value="não configurado" readonly><div class="actions"><button class="btn btn-red" data-action="test_server">Testar servidor</button><button class="btn btn-dark" data-action="join_server">Entrar no servidor</button></div><div class="status-box"><span>Status do servidor</span><strong id="server-test-state">Aguardando teste</strong><em id="server-test-detail">Use o botão para validar a conexão.</em>
+                <div class="server-live-grid">
+                  <div><span>Online agora</span><strong id="server-live-online">--</strong></div>
+                  <div><span>Capacidade</span><strong id="server-live-max">--</strong></div>
+                  <div><span>Ping</span><strong id="server-live-latency">--</strong></div>
+                  <div><span>Versão</span><strong id="server-live-version">--</strong></div>
+                  <div><span>Atualizado</span><strong id="server-live-checked">--</strong></div>
+                  <div><span>Sinal</span><strong><span class="server-bars"><i></i><i></i><i></i><i></i><i></i></span></strong></div>
+                </div>
+
+                <div class="server-player-list">
+                  <div class="server-player-list-title">Jogadores visíveis</div>
+                  <div id="server-player-tags" class="server-player-tags">
+                    <span class="server-player-tag">Aguardando consulta</span>
+                  </div>
+                  <div id="server-motd" class="server-motd">A descrição do servidor aparecerá aqui quando a API responder.</div>
+                </div></div></article></div>
+        </section>
+        <section id="tab-discord" class="tab-panel" data-panel-title="Discord">
+          <header class="panel-heading"><h2><img class="title-discord-icon" src="/assets/img/rubymc-discord-ruby-icon-64.png" alt="">Discord Bot</h2><p>Valide canais, cargos, permissões e integração do bot.</p></header>
+          <div class="panel-grid"><article class="panel-copy"><h3>Canais e cargos</h3><p>Valide os IDs configurados em <strong>config/settings.yml</strong> sem expor o token.</p><div class="mini-stats"><div><span>BOT</span><strong id="discord-bot-state">Inativo</strong></div><div><span>CANAIS</span><strong id="discord-channel-count">--/--</strong></div><div><span>CARGOS</span><strong id="discord-role-count">--/--</strong></div></div><div class="actions"><button class="btn btn-red" data-action="validate_discord">Validar Discord</button><button class="btn btn-dark" data-action="test_discord_logs">Testar canal de logs</button></div></article><article class="permission-box"><h3>Permissões</h3><p><strong>Membro</strong> acessa canais públicos. <strong>Jogador</strong> libera áreas do Minecraft. <strong>Staff/Admin</strong> liberam suporte e moderação.</p><p><strong>RubyMC Bot</strong> precisa ficar acima dos cargos que ele entrega.</p><ul><li>Canal de logs: <strong id="logs-channel-state">pendente</strong></li><li>Status: <strong id="discord-config-state">configurado</strong></li></ul></article></div>
+        </section>
+        <section id="tab-display" class="tab-panel" data-panel-title="Display">
+          <header class="panel-heading with-actions"><div><h2>▣ Display Interno de Logs</h2><p>Acompanhe tudo que acontece no launcher em tempo real.</p></div><div class="actions"><button class="btn btn-dark" data-action="run_tests">Rodar testes</button><button class="btn btn-dark" data-action="clear_display">Limpar</button></div></header>
+          <div class="panel-grid display-grid"><pre id="display-log" class="terminal-display">[SYSTEM] RubyMC Web Launcher inicializando...
+[SYSTEM] Aguardando eventos do backend...</pre><figure class="preview-frame"><img src="/assets/img/rubymc-display-logs.png" alt="Display interno RubyMC"></figure></div>
+        </section>
+        <section id="tab-project" class="tab-panel" data-panel-title="Projeto">
+          <header class="panel-heading"><h2>📁 Projeto</h2><p>Organize scripts, testes, documentos e recursos do launcher.</p></header>
+          <div class="panel-grid"><article class="project-actions"><button class="project-option" data-action="open_project_folder"><span>📁</span><strong>Abrir pasta do projeto</strong><em>Acesse a raiz do projeto.</em></button><button class="project-option" data-action="organize_project"><span>💻</span><strong>Abrir scripts</strong><em>Gerencie os scripts do launcher.</em></button><button class="project-option" data-action="open_docs"><span>📖</span><strong>Abrir documentação</strong><em>Acesse os documentos do projeto.</em></button></article></div>
+        </section>
+        <section id="tab-settings" class="tab-panel settings-panel" data-panel-title="Configurações">
+          <header class="settings-page-header">
+            <div class="settings-title-group">
+              <span class="settings-icon">⚙️</span>
+              <div>
+                <h2>Configurações</h2>
+                <p>Personalize sua experiência no RubyMC Launcher.</p>
+              </div>
             </div>
-          </article>
-        </div>
-      </section>
+          </header>
 
-      <section class="panel" id="server" data-panel="server" hidden>
-        <article class="card wide">
-          <h2>Servidor da comunidade</h2>
-          <p>Endereço configurado: <strong id="serverAddress">--</strong></p>
-          <div class="button-row">
-            <button type="button" data-action="test_server">Testar servidor</button>
-            <button type="button" class="primary" data-action="enter_server">Entrar no servidor</button>
+          <div class="settings-page-grid">
+            <article class="settings-form-card">
+              <h3>Configurações gerais</h3>
+              <p>Personalize sua experiência.</p>
+
+              <label for="settings-version">Minecraft</label>
+              <div class="settings-fields-grid">
+                <div class="field-box">
+                  <small>Versão padrão</small>
+                  <select id="settings-version">
+                    <option>1.21.4</option>
+                    <option>1.20.1</option>
+                    <option>Vanilla</option>
+                  </select>
+                </div>
+
+                <div class="field-box">
+                  <small>RAM (MB)</small>
+                  <input id="settings-ram" type="number" value="2048" placeholder="RAM (MB)">
+                </div>
+              </div>
+
+              <label>Discord</label>
+              <div class="settings-toggle-row">
+                <span>Rich Presence</span>
+                <button class="toggle active" data-toggle="rich_presence" aria-label="Alternar Rich Presence"></button>
+              </div>
+
+              <div class="settings-toggle-row">
+                <span>Ativar Bot Discord</span>
+                <button class="toggle active" data-toggle="discord_bot" aria-label="Alternar Bot Discord"></button>
+              </div>
+
+              <footer class="settings-connected">
+                <span></span>
+                <small>Você está conectado</small>
+              </footer>
+            </article>
+
+            <article class="settings-about-card">
+              <h3>Sobre o RubyMC Launcher</h3>
+
+              <div class="settings-about-brand">
+                <div class="settings-logo-orb">
+                  <img src="/assets/img/rubymc-logo-banner.png" alt="RubyMC">
+                </div>
+
+                <div class="settings-brand-text">
+                  <strong>RUBYMC</strong>
+                  <span>— LAUNCHER —</span>
+                </div>
+              </div>
+
+              <p>Versão: <strong id="launcher-version">1.0.0</strong></p>
+              <p>Feito com <strong class="heart">❤</strong> para a comunidade Minecraft.</p>
+
+              <button class="btn btn-dark settings-update-button" data-action="check_updates">Verificar atualizações</button>
+            </article>
           </div>
-        </article>
-      </section>
-
-
-      <section class="panel" id="discord" data-panel="discord" hidden>
-        <div class="grid two discord-grid">
-          <article class="card">
-            <span class="ruby-pin"></span>
-            <span class="eyebrow">DISCORD BOT</span>
-            <h2>Canais e cargos</h2>
-            <p>Valide os IDs configurados em <strong>config/settings.yml</strong> sem expor o token do bot.</p>
-
-            <div class="discord-stats">
-              <div><strong id="discordBotStatus">--</strong><span>Bot</span></div>
-              <div><strong id="discordChannelsCount">0/0</strong><span>Canais</span></div>
-              <div><strong id="discordRolesCount">0/0</strong><span>Cargos</span></div>
-            </div>
-
-            <div class="button-row">
-              <button type="button" class="primary" data-action="validate_discord_config">Validar Discord</button>
-              <button type="button" data-action="test_discord_log">Testar canal de logs</button>
-            </div>
-          </article>
-
-          <article class="card">
-            <span class="ruby-pin"></span>
-            <span class="eyebrow">PERMISSÕES</span>
-            <h2>Uso dos cargos</h2>
-            <p><strong>Membro</strong> acessa canais públicos. <strong>Jogador</strong> libera áreas do Minecraft. <strong>Staff/Admin</strong> liberam suporte e moderação. <strong>RubyMC Bot</strong> precisa ficar acima dos cargos que ele entrega.</p>
-            <p>Canal de logs: <strong id="discordLogsChannel">--</strong></p>
-            <p>Status: <strong id="discordConfigStatus">--</strong></p>
-          </article>
-        </div>
-      </section>
-
-      <section class="panel" id="display" data-panel="display" hidden>
-        <article class="card wide terminal-card">
-          <div class="card-header">
-            <div>
-              <span class="eyebrow">DISPLAY INTERNO</span>
-              <h2>Logs, testes e erros</h2>
-            </div>
-            <div class="button-row">
-              <button type="button" data-action="run_tests">Rodar testes</button>
-              <button type="button" data-action="clear_logs">Limpar</button>
-            </div>
-          </div>
-          <pre id="displayLog" class="display-log">[Display] Conectando ao backend...</pre>
-        </article>
-      </section>
-
-      <section class="panel" id="project" data-panel="project" hidden>
-        <article class="card wide">
-          <h2>Projeto</h2>
-          <p>Organize a raiz do projeto movendo scripts, testes e documentos para suas pastas corretas.</p>
-          <div class="button-row">
-            <button type="button" data-action="organize_project">Organizar raiz</button>
-            <button type="button" data-action="launch_classic">Abrir clássico</button>
-          </div>
-        </article>
-      </section>
-    </main>
+        </section>
+      </main>
+    </section>
   </div>
+  <script src="/assets/js/launcher.js?v=rubymc-actions-final-fix-1"></script>
 </body>
 </html>

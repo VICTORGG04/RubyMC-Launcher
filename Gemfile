@@ -24,6 +24,38 @@ gem "websocket-client-simple", "~> 0.7"    # Gateway WebSocket do Discord (bot d
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 gem "webrick", "~> 1.9"
 gem "rubyzip", "~> 2.3"
 gem "json"
