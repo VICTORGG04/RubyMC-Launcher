@@ -185,7 +185,7 @@ module RubyMC
         result = test_discord_log
         json(res, { ok: true, message: 'Teste de log enviado ao Discord.', result: result })
       else
-              if ['clear_display', 'display_clear', 'validate_discord', 'discord_validate', 'validate_discord_settings', 'test_discord_logs', 'discord_test_logs', 'test_logs_channel', 'open_docs', 'open_documentation', 'check_updates', 'update_check', 'join_server', 'server_join'].include?(action.to_s)
+      if ['clear_display', 'display_clear', 'validate_discord', 'discord_validate', 'validate_discord_settings', 'test_discord_logs', 'discord_test_logs', 'test_logs_channel', 'open_docs', 'open_documentation', 'check_updates', 'update_check', 'join_server', 'server_join'].include?(action.to_s)
         return json(res, rubymc_handle_ui_action(action))
       end
 
