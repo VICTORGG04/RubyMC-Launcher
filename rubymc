@@ -14,8 +14,8 @@ LOG_FILE="$RUN_DIR/web.log"
 mkdir -p "$RUN_DIR"
 
 say() { echo "[RubyMC] $*"; }
-ok() { echo "[OK] $*"; }
-warn() { echo "[AVISO] $*"; }
+ok()  { echo "[OK] $*"; }
+warn(){ echo "[AVISO] $*"; }
 
 ensure_gemfile() {
   say "Verificando Gemfile..."
@@ -84,19 +84,27 @@ stop_server() {
     rm -f "$PID_FILE"
   fi
 
-  pkill -f "launcher_gui.rb" >/dev/null 2>&1 || true
+  pkill -f "app/server.rb" >/dev/null 2>&1 || true
   free_port
 
   ok "Servidor parado/liberado."
+  stop_bot
 }
 
 start_server() {
+  local simulate_flag=""
+
+  if [ "$1" = "--simulate" ] || [ "${RUBYMC_SIMULATE}" = "1" ]; then
+    simulate_flag="--simulate"
+    say "Modo simulação ativado! (20 jogadores + Discord mock)"
+  fi
+
   install_deps
   stop_server
 
   say "Iniciando RubyMC Launcher em ${URL}"
 
-  nohup bundle exec ruby launcher_gui.rb > "$LOG_FILE" 2>&1 &
+  nohup bundle exec ruby app/server.rb $simulate_flag > "$LOG_FILE" 2>&1 &
   new_pid="$!"
   echo "$new_pid" > "$PID_FILE"
 
@@ -108,7 +116,7 @@ start_server() {
     exit 1
   fi
 
-  ok "Servidor iniciado. PID: $new_pid"
+  ok "Servidor iniciado. PID: $new_pid${simulate_flag:+ (modo simulação)}"
 
   if command -v xdg-open >/dev/null 2>&1; then
     xdg-open "${URL}/?v=latest-update" >/dev/null 2>&1 || true
@@ -118,6 +126,8 @@ start_server() {
   say "Acesse: ${URL}/?v=latest-update"
   say "Use './rubymc logs' para ver logs."
   say "Use './rubymc stop' para parar."
+
+  start_bot
 }
 
 status_server() {
@@ -127,19 +137,21 @@ status_server() {
   if [ -f "$PID_FILE" ]; then
     pid="$(cat "$PID_FILE")"
     if kill -0 "$pid" >/dev/null 2>&1; then
-      echo "Status: rodando"
-      echo "PID: $pid"
+      echo "Servidor web: rodando (PID $pid)"
     else
-      echo "Status: PID salvo, mas processo morto"
+      echo "Servidor web: PID salvo, mas processo morto"
     fi
   else
-    echo "Status: sem PID salvo"
+    echo "Servidor web: sem PID salvo"
   fi
 
   if command -v lsof >/dev/null 2>&1; then
     echo
     lsof -nP -iTCP:${PORT} -sTCP:LISTEN || true
   fi
+
+  echo
+  status_bot
 }
 
 show_logs() {
@@ -150,10 +162,10 @@ show_logs() {
 run_tests() {
   install_deps
   echo "[RubyMC] Verificando sintaxe Ruby..."
-  [ -f launcher_gui.rb ] && ruby -c launcher_gui.rb
-  [ -f launcher.rb ] && ruby -c launcher.rb
+  [ -f app/server.rb ] && ruby -c app/server.rb
+  [ -f app/console.rb ] && ruby -c app/console.rb
   [ -f lib/web_launcher_app.rb ] && ruby -c lib/web_launcher_app.rb
-  [ -f bin/run_launcher_checks.rb ] && ruby bin/run_launcher_checks.rb || true
+  [ -f bin/run_checks.rb ] && ruby bin/run_checks.rb || true
   echo "[RubyMC] Verificando bundle..."
   bundle check
   ok "Testes básicos concluídos."
@@ -161,20 +173,103 @@ run_tests() {
 
 open_classic() {
   install_deps
-  ruby launcher.rb
+  ruby app/console.rb
 }
 
 organize_project() {
-  if [ -f scripts/organize_project_root.rb ]; then
-    ruby scripts/organize_project_root.rb --apply
-  else
-    echo "[AVISO] scripts/organize_project_root.rb não encontrado."
+  echo "[AVISO] Comando 'organize' foi movido para archive/scripts/. Use apenas se necessário."
+  echo "  ruby archive/scripts/organize_project_root.rb --apply"
+}
+
+ai_ask() {
+  install_deps
+  shift
+  local question="$*"
+  if [ -z "$question" ]; then
+    echo "[ERRO] Use: ./rubymc ai \"sua pergunta\""
+    exit 1
   fi
+  bundle exec ruby lib/rubymc/ai_cli.rb ask "$question"
+}
+
+ai_chat() {
+  install_deps
+  bundle exec ruby lib/rubymc/ai_cli.rb chat
+}
+
+BOT_PID_FILE="$RUN_DIR/bot.pid"
+BOT_LOG_FILE="$RUN_DIR/bot.log"
+
+start_bot() {
+  install_deps
+
+  if [ -f "$BOT_PID_FILE" ]; then
+    pid="$(cat "$BOT_PID_FILE" 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1; then
+      say "Bot já está rodando (PID $pid). Use './rubymc bot restart' para reiniciar."
+      return
+    fi
+    rm -f "$BOT_PID_FILE"
+  fi
+
+  say "Iniciando bot Discord..."
+
+  nohup bundle exec ruby app/bot.rb > "$BOT_LOG_FILE" 2>&1 &
+  new_pid="$!"
+  echo "$new_pid" > "$BOT_PID_FILE"
+
+  sleep 2
+
+  if ! kill -0 "$new_pid" >/dev/null 2>&1; then
+    echo "[ERRO] O bot não iniciou. Últimos logs:"
+    tail -n 40 "$BOT_LOG_FILE" || true
+    exit 1
+  fi
+
+  ok "Bot Discord iniciado. PID: $new_pid"
+  say "Use './rubymc bot logs' para ver logs."
+  say "Use './rubymc bot stop' para parar."
+}
+
+stop_bot() {
+  say "Parando bot Discord..."
+
+  if [ -f "$BOT_PID_FILE" ]; then
+    pid="$(cat "$BOT_PID_FILE" 2>/dev/null || true)"
+    if [ -n "$pid" ]; then
+      kill "$pid" >/dev/null 2>&1 || true
+      sleep 1
+      kill -9 "$pid" >/dev/null 2>&1 || true
+    fi
+    rm -f "$BOT_PID_FILE"
+  fi
+
+  pkill -f "app/bot.rb" >/dev/null 2>&1 || true
+  ok "Bot Discord parado."
+}
+
+status_bot() {
+  if [ -f "$BOT_PID_FILE" ]; then
+    pid="$(cat "$BOT_PID_FILE")"
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      echo "Bot Discord: rodando (PID $pid)"
+    else
+      echo "Bot Discord: PID salvo, mas processo morto"
+    fi
+  else
+    echo "Bot Discord: parado"
+  fi
+}
+
+bot_logs() {
+  touch "$BOT_LOG_FILE"
+  tail -f "$BOT_LOG_FILE"
 }
 
 case "${1:-start}" in
   start|web)
-    start_server
+    shift
+    start_server "$@"
     ;;
   stop)
     stop_server
@@ -201,8 +296,43 @@ case "${1:-start}" in
   install)
     install_deps
     ;;
+  ai)
+    ai_ask "$@"
+    ;;
+  ai-chat|aic)
+    ai_chat
+    ;;
+  bot)
+    cmd="${2:-start}"
+    case "$cmd" in
+      start)
+        start_bot
+        ;;
+      stop)
+        stop_bot
+        ;;
+      restart)
+        stop_bot
+        start_bot
+        ;;
+      status)
+        status_bot
+        ;;
+      logs)
+        bot_logs
+        ;;
+      *)
+        echo "Uso: ./rubymc bot [start|stop|restart|status|logs]"
+        exit 1
+        ;;
+    esac
+    ;;
   *)
-    echo "Uso: ./rubymc [start|web|stop|restart|status|logs|test|classic|organize|install]"
+    echo "Uso: ./rubymc [start|web|stop|restart|status|logs|test|classic|organize|install|ai|ai-chat|bot]"
+    echo ""
+    echo "  start [--simulate]  Inicia o servidor web (--simulate: modo simulação com 20 jogadores)"
+    echo "  web                 Atalho para start"
+    echo "  bot [comando]       Gerencia o bot Discord (start|stop|restart|status|logs)"
     exit 1
     ;;
 esac

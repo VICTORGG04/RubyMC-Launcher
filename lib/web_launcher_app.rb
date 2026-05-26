@@ -11,42 +11,36 @@ require 'timeout'
 require 'yaml'
 
 begin
-  require_relative 'minecraft_server_status'
+  require_relative 'rubymc/minecraft_server_status'
 rescue LoadError
   # Status live do servidor fica indisponível se o helper não estiver presente.
 end
 require 'securerandom'
 
 begin
-  require_relative 'rubymc_settings'
-  require_relative 'discord_config'
-  require_relative 'discord_bot_service'
+  require_relative 'rubymc/rubymc_settings'
+  require_relative 'rubymc/discord_config'
+  require_relative 'rubymc/discord_bot_service'
 rescue LoadError
   # O launcher web continua funcionando mesmo sem os módulos avançados do Discord.
 end
 
 begin
-  require_relative 'modpack_manager'
+  require_relative 'rubymc/modpack_manager'
 rescue LoadError
   # O launcher continua funcionando mesmo sem o gerenciador avançado de modpacks.
 end
 
 begin
-  require_relative 'rubymc_backend_actions'
-begin
-  require_relative 'ai_support_service'
-begin
-  require_relative 'rubymc_discord_panel_actions'
-rescue LoadError => e
-  warn "RubyMC Discord panel actions não carregado: #{e.message}"
-end
-
+  require_relative 'rubymc/ai_support_service'
 rescue LoadError => e
   warn "RubyMC AI support não carregado: #{e.message}"
 end
 
+begin
+  require_relative 'rubymc/rubymc_discord_panel_actions'
 rescue LoadError => e
-  warn "RubyMC backend actions não carregado: #{e.message}"
+  warn "RubyMC Discord panel actions não carregado: #{e.message}"
 end
 
 module RubyMC
@@ -69,13 +63,18 @@ module RubyMC
     # que chamam project_root — ambos apontam para o mesmo diretório raiz.
     alias project_root root
 
-    def initialize(root:, host: '127.0.0.1', port: 4567)
+    def initialize(root:, host: '127.0.0.1', port: 4567, simulate: false)
       @root = File.expand_path(root)
       @host = host
       @port = Integer(port)
+      @simulate = simulate
       @log_file = File.join(@root, 'tmp', 'rubymc-display.log')
       FileUtils.mkdir_p(File.dirname(@log_file))
       FileUtils.touch(@log_file)
+    end
+
+    def simulate?
+      @simulate
     end
 
     def start
@@ -127,14 +126,27 @@ module RubyMC
         service = RubyMC::AISupportService.new(root: project_root)
         json(res, service.health)
 
+      when '/api/ai/context'
+        json(res, {
+          ok: true,
+          discord: discord_status_payload,
+          modpacks: list_modpack_payloads.map { |mp| { name: mp[:name], id: mp[:id], version: mp[:minecraft_version] } },
+          server: server_info,
+          logs: read_logs.last(20)
+        })
+
       when '/api/action'
         handle_action(req, res)
       when '/api/modpacks'
         json(res, { ok: true, modpacks: list_modpack_payloads })
       when '/api/modpacks/import'
         handle_modpack_import(req, res)
+      when '/api/modpacks/remove'
+        handle_modpack_remove(req, res)
       when '/api/discord/status'
         json(res, { ok: true, discord: discord_status_payload })
+      when '/api/discord/members'
+        json(res, { ok: true, members: discord_members_payload })
       when '/api/discord/validate'
         handle_discord_validate(req, res)
       when '/api/discord/test-log'
@@ -188,6 +200,8 @@ module RubyMC
       when 'clear_display', 'display_clear',
            'validate_discord', 'discord_validate', 'validate_discord_settings',
            'test_discord_logs', 'discord_test_logs', 'test_logs_channel',
+           'test_all_channels', 'discord_test_channels', 'test_channels',
+           'create_invite', 'discord_create_invite', 'generate_invite',
            'open_docs', 'open_documentation',
            'check_updates', 'update_check',
            'join_server', 'server_join'
@@ -236,6 +250,10 @@ module RubyMC
       when 'test_server', 'server_test', 'check_server'
         run_async('Testar servidor') { test_community_server }
         json(res, { ok: true, message: 'Teste do servidor iniciado. Veja o Display.' })
+
+      # ── Discord: simulação (sempre mock, independente de --simulate) ──────
+      when 'simular_discord', 'discord_simulate'
+        json(res, rubymc_simular_discord)
 
       # ── Discord avançado (via módulos opcionais) ──────────────────────────
       when 'validate_discord_config'
@@ -303,6 +321,48 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       json(res, { ok: false, error: e.message, type: e.class.name })
     end
 
+
+    def handle_modpack_remove(req, res)
+      unless req.request_method == 'POST'
+        res.status = 405
+        json(res, { ok: false, error: 'Use POST para remover modpacks.' })
+        return
+      end
+
+      data = parse_json(req.body)
+      profile_id = data['profile_id'].to_s.strip
+      if profile_id.empty?
+        res.status = 422
+        json(res, { ok: false, error: 'profile_id é obrigatório.' })
+        return
+      end
+
+      manager = modpack_manager
+      if manager
+        removed = manager.remove(profile_id)
+        unless removed
+          res.status = 404
+          json(res, { ok: false, error: 'Modpack não encontrado.' })
+          return
+        end
+      else
+        dir = File.expand_path("~/.minecraft_ruby_launcher/modpacks/#{profile_id}")
+        if Dir.exist?(dir)
+          FileUtils.rm_rf(dir)
+        else
+          res.status = 404
+          json(res, { ok: false, error: 'Modpack não encontrado.' })
+          return
+        end
+      end
+
+      log('OK', "Modpack removido: #{profile_id}")
+      json(res, { ok: true, message: 'Modpack removido.', modpacks: list_modpack_payloads })
+    rescue StandardError => e
+      log('ERROR', "Falha ao remover modpack: #{e.class}: #{e.message}")
+      res.status = 422
+      json(res, { ok: false, error: e.message, type: e.class.name })
+    end
 
     def handle_discord_validate(_req, res)
       log('ACTION', 'Validação Discord solicitada pelo painel.')
@@ -489,6 +549,19 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       end
     end
 
+    def discord_members_payload
+      cfg = discord_config
+      return { members_count: 0, presence_count: 0 } unless cfg
+      return { members_count: 0, presence_count: 0 } unless defined?(RubyMC::DiscordBotService)
+
+      service = RubyMC::DiscordBotService.new(load_settings, simulate: simulate?)
+      result = service.validate_remote!
+      { members_count: result[:members_count] || 0, presence_count: result[:presence_count] || 0 }
+    rescue StandardError => e
+      log('WARN', "discord_members_payload: #{e.message}")
+      { members_count: 0, presence_count: 0 }
+    end
+
     def discord_status_payload
       cfg = discord_config
       return { configured: false, status: 'indisponível' } unless cfg
@@ -559,6 +632,12 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       when 'test_discord_logs', 'discord_test_logs', 'test_logs_channel'
         rubymc_test_discord_logs_final
 
+      when 'test_all_channels', 'discord_test_channels', 'test_channels'
+        rubymc_test_all_channels_final
+
+      when 'create_invite', 'discord_create_invite', 'generate_invite'
+        rubymc_create_invite_final
+
       when 'open_docs', 'open_documentation'
         rubymc_open_docs_final
 
@@ -577,21 +656,65 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
     end
 
     def rubymc_validate_discord_final
-      log('ACTION', 'Validação Discord solicitada pelo painel.') if respond_to?(:log)
-
-      script = File.join(project_root, 'scripts', 'validate_discord_settings.rb')
-      unless File.exist?(script)
-        log('WARN', 'Script scripts/validate_discord_settings.rb não encontrado.') if respond_to?(:log)
-        return { ok: false, message: 'Script de validação Discord não encontrado.' }
+      log('ACTION', 'Validação Discord solicitada pelo painel.')
+      cfg = discord_config
+      unless cfg
+        log('ERROR', 'RubyMC::DiscordConfig não carregado.')
+        return { ok: false, message: 'DiscordConfig não disponível.' }
       end
 
-      ok = system(RbConfig.ruby, script)
-      if ok
-        log('OK', 'Configuração Discord validada com sucesso.') if respond_to?(:log)
-        { ok: true, message: 'Configuração Discord validada com sucesso.' }
+      report = cfg.validation_report
+      summary = report[:summary]
+
+      log('CHECK', "Bot ativo: #{summary[:bot_enabled]} | Token: #{summary[:token_configured]} | Guild: #{summary[:guild_id_configured]}")
+      log('CHECK', "Canais: #{summary[:channels_configured]}/#{summary[:channels_total]}")
+      log('CHECK', "Cargos: #{summary[:roles_configured]}/#{summary[:roles_total]}")
+
+      report[:channels].each do |key, value|
+        status = value[:configured] ? 'OK' : 'pendente'
+        log('CHANNEL', "#{status.ljust(7)} #{value[:label]}: #{value[:id].empty? ? '(vazio)' : value[:id]}")
+      end
+
+      report[:roles].each do |key, value|
+        status = value[:configured] ? 'OK' : 'pendente'
+        log('ROLE', "#{status.ljust(7)} #{value[:label]}: #{value[:id].empty? ? '(vazio)' : value[:id]}")
+      end
+
+      report[:warnings].each { |w| log('WARN', w) }
+      report[:errors].each { |e| log('ERROR', e) }
+
+      discord_payload = summary.merge(
+        configured: report[:ok],
+        status: report[:ok] ? 'configurado' : 'pendente',
+        members_count: 0,
+        presence_count: 0
+      )
+
+      if defined?(RubyMC::DiscordBotService) && cfg.bot_enabled? && cfg.token_configured?
+        begin
+          remote = RubyMC::DiscordBotService.new(load_settings, simulate: simulate?).validate_remote!
+          discord_payload[:members_count] = remote[:members_count] || 0
+          discord_payload[:presence_count] = remote[:presence_count] || 0
+          log('OK', "Discord: #{remote[:members_count]} membros, #{remote[:presence_count]} online.")
+        rescue StandardError => e
+          log('WARN', "Não foi possível obter contagem de membros: #{e.message}")
+        end
+      end
+
+      if report[:ok]
+        log('OK', 'Configuração Discord validada com sucesso.')
+        {
+          ok: true,
+          message: 'Configuração Discord validada com sucesso.',
+          discord: discord_payload
+        }
       else
-        log('ERROR', 'Validação Discord retornou erro. Veja o terminal para detalhes.') if respond_to?(:log)
-        { ok: false, message: 'Validação Discord retornou erro.' }
+        log('ERROR', 'Configuração Discord possui pendências.')
+        {
+          ok: false,
+          message: 'Discord precisa de ajustes.',
+          discord: discord_payload
+        }
       end
     end
 
@@ -600,14 +723,10 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
 
       begin
         if defined?(RubyMC::DiscordBotService)
-          service = RubyMC::DiscordBotService.new
-          [:send_log_test, :test_logs_channel, :send_test_log].each do |method_name|
-            if service.respond_to?(method_name)
-              result = service.public_send(method_name)
-              log('OK', 'Mensagem de teste enviada ao canal de logs Discord.') if respond_to?(:log)
-              return { ok: true, message: 'Mensagem de teste enviada ao canal de logs Discord.', result: result }
-            end
-          end
+          service = RubyMC::DiscordBotService.new(load_settings, simulate: simulate?)
+          result = service.send_log_message("💎 RubyMC Launcher: teste de log enviado pelo painel web às #{Time.now.strftime('%H:%M:%S')}.")
+          log('OK', 'Mensagem de teste enviada ao canal de logs Discord.') if respond_to?(:log)
+          return { ok: true, message: 'Mensagem de teste enviada ao canal de logs Discord.', result: result }
         end
       rescue StandardError => e
         log('ERROR', "Falha ao enviar mensagem ao canal de logs: #{e.message}") if respond_to?(:log)
@@ -616,9 +735,116 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
 
       result = rubymc_validate_discord_final
       if result[:ok]
-        log('WARN', 'Configuração Discord válida, mas método de envio de teste não foi encontrado no serviço Discord.') if respond_to?(:log)
+        log('WARN', 'Configuração Discord válida, mas serviço Discord não está disponível para envio de mensagens.') if respond_to?(:log)
       end
       result
+    end
+
+    def rubymc_test_all_channels_final
+      log('ACTION', 'Teste de todos os canais Discord solicitado pelo painel.')
+      cfg = discord_config
+      unless cfg
+        log('ERROR', 'DiscordConfig não carregado.')
+        return { ok: false, message: 'DiscordConfig não disponível.' }
+      end
+
+      results = { ok: true, tested: 0, failed: 0, details: {} }
+
+      if simulate?
+        log('OK', 'Modo simulação: simulando teste de canais.')
+        RubyMC::DiscordConfig::CHANNEL_LABELS.each do |key, label|
+          log('CHANNEL', "✅ Simulado #{label} (#{key})")
+          results[:details][key] = { label: label, ok: true }
+          results[:tested] += 1
+        end
+        return {
+          ok: true,
+          message: "Teste simulado: #{results[:tested]} canais.",
+          test_results: results
+        }
+      end
+
+      service = RubyMC::DiscordBotService.new(load_settings, simulate: false)
+
+      RubyMC::DiscordConfig::CHANNEL_LABELS.each do |key, label|
+        ch_id = cfg.channel_id(key)
+        unless cfg.valid_id?(ch_id)
+          log('CHANNEL', "⚠ #{'PULANDO'.ljust(7)} #{label} (#{key}) — ID vazio ou inválido")
+          next
+        end
+        begin
+          service.send_channel_message(ch_id, "🧪 Teste automático do canal **#{label}** — RubyMC Launcher #{Time.now.strftime('%d/%m/%Y %H:%M:%S')}")
+          log('CHANNEL', "✅ #{'OK'.ljust(7)} #{label} (#{key}): #{ch_id}")
+          results[:details][key] = { label: label, ok: true }
+          results[:tested] += 1
+        rescue StandardError => e
+          log('CHANNEL', "❌ #{'FALHA'.ljust(7)} #{label} (#{key}): #{e.message}")
+          results[:details][key] = { label: label, ok: false, error: e.message }
+          results[:failed] += 1
+          results[:ok] = false
+        end
+        sleep(0.6)
+      end
+
+      if results[:failed].zero?
+        log('OK', "Todos os #{results[:tested]} canais testados com sucesso.")
+      else
+        log('WARN', "#{results[:tested]} testados, #{results[:failed]} falhas.")
+      end
+
+      { ok: results[:ok], message: "Teste de canais: #{results[:tested]} ok, #{results[:failed]} falhas.", test_results: results }
+    rescue StandardError => e
+      log('ERROR', "Falha ao testar canais: #{e.class}: #{e.message}")
+      { ok: false, message: e.message }
+    end
+
+    def rubymc_create_invite_final
+      log('ACTION', 'Geração de convite solicitada pelo painel.')
+      begin
+        if simulate?
+          log('OK', 'Convite simulado: https://discord.gg/rubymc-simulado')
+          return { ok: true, message: 'Convite simulado.', invite_url: 'https://discord.gg/rubymc-simulado' }
+        end
+
+        service = RubyMC::DiscordBotService.new(load_settings, simulate: false)
+        result = service.create_invite('invite_channel_id', max_age: 86400, max_uses: 0)
+        if result[:ok]
+          log('OK', "Convite gerado: #{result[:url]}")
+          return { ok: true, message: 'Convite gerado com sucesso.', invite_url: result[:url] }
+        else
+          log('ERROR', "Falha ao gerar convite: #{result[:reason] || result[:error] || 'desconhecida'}")
+          return { ok: false, message: result[:reason] || result[:error] || 'Falha ao gerar convite.' }
+        end
+      rescue StandardError => e
+        log('ERROR', "Falha ao gerar convite: #{e.class}: #{e.message}")
+        { ok: false, message: e.message }
+      end
+    end
+
+    def rubymc_simular_discord
+      log('ACTION', 'Simulação Discord solicitada pelo painel.')
+      cfg = discord_config
+      discord_payload = if cfg
+        cfg.validation_report[:summary].merge(
+          configured: true, status: 'configurado'
+        )
+      else
+        { configured: false, status: 'indisponível' }
+      end
+
+      service = RubyMC::DiscordBotService.new(load_settings, simulate: true)
+      remote = service.validate_remote!
+      discord_payload[:members_count] = remote[:members_count] || 0
+      discord_payload[:presence_count] = remote[:presence_count] || 0
+      log('OK', "Simulação Discord: #{discord_payload[:members_count]} membros, #{discord_payload[:presence_count]} online.")
+      {
+        ok: true,
+        message: 'Simulação Discord ativada.',
+        discord: discord_payload
+      }
+    rescue StandardError => e
+      log('ERROR', "Simulação Discord falhou: #{e.class}: #{e.message}")
+      { ok: false, message: e.message }
     end
 
     def rubymc_open_docs_final
@@ -717,7 +943,7 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
 
     def run_project_checks
       ruby_files = Dir.glob(File.join(root, '{lib,bin,scripts,test}', '**', '*.rb')) +
-                   [File.join(root, 'launcher.rb'), File.join(root, 'launcher_gui.rb'), File.join(root, 'bot_daemon.rb')]
+                   [File.join(root, 'launcher.rb'), File.join(root, 'launcher_gui.rb'), File.join(root, 'app', 'bot.rb')]
       ruby_files.select! { |file| File.file?(file) }
 
       log('CHECK', "Verificando sintaxe de #{ruby_files.size} arquivos Ruby...")
@@ -787,7 +1013,7 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
         elsif !cfg.token_configured?
           log('WARN', 'Bot token não configurado. Validação remota não executada.')
         else
-          remote_report = RubyMC::DiscordBotService.new(load_settings).validate_remote!
+          remote_report = RubyMC::DiscordBotService.new(load_settings, simulate: simulate?).validate_remote!
           report[:remote] = remote_report
           log('OK', "Bot autenticado: #{remote_report.dig(:bot, :username) || remote_report.dig('bot', 'username')}")
           log('OK', "Servidor Discord validado: #{remote_report.dig(:guild, :name) || remote_report.dig('guild', 'name')}")
@@ -804,7 +1030,7 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
     def test_discord_log
       raise 'Módulo RubyMC::DiscordBotService não carregado.' unless defined?(RubyMC::DiscordBotService)
 
-      service = RubyMC::DiscordBotService.new(load_settings)
+      service = RubyMC::DiscordBotService.new(load_settings, simulate: simulate?)
       result = service.send_log_message("💎 RubyMC Launcher: teste de log enviado pelo painel web às #{Time.now.strftime('%H:%M:%S')}.")
       log('OK', "Mensagem de teste enviada ao Discord no canal #{result[:channel_id]}.")
       result

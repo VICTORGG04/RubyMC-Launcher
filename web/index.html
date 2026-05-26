@@ -4,26 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>RubyMC Launcher</title>
-  <link rel="stylesheet" href="/assets/css/launcher.css?v=rubymc-discord-ai-apply-fix-1">
+  <link rel="stylesheet" href="/assets/css/launcher.css?v=rubymc-bg-unified-3">
 </head>
 <body>
   <div class="rubymc-shell">
-    <section class="brand-strip">
-      <div class="brand-left">
-        <img src="/assets/img/rubymc-logo-banner.png" alt="RubyMC Launcher">
-        <div>
-          <span>MINECRAFT</span><strong>RUBY</strong><em>LAUNCHER</em>
-          <p>Sua experiência Minecraft, elevada.</p>
-        </div>
-      </div>
-      <div class="feature-strip">
-        <div><b>🛡️</b><span>Autenticação<br>Microsoft</span></div>
-        <div><b>📦</b><span>Gerenciamento<br>de Modpacks</span></div>
-        <div><b>🎮</b><span>Discord<br>Integrado</span></div>
-        <div><b>🔄</b><span>Atualizações<br>Automáticas</span></div>
-        <div><b>⛶</b><span>Modo<br>Offline</span></div>
-      </div>
-    </section>
     <section class="launcher-window app-window">
       <aside class="app-sidebar">
         <div class="app-title"><span>💎</span><strong>RUBYMC LAUNCHER</strong></div>
@@ -31,6 +15,7 @@
           <button class="tab-link active" data-tab="home">🏠 <span>Início</span></button>
           <button class="tab-link" data-tab="modpacks"><img class="nav-modpack-icon" src="/assets/img/rubymc-modpack-box-icon.png" alt=""> <span>Modpacks</span></button>
           <button class="tab-link" data-tab="server">🌐 <span>Servidor</span></button>
+          <button class="tab-link" data-tab="ai">🧠 <span>IA</span></button>
           <button class="tab-link" data-tab="discord"><img class="nav-discord-icon" src="/assets/img/rubymc-discord-ruby-icon-64.png" alt=""> <span>Discord</span></button>
           <button class="tab-link" data-tab="display">▣ <span>Display</span></button>
           <button class="tab-link" data-tab="project">🧪 <span>Projeto</span></button>
@@ -51,6 +36,9 @@
               <div class="actions"><button class="btn btn-red" data-action="play">Jogar Minecraft</button><button class="btn btn-dark" data-action="join_server">Entrar no servidor</button></div>
               <div class="hero-stats"><div><span>VERSÃO</span><strong id="minecraft-version">1.21.4</strong><em>Instalada</em></div><div><span>PERFIL ATIVO</span><strong id="active-profile">Vanilla</strong><em>Online</em></div><div><span>SERVIDOR</span><strong id="server-state">Online</strong><em id="server-players">0 jogadores</em></div><div><span>STATUS</span><strong id="launcher-state">Tudo certo!</strong><em>Pronto para jogar</em></div></div>
             </article>
+            <figure class="preview-frame">
+              <img src="/assets/img/rubymc-tela-inicio.png" alt="RubyMC Launcher">
+            </figure>
           </div>
         </section>
         <section id="tab-modpacks" class="tab-panel" data-panel-title="Modpacks">
@@ -85,18 +73,38 @@
                   <div id="server-motd" class="server-motd">A descrição do servidor aparecerá aqui quando a API responder.</div>
                 </div></div></article></div>
         </section>
+        <section id="tab-ai" class="tab-panel" data-panel-title="IA">
+          <header class="panel-heading"><h2>🧠 Assistente IA</h2><p>Assistente inteligente com contexto do projeto RubyMC.</p></header>
+          <div class="panel-grid ai-chat-layout">
+            <article class="panel-copy ai-chat-main">
+              <div class="ai-chat-container">
+                <div id="ai-chat-messages" class="ai-chat-messages">
+                </div>
+                <div class="ai-chat-input-bar">
+                  <textarea id="ai-chat-input" class="ai-chat-input" placeholder="Pergunte sobre Discord, modpacks, servidor..." rows="1"></textarea>
+                  <button id="ai-chat-send" class="btn btn-red">Enviar</button>
+                </div>
+              </div>
+            </article>
+            <aside class="ai-context-panel">
+              <h3>Contexto Ativo</h3>
+              <div id="ai-context-display"><span class="loading-dots">Carregando</span></div>
+              <button class="btn btn-dark" id="ai-refresh-context" style="margin-top:12px;width:100%">Atualizar contexto</button>
+            </aside>
+          </div>
+        </section>
         <section id="tab-discord" class="tab-panel" data-panel-title="Discord">
           <header class="panel-heading"><h2><img class="title-discord-icon" src="/assets/img/rubymc-discord-ruby-icon-64.png" alt="">Discord Bot</h2><p>Valide canais, cargos, permissões e integração do bot.</p></header>
-          <div class="panel-grid"><article class="panel-copy"><h3>Canais e cargos</h3><p>Valide os IDs configurados em <strong>config/settings.yml</strong> sem expor o token.</p><div class="mini-stats"><div><span>BOT</span><strong id="discord-bot-state">Inativo</strong></div><div><span>CANAIS</span><strong id="discord-channel-count">--/--</strong></div><div><span>CARGOS</span><strong id="discord-role-count">--/--</strong></div></div><div class="actions"><button class="btn btn-red" data-action="validate_discord">Validar Discord</button><button class="btn btn-dark" data-action="test_discord_logs">Testar canal de logs</button></div></article><article class="permission-box"><h3>Permissões</h3><p><strong>Membro</strong> acessa canais públicos. <strong>Jogador</strong> libera áreas do Minecraft. <strong>Staff/Admin</strong> liberam suporte e moderação.</p><p><strong>RubyMC Bot</strong> precisa ficar acima dos cargos que ele entrega.</p><ul><li>Canal de logs: <strong id="logs-channel-state">pendente</strong></li><li>Status: <strong id="discord-config-state">configurado</strong></li></ul></article></div>
+          <div class="panel-grid"><article class="panel-copy"><h3>Canais e cargos</h3><p>Valide os IDs configurados em <strong>config/settings.yml</strong> sem expor o token.</p><div class="mini-stats"><div><span>BOT</span><strong id="discord-bot-state">Inativo</strong></div><div><span>CANAIS</span><strong id="discord-channel-count">--/--</strong></div><div><span>CARGOS</span><strong id="discord-role-count">--/--</strong></div><div><span>MEMBROS</span><strong id="discord-member-count">--</strong></div><div><span>ONLINE</span><strong id="discord-online-count">--</strong></div></div><div class="actions"><button class="btn btn-red" data-action="validate_discord">Validar Discord</button><button class="btn btn-dark" data-action="test_discord_logs">Testar logs</button><button class="btn btn-dark" data-action="test_all_channels">Testar canais</button><button class="btn btn-dark" data-action="create_invite">Gerar convite</button><button class="btn btn-dark" data-action="simular_discord" id="discord-simulate-btn">Simular Discord</button></div></article><article class="permission-box"><h3>Permissões</h3><p><strong>Membro</strong> acessa canais públicos. <strong>Jogador</strong> libera áreas do Minecraft. <strong>Staff/Admin</strong> liberam suporte e moderação.</p><p><strong>RubyMC Bot</strong> precisa ficar acima dos cargos que ele entrega.</p><ul><li>Canal de logs: <strong id="logs-channel-state">pendente</strong></li><li>Status: <strong id="discord-config-state">configurado</strong></li></ul></article></div>
         </section>
         <section id="tab-display" class="tab-panel" data-panel-title="Display">
           <header class="panel-heading with-actions"><div><h2>▣ Display Interno de Logs</h2><p>Acompanhe tudo que acontece no launcher em tempo real.</p></div><div class="actions"><button class="btn btn-dark" data-action="run_tests">Rodar testes</button><button class="btn btn-dark" data-action="clear_display">Limpar</button></div></header>
           <div class="panel-grid display-grid"><pre id="display-log" class="terminal-display">[SYSTEM] RubyMC Web Launcher inicializando...
-[SYSTEM] Aguardando eventos do backend...</pre><figure class="preview-frame"><img src="/assets/img/rubymc-display-logs.png" alt="Display interno RubyMC"></figure></div>
+[SYSTEM] Aguardando eventos do backend...</pre></div>
         </section>
         <section id="tab-project" class="tab-panel" data-panel-title="Projeto">
           <header class="panel-heading"><h2>📁 Projeto</h2><p>Organize scripts, testes, documentos e recursos do launcher.</p></header>
-          <div class="panel-grid"><article class="project-actions"><button class="project-option" data-action="open_project_folder"><span>📁</span><strong>Abrir pasta do projeto</strong><em>Acesse a raiz do projeto.</em></button><button class="project-option" data-action="organize_project"><span>💻</span><strong>Abrir scripts</strong><em>Gerencie os scripts do launcher.</em></button><button class="project-option" data-action="open_docs"><span>📖</span><strong>Abrir documentação</strong><em>Acesse os documentos do projeto.</em></button></article></div>
+          <div class="panel-grid"><article class="project-actions"><button class="project-option" data-action="open_project_folder"><span>📁</span><strong>Abrir pasta do projeto</strong><em>Acesse a raiz do projeto.</em></button><button class="project-option" data-action="organize_project"><span>💻</span><strong>Abrir scripts</strong><em>Gerencie os scripts do launcher.</em></button><button class="project-option" data-action="open_docs"><span>📖</span><strong>Abrir documentação</strong><em>Acesse os documentos do projeto.</em></button></article><figure class="preview-frame"><img src="/assets/img/rubymc-page-project-bg.jpg" alt="Projeto RubyMC"></figure></div>
         </section>
         <section id="tab-settings" class="tab-panel settings-panel" data-panel-title="Configurações">
           <header class="settings-page-header">
@@ -153,7 +161,7 @@
 
               <div class="settings-about-brand">
                 <div class="settings-logo-orb">
-                  <img src="/assets/img/rubymc-logo-banner.png" alt="RubyMC">
+                  <img src="/assets/img/rubymc-discord-ruby-icon-64.png" alt="RubyMC">
                 </div>
 
                 <div class="settings-brand-text">
@@ -172,6 +180,7 @@
       </main>
     </section>
   </div>
-  <script src="/assets/js/launcher.js?v=rubymc-discord-ai-apply-fix-1"></script>
+  <script src="/assets/js/launcher.js?v=rubymc-bg-unified-3"></script>
+  <script src="/assets/js/rubymc-ai-support.js?v=rubymc-ai-embedded-1"></script>
 </body>
 </html>

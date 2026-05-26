@@ -1,4 +1,4 @@
-(()=>{const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>Array.from(r.querySelectorAll(s));let busy=false;const ROUTES={status:["/api/status","/status"],logs:["/api/logs","/logs"],modpackImport:["/api/modpacks/import","/api/import_modpack","/api/modpack/import"],modpacks:["/api/modpacks","/api/modpacks/list"]};const ACTION_ALIASES={play:["play","start_minecraft","launch_minecraft"],update_modpacks:["update_modpacks","refresh_modpacks","list_modpacks"],validate_discord:["validate_discord","discord_validate","validate_discord_settings"],test_discord_logs:["test_discord_logs","discord_test_logs","test_logs_channel"],test_server:["test_server","server_test","check_server"],join_server:["join_server","server_join"],clear_display:["clear_display","display_clear"],run_tests:["run_tests","test"],organize_project:["organize_project","organize"],open_project_folder:["open_project_folder","project_folder"],open_docs:["open_docs","docs"],check_updates:["check_updates","update_check"],refresh_status:["refresh_status","status"]};function time(){return new Date().toLocaleTimeString("pt-BR",{hour12:false})}function log(t,m){const d=$("#display-log");if(!d)return;d.textContent+=`\n[${time()}] ${String(t).padEnd(7)} ${m}`;d.scrollTop=d.scrollHeight}function activateTab(tab){document.body.dataset.currentTab=tab;$$('.tab-link').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$$('.tab-panel').forEach(p=>p.classList.toggle('active',p.id===`tab-${tab}`));const p=$(`#tab-${tab}`);if(p)document.title=`RubyMC Launcher — ${p.dataset.panelTitle||tab}`}async function fetchJson(url,opt={}){const r=await fetch(url,{headers:{Accept:'application/json',...(opt.headers||{})},...opt});if(!r.ok){const b=await r.text().catch(()=>"");throw new Error(`${r.status} ${r.statusText}${b?` — ${b.slice(0,160)}`:""}`)}return r.json()}async function postJson(url,payload={}){return fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}async function firstGet(urls){let e;for(const u of urls){try{return await fetchJson(u)}catch(err){e=err}}throw e}function payload(action){return{action,profile:$('#profile-select')?.value||'vanilla',modpack_name:$('#modpack-name')?.value||'',server_address:$('#server-address')?.value||'',settings:{version:$('#settings-version')?.value||'',ram:$('#settings-ram')?.value||''}}}async function backendAction(action){let e;for(const a of ACTION_ALIASES[action]||[action]){try{return await postJson('/api/action',payload(a))}catch(err){e=err}try{return await postJson(`/api/${a}`,payload(a))}catch(err){e=err}}throw e}async function runAction(action){if(!action||busy)return;busy=true;log('ACTION',`Executando: ${action}`);try{if(action==='import_modpack')await importModpack();else if(action==='update_modpacks')await updateModpacks();else if(action==='clear_display'){clearDisplay();try{applyResult(await backendAction(action),action)}catch(_){}}else applyResult(await backendAction(action),action)}catch(e){log('ERROR',`${action}: ${e.message}`)}finally{busy=false}}async function importModpack(){const input=$('#modpack-file'),nameInput=$('#modpack-name');if(!input?.files?.length){log('WARN','Selecione um arquivo .mrpack ou .zip.');activateTab('modpacks');return}const file=input.files[0],profileName=nameInput?.value?.trim()||file.name.replace(/\.(mrpack|zip)$/i,'');const form=new FormData();form.append('file',file);form.append('modpack',file);form.append('profile_name',profileName);form.append('name',profileName);let last;for(const url of ROUTES.modpackImport){try{applyResult(await fetchJson(url,{method:'POST',body:form}),'import_modpack');await updateModpacks(false);return}catch(e){last=e}}try{applyResult(await backendAction('import_modpack'),'import_modpack');await updateModpacks(false)}catch(_){throw last}}async function updateModpacks(show=true){if(show)log('ACTION','Atualizando lista de modpacks...');for(const url of ROUTES.modpacks){try{const r=await fetchJson(url),m=r.modpacks||r.data||r;renderModpacks(Array.isArray(m)?m:[]);if(show)log('OK','Lista de modpacks atualizada.');return}catch(_){}}applyResult(await backendAction('update_modpacks'),'update_modpacks')}function clearDisplay(){const d=$('#display-log');if(d)d.textContent=`[${time()}] SYSTEM  Display limpo. Aguardando novos eventos...`;activateTab('display')}function applyResult(r,action){if(!r){log('OK',`${action} concluído.`);return}if(typeof r==='string'){log('OK',r);return}if(r.message)log(r.ok===false?'ERROR':'OK',r.message);if(Array.isArray(r.logs))r.logs.forEach(i=>typeof i==='string'?log('LOG',i):log(i.type||'LOG',i.message||JSON.stringify(i)));if(r.display)updateDisplay(r.display);if(r.status)applyStatus(r.status);else applyStatus(r);if(r.modpacks)renderModpacks(r.modpacks);if(r.discord)applyStatus({discord:r.discord});if(action==='test_server'&&r.ok!==undefined){setText('server-test-state',r.ok?'Online':'Offline');setText('server-test-detail',r.message||'')}}function setText(id,v){const e=document.getElementById(id);if(e&&v!==undefined&&v!==null&&v!=='')e.textContent=v}function setValue(id,v){const e=document.getElementById(id);if(e&&v!==undefined&&v!==null&&v!=='')e.value=v}function applyStatus(s={}){setText('minecraft-version',s.minecraft_version||s.default_version||s.version);setText('active-profile',s.active_profile||s.profile);setText('server-state',s.server_status||s.server_state||s.server);setText('server-players',s.server_players||s.players);setText('launcher-state',s.launcher_status||s.status);setText('launcher-version',s.launcher_version||s.version);setValue('server-address',s.server_address||s.community_server||s.address);if(s.server_test){setText('server-test-state',s.server_test.ok?'Online':'Offline');setText('server-test-detail',s.server_test.message||'')}const d=s.discord||{};if(Object.keys(d).length){const on=d.bot_enabled===true||d.bot===true||d.status==='ativo'||d.bot_state==='ativo';setText('discord-bot-state',on?'Ativo':(d.bot_state||'Inativo'));setText('discord-channel-count',d.channels||d.channel_count||d.channels_count);setText('discord-role-count',d.roles||d.role_count||d.roles_count);setText('logs-channel-state',d.logs_channel||d.logs_channel_id?'configurado':'pendente');setText('discord-config-state',d.configured===false?'pendente':'configurado')}}function renderModpacks(m){const list=$('#modpack-list'),select=$('#profile-select');if(!list)return;if(!Array.isArray(m)||!m.length){list.textContent='Nenhum modpack importado ainda.';return}list.innerHTML=m.map(i=>{const n=typeof i==='string'?i:(i.name||i.profile||i.title||'Modpack'),v=typeof i==='object'&&i.version?i.version:'';return `<div class="modpack-row"><strong>${esc(n)}</strong><span>${esc(v)}</span></div>`}).join('');if(select){const cur=select.value;select.innerHTML='<option value="vanilla">Vanilla / sem modpack</option>'+m.map(i=>{const n=typeof i==='string'?i:(i.name||i.profile||i.title||'Modpack');return `<option value="${esc(n)}">${esc(n)}</option>`}).join('');if([...select.options].some(o=>o.value===cur))select.value=cur}}function updateDisplay(c){const d=$('#display-log');if(!d)return;d.textContent=Array.isArray(c)?c.join('\n'):String(c);d.scrollTop=d.scrollHeight}function esc(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}async function refreshStatus(){try{applyStatus((await firstGet(ROUTES.status)).status||await firstGet(ROUTES.status))}catch(_){try{applyResult(await backendAction('refresh_status'),'refresh_status')}catch(_){log('WARN','Status será atualizado quando o backend responder.')}}}async function pollLogs(){try{const d=await firstGet(ROUTES.logs);if(d.display)updateDisplay(d.display);else if(d.logs)updateDisplay(d.logs)}catch(_){}}function bind(){ $$('.tab-link').forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.tab)));$$('[data-action]').forEach(b=>b.addEventListener('click',()=>runAction(b.dataset.action)));$$('.toggle').forEach(t=>t.addEventListener('click',()=>{t.classList.toggle('active');log('ACTION',`Configuração alterada: ${t.dataset.toggle}`)}));const f=$('#modpack-file'),l=$('#modpack-file-label');if(f&&l)f.addEventListener('change',()=>{l.textContent=f.files&&f.files[0]?f.files[0].name:'Clique para escolher ou arraste o arquivo aqui'})}document.addEventListener('DOMContentLoaded',()=>{document.body.dataset.currentTab='home';bind();log('SYSTEM','Aba Configurações atualizada no estilo RubyMC. Interface pronta.');refreshStatus();updateModpacks(false).catch(()=>{});setInterval(pollLogs,4000)})})();
+(()=>{const $=(s,r=document)=>r.querySelector(s),$$=(s,r=document)=>Array.from(r.querySelectorAll(s));let busy=false;const ROUTES={status:["/api/status","/status"],logs:["/api/logs","/logs"],modpackImport:["/api/modpacks/import","/api/import_modpack","/api/modpack/import"],modpacks:["/api/modpacks","/api/modpacks/list"]};const ACTION_ALIASES={play:["play","start_minecraft","launch_minecraft"],update_modpacks:["update_modpacks","refresh_modpacks","list_modpacks"],validate_discord:["validate_discord","discord_validate","validate_discord_settings"],test_discord_logs:["test_discord_logs","discord_test_logs","test_logs_channel"],test_all_channels:["test_all_channels","discord_test_channels","test_channels"],create_invite:["create_invite","discord_create_invite","generate_invite"],test_server:["test_server","server_test","check_server"],join_server:["join_server","server_join"],clear_display:["clear_display","display_clear"],run_tests:["run_tests","test"],organize_project:["organize_project","organize"],open_project_folder:["open_project_folder","project_folder"],open_docs:["open_docs","docs"],check_updates:["check_updates","update_check"],refresh_status:["refresh_status","status"]};function time(){return new Date().toLocaleTimeString("pt-BR",{hour12:false})}function log(t,m){const d=$("#display-log");if(!d)return;d.textContent+=`\n[${time()}] ${String(t).padEnd(7)} ${m}`;d.scrollTop=d.scrollHeight}function activateTab(tab){document.body.dataset.currentTab=tab;$$('.tab-link').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$$('.tab-panel').forEach(p=>p.classList.toggle('active',p.id===`tab-${tab}`));const p=$(`#tab-${tab}`);if(p)document.title=`RubyMC Launcher — ${p.dataset.panelTitle||tab}`}async function fetchJson(url,opt={}){const r=await fetch(url,{headers:{Accept:'application/json',...(opt.headers||{})},...opt});if(!r.ok){const b=await r.text().catch(()=>"");throw new Error(`${r.status} ${r.statusText}${b?` — ${b.slice(0,160)}`:""}`)}return r.json()}async function postJson(url,payload={}){return fetchJson(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})}async function firstGet(urls){let e;for(const u of urls){try{return await fetchJson(u)}catch(err){e=err}}throw e}function payload(action){return{action,profile:$('#profile-select')?.value||'vanilla',modpack_name:$('#modpack-name')?.value||'',server_address:$('#server-address')?.value||'',settings:{version:$('#settings-version')?.value||'',ram:$('#settings-ram')?.value||''}}}async function backendAction(action){let e;for(const a of ACTION_ALIASES[action]||[action]){try{return await postJson('/api/action',payload(a))}catch(err){e=err}try{return await postJson(`/api/${a}`,payload(a))}catch(err){e=err}}throw e}async function runAction(action){if(!action||busy)return;busy=true;log('ACTION',`Executando: ${action}`);try{if(action==='import_modpack')await importModpack();else if(action==='update_modpacks')await updateModpacks();else if(action==='clear_display'){clearDisplay();try{applyResult(await backendAction(action),action)}catch(_){}}else applyResult(await backendAction(action),action)}catch(e){log('ERROR',`${action}: ${e.message}`)}finally{busy=false}}async function importModpack(){const input=$('#modpack-file'),nameInput=$('#modpack-name');if(!input?.files?.length){log('WARN','Selecione um arquivo .mrpack ou .zip.');activateTab('modpacks');return}const file=input.files[0],profileName=nameInput?.value?.trim()||file.name.replace(/\.(mrpack|zip)$/i,'');const form=new FormData();form.append('file',file);form.append('modpack',file);form.append('profile_name',profileName);form.append('name',profileName);let last;for(const url of ROUTES.modpackImport){try{applyResult(await fetchJson(url,{method:'POST',body:form}),'import_modpack');await updateModpacks(false);return}catch(e){last=e}}try{applyResult(await backendAction('import_modpack'),'import_modpack');await updateModpacks(false)}catch(_){throw last}}async function updateModpacks(show=true){if(show)log('ACTION','Atualizando lista de modpacks...');for(const url of ROUTES.modpacks){try{const r=await fetchJson(url),m=r.modpacks||r.data||r;renderModpacks(Array.isArray(m)?m:[]);if(show)log('OK','Lista de modpacks atualizada.');return}catch(_){}}applyResult(await backendAction('update_modpacks'),'update_modpacks')}function clearDisplay(){const d=$('#display-log');if(d)d.textContent=`[${time()}] SYSTEM  Display limpo. Aguardando novos eventos...`;activateTab('display')}function applyResult(r,action){if(!r){log('OK',`${action} concluído.`);return}if(typeof r==='string'){log('OK',r);return}if(r.message)log(r.ok===false?'ERROR':'OK',r.message);if(Array.isArray(r.logs))r.logs.forEach(i=>typeof i==='string'?log('LOG',i):log(i.type||'LOG',i.message||JSON.stringify(i)));if(r.display)updateDisplay(r.display);if(r.status)applyStatus(r.status);else applyStatus(r);if(r.modpacks)renderModpacks(r.modpacks);if(r.discord)applyStatus({discord:r.discord});if(action==='test_server'&&r.ok!==undefined){setText('server-test-state',r.ok?'Online':'Offline');setText('server-test-detail',r.message||'')}}function setText(id,v){const e=document.getElementById(id);if(e&&v!==undefined&&v!==null&&v!=='')e.textContent=v}function setValue(id,v){const e=document.getElementById(id);if(e&&v!==undefined&&v!==null&&v!=='')e.value=v}function applyStatus(s={}){setText('minecraft-version',s.minecraft_version||s.default_version||s.version);setText('active-profile',s.active_profile||s.profile);setText('server-state',s.server_status||s.server_state||s.server);setText('server-players',s.server_players||s.players);setText('launcher-state',s.launcher_status||s.status);setText('launcher-version',s.launcher_version||s.version);setValue('server-address',s.server_address||s.community_server||s.address);if(s.server_test){setText('server-test-state',s.server_test.ok?'Online':'Offline');setText('server-test-detail',s.server_test.message||'')}const d=s.discord||{};if(Object.keys(d).length){const on=d.bot_enabled===true||d.bot===true||d.status==='ativo'||d.bot_state==='ativo';setText('discord-bot-state',on?'Ativo':(d.bot_state||'Inativo'));setText('discord-channel-count',d.channels||d.channel_count||d.channels_count||(d.channels_configured!==void 0?d.channels_configured+'/'+d.channels_total:void 0));setText('discord-role-count',d.roles||d.role_count||d.roles_count||(d.roles_configured!==void 0?d.roles_configured+'/'+d.roles_total:void 0));setText('logs-channel-state',d.logs_channel||d.logs_channel_id?'configurado':'pendente');setText('discord-config-state',d.configured===false?'pendente':'configurado');setText('discord-member-count',d.members_count);setText('discord-online-count',d.presence_count)}}function renderModpacks(m){const list=$('#modpack-list'),select=$('#profile-select');if(!list)return;if(!Array.isArray(m)||!m.length){list.textContent='Nenhum modpack importado ainda.';return}list.innerHTML=m.map(i=>{const n=typeof i==='string'?i:(i.name||i.profile||i.title||'Modpack'),v=typeof i==='object'&&i.version?i.version:'';return `<div class="modpack-row"><strong>${esc(n)}</strong><span>${esc(v)}</span><button class="modpack-remove-btn" data-modpack-id="${esc(i.id||'')}" data-action="remove_modpack" title="Remover">✕</button></div>`}).join('');if(select){const cur=select.value;select.innerHTML='<option value="vanilla">Vanilla / sem modpack</option>'+m.map(i=>{const n=typeof i==='string'?i:(i.name||i.profile||i.title||'Modpack');return `<option value="${esc(n)}">${esc(n)}</option>`}).join('');if([...select.options].some(o=>o.value===cur))select.value=cur}}function updateDisplay(c){const d=$('#display-log');if(!d)return;d.textContent=Array.isArray(c)?c.join('\n'):String(c);d.scrollTop=d.scrollHeight}function esc(v){return String(v).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}async function refreshStatus(){try{applyStatus((await firstGet(ROUTES.status)).status||await firstGet(ROUTES.status))}catch(_){try{applyResult(await backendAction('refresh_status'),'refresh_status')}catch(_){log('WARN','Status será atualizado quando o backend responder.')}}}async function pollLogs(){try{const d=await firstGet(ROUTES.logs);if(d.display)updateDisplay(d.display);else if(d.logs)updateDisplay(d.logs)}catch(_){}}function bind(){ $$('.tab-link').forEach(b=>b.addEventListener('click',()=>activateTab(b.dataset.tab)));$$('[data-action]').forEach(b=>b.addEventListener('click',()=>runAction(b.dataset.action)));$$('.toggle').forEach(t=>t.addEventListener('click',()=>{t.classList.toggle('active');log('ACTION',`Configuração alterada: ${t.dataset.toggle}`)}));const f=$('#modpack-file'),l=$('#modpack-file-label');if(f&&l)f.addEventListener('change',()=>{l.textContent=f.files&&f.files[0]?f.files[0].name:'Clique para escolher ou arraste o arquivo aqui'})}document.addEventListener('DOMContentLoaded',()=>{document.body.dataset.currentTab='home';bind();log('SYSTEM','Aba Configurações atualizada no estilo RubyMC. Interface pronta.');refreshStatus();updateModpacks(false).catch(()=>{});setInterval(pollLogs,4000)})})();
 
 
 /* =========================================================
@@ -202,78 +202,11 @@
 })();
 
 
-/* RubyMC AI Support Frontend */
-(() => {
-  const $ = (selector, root = document) => root.querySelector(selector);
-
-  function ensurePanel() {
-    if ($("#ai-support-card")) return;
-
-    const target = $("#tab-project") || $("#tab-discord") || $("#tab-home") || document.body;
-    const card = document.createElement("section");
-    card.id = "ai-support-card";
-    card.className = "ai-support-card";
-    card.innerHTML = `
-      <h3>Suporte IA RubyMC</h3>
-      <p>Assistente local usando Ollama + qwen3.5:9b para ajudar com Discord, modpacks, servidor Minecraft e erros do projeto.</p>
-      <textarea id="ai-support-input" class="ai-support-input" placeholder="Digite sua dúvida sobre o RubyMC..."></textarea>
-      <div class="ai-support-actions">
-        <button class="btn btn-red" id="ai-support-send" type="button">Perguntar à IA</button>
-        <button class="btn btn-dark" id="ai-support-health" type="button">Verificar IA</button>
-      </div>
-      <div id="ai-support-output" class="ai-support-output">Aguardando pergunta...</div>
-    `;
-    target.appendChild(card);
-
-    $("#ai-support-send")?.addEventListener("click", askAI);
-    $("#ai-support-health")?.addEventListener("click", checkAI);
-  }
-
-  async function askAI() {
-    const input = $("#ai-support-input");
-    const output = $("#ai-support-output");
-    const message = input?.value?.trim();
-
-    if (!message) {
-      output.textContent = "Digite uma pergunta para o suporte IA.";
-      return;
-    }
-
-    output.textContent = "Consultando IA local...";
-
-    try {
-      const response = await fetch("/api/ai/support", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        body: JSON.stringify({ message })
-      });
-      const data = await response.json();
-      output.textContent = data.answer || data.message || "Sem resposta.";
-    } catch (error) {
-      output.textContent = `Erro ao consultar IA: ${error.message}`;
-    }
-  }
-
-  async function checkAI() {
-    const output = $("#ai-support-output");
-    output.textContent = "Verificando Ollama/modelo...";
-
-    try {
-      const response = await fetch("/api/ai/health", { headers: { "Accept": "application/json" } });
-      const data = await response.json();
-      output.textContent = data.ok ? `IA pronta: ${data.model}` : `IA não pronta: ${data.message}`;
-    } catch (error) {
-      output.textContent = `Erro ao verificar IA: ${error.message}`;
-    }
-  }
-
-  document.addEventListener("DOMContentLoaded", ensurePanel);
-})();
 
 
 /* RubyMC Discord + IA Final Frontend Guard */
 (() => {
-  const guarded = new Set(["validate_discord","discord_validate","test_discord_logs","discord_test_logs","test_logs_channel","join_server","server_join"]);
+  const guarded = new Set(["validate_discord","discord_validate","test_discord_logs","discord_test_logs","test_logs_channel","test_all_channels","discord_test_channels","test_channels","create_invite","discord_create_invite","generate_invite","join_server","server_join"]);
   const active = new Set();
 
   function log(type, message) {
@@ -310,4 +243,90 @@
       button.textContent = old;
     }, 8000);
   }, true);
+})();
+
+/* RubyMC Modpack Remove Handler */
+(() => {
+  document.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-action="remove_modpack"]');
+    if (!btn) return;
+    const id = btn.dataset.modpackId;
+    if (!id) return;
+    if (!confirm('Remover este modpack?')) return;
+    btn.disabled = true;
+    btn.textContent = '...';
+    try {
+      const r = await fetch('/api/modpacks/remove', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile_id: id })
+      });
+      const data = await r.json();
+      if (data.ok) {
+        const updateBtn = document.querySelector('[data-action="update_modpacks"]');
+        if (updateBtn) updateBtn.click();
+      } else {
+        alert('Erro ao remover: ' + (data.message || 'desconhecido'));
+      }
+    } catch (err) {
+      alert('Erro ao remover: ' + err.message);
+    }
+  });
+})();
+
+/* =========================================================
+   RubyMC Discord Simulate Toggle
+   Alterna entre "Simular Discord" e "Parar simulação".
+   Previne dupla chamada com stopImmediatePropagation.
+   ========================================================= */
+(() => {
+  const BTN = document.getElementById("discord-simulate-btn");
+  if (!BTN) return;
+  const SIM_CLASS = "is-simulating";
+  const LBL_ON = "Simular Discord";
+  const LBL_OFF = "Parar simulação";
+
+  function resetSimulation() {
+    BTN.classList.remove(SIM_CLASS);
+    BTN.textContent = LBL_ON;
+  }
+
+  function applySimulation(data) {
+    const set = (id, v) => {
+      const el = document.getElementById(id);
+      if (el && v !== undefined && v !== null && v !== "") el.textContent = v;
+    };
+    set("discord-member-count", data.members_count);
+    set("discord-online-count", data.presence_count);
+    BTN.classList.add(SIM_CLASS);
+    BTN.textContent = LBL_OFF;
+  }
+
+  document.querySelectorAll('[data-action="validate_discord"]').forEach(btn => {
+    btn.addEventListener("click", resetSimulation);
+  });
+
+  BTN.addEventListener("click", async (e) => {
+    e.stopImmediatePropagation();
+    if (BTN.classList.contains(SIM_CLASS)) {
+      ["discord-member-count", "discord-online-count", "discord-bot-state", "discord-channel-count", "discord-role-count"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && id === "discord-bot-state") el.textContent = "Inativo";
+        else if (el && id === "discord-channel-count") el.textContent = "--/--";
+        else if (el && id === "discord-role-count") el.textContent = "--/--";
+        else if (el) el.textContent = "--";
+      });
+      resetSimulation();
+      return;
+    }
+    try {
+      const r = await fetch("/api/action", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "simular_discord" })
+      });
+      const data = await r.json();
+      if (data.ok && data.discord) applySimulation(data.discord);
+    } catch (_) {}
+  });
 })();

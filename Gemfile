@@ -1,5 +1,3 @@
-source 'https://rubygems.org'
-
 # frozen_string_literal: true
 
 source "https://rubygems.org"
@@ -12,6 +10,7 @@ gem "tty-spinner",             "~> 0.9"    # Animações de carregamento
 gem "tty-box",                 "~> 0.7"    # Caixas de texto estilizadas
 gem "pastel",                  "~> 0.8"    # Cores no terminal
 gem "websocket-client-simple", "~> 0.7"    # Gateway WebSocket do Discord (bot de boas-vindas)
+
 
 
 
