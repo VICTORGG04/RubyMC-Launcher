@@ -31,7 +31,6 @@ require_relative "../lib/discord_integration"
 require_relative "../lib/rubymc/discord_config"
 require_relative '../lib/rubymc/rubymc_bot_config_bridge'
 require_relative '../lib/rubymc/minecraft_server_status'
-require_relative '../lib/rubymc/bedrock_server_status'
 require_relative '../lib/rubymc/server_manager'
 
 RUBYMC_CHANNEL_ALIASES = {
@@ -245,7 +244,7 @@ def command_help
       "`!status`     — estado do bot, servidor e convites\n" \
       "`!versao`     — versão do launcher e Minecraft\n" \
       "`!ping`       — latency do bot\n" \
-      "`!servidor`   — status dos servidores Minecraft (Java + Bedrock)\n\n" \
+      "`!servidor`   — status do servidor Minecraft Java\n\n" \
       "**📋 Regras e Cargos**\n" \
       "`!regras`     — exibe as regras do servidor\n" \
       "`!cargos`     — lista os cargos disponíveis\n\n" \
@@ -260,11 +259,11 @@ def command_help
       "`!reportar <texto>` — reporta um bug/problema\n" \
       "`!java`       — qual Java usar com cada versão\n\n" \
       "**⚙️ Admin** (apenas ADMIN)\n" \
-      "`!iniciar java/bedrock` — inicia o servidor\n" \
-      "`!parar java/bedrock`   — para o servidor\n" \
-      "`!restart java/bedrock` — reinicia o servidor\n" \
-      "`!log java/bedrock`     — exibe o console (últimas N linhas)\n" \
-      "`!backup java/bedrock`  — faz backup do mundo\n\n" \
+      "`!iniciar` — inicia o servidor Java\n" \
+      "`!parar`   — para o servidor Java\n" \
+      "`!restart` — reinicia o servidor Java\n" \
+      "`!log`     — exibe o console (últimas N linhas)\n" \
+      "`!backup`  — faz backup do mundo\n\n" \
       "**🤖 Respostas automáticas**\n" \
       "Palavras-chave: `login`, `instalar`, `erro`, `offline`, `ram`, `discord`",
     title: "Ajuda"
@@ -359,23 +358,14 @@ def post_channel_topics
   end
 end
 
-def query_both_servers
+def query_java_server
   java_addr = CONFIG.dig("discord", "server_address") || "127.0.0.1:25565"
-  bedrock_addr = "#{CONFIG.dig("servers", "bedrock", "host") || "127.0.0.1"}:#{CONFIG.dig("servers", "bedrock", "port") || 19132}"
 
-  java_status = begin
+  begin
     RubyMC::MinecraftServerStatus.query(java_addr, timeout: 5)
   rescue => e
     { online: false, error: e.message, players: { online: 0, max: 0, sample: [] }, version: { name: '' } }
   end
-
-  bedrock_status = begin
-    RubyMC::BedrockServerStatus.query(bedrock_addr, timeout: 5)
-  rescue => e
-    { online: false, error: e.message, players: { online: 0, max: 0, sample: [] }, version: { name: '' }, edition: '' }
-  end
-
-  { java: java_status, bedrock: bedrock_status }
 end
 
 def post_server_status
@@ -383,34 +373,24 @@ def post_server_status
   channel_id = SERVER_CHANNEL_ID if channel_id.empty?
   return if channel_id.empty? || channel_id.start_with?("ID_")
 
-  statuses = query_both_servers
+  status = query_java_server
   invite_url = create_invite(INVITE_CHANNEL_ID, max_uses: 0)
 
-  fields = statuses.map do |key, s|
-    online = s[:online] == true
-    players = s.dig(:players, :online) || 0
-    max_pl  = s.dig(:players, :max) || 0
-    ver     = s.dig(:version, :name) || ''
-    emoji   = online ? '🟢' : '🔴'
-    edition = key == :bedrock ? "#{s[:edition]} " : ''
-    sample  = s.dig(:players, :sample) || []
-    names   = sample.first(5).map { |p| p.is_a?(Hash) ? p["name"] : p.to_s }.join(", ")
-    status_line = online ? "#{emoji} **Online** — #{players}/#{max_pl} jogadores" : "#{emoji} **Offline**"
-
-    {
-      name: key == :java ? "☕ Servidor Java" : "🧱 Servidor Bedrock",
-      value: "#{status_line}\n#{edition}Versão: #{ver.empty? ? '—' : ver}#{names.empty? ? '' : "\nJogando: #{names}"}",
-      inline: true
-    }
-  end
+  online = status[:online] == true
+  players = status.dig(:players, :online) || 0
+  max_pl  = status.dig(:players, :max) || 0
+  ver     = status.dig(:version, :name) || ''
+  emoji   = online ? '🟢' : '🔴'
+  sample  = status.dig(:players, :sample) || []
+  names   = sample.first(5).map { |p| p.is_a?(Hash) ? p["name"] : p.to_s }.join(", ")
+  status_line = online ? "#{emoji} **Online** — #{players}/#{max_pl} jogadores" : "#{emoji} **Offline**"
 
   payload = {
     embeds: [{
-      title: "🎮 Servidores RubyMC",
-      description: invite_url ? "🔗 #{invite_url}" : "Status dos servidores RubyMC:",
-      color: 0x5865F2,
-      fields: fields,
-      footer: { text: "RubyMC Launcher • Status dos Servidores" },
+      title: "☕ Servidor Java RubyMC",
+      description: invite_url ? "🔗 #{invite_url}\n\n#{status_line}\nVersão: #{ver.empty? ? '—' : ver}#{names.empty? ? '' : "\nJogando: #{names}"}" : "Status do servidor RubyMC:",
+      color: online ? 0x2ECC71 : 0xE74C3C,
+      footer: { text: "RubyMC Launcher • Status do Servidor" },
       timestamp: Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     }]
   }
@@ -639,7 +619,7 @@ def command_report(text, author_hash)
   simple_reply("✅ Seu reporte foi enviado para o canal de bugs! A equipe vai analisar. 🐛", title: "Reporte Enviado")
 end
 
-def server_embed(key, status, invite_url)
+def server_embed(status, invite_url)
   online = status[:online] == true
   players = status.dig(:players, :online) || 0
   max_pl  = status.dig(:players, :max) || 0
@@ -649,7 +629,7 @@ def server_embed(key, status, invite_url)
   names   = sample.first(10).map { |p| p.is_a?(Hash) ? p["name"] : p.to_s }.join(", ")
 
   motd = status[:description].to_s
-  addr = key == :bedrock ? "#{CONFIG.dig("servers", "bedrock", "host") || "127.0.0.1"}:#{CONFIG.dig("servers", "bedrock", "port") || 19132}" : CONFIG.dig("discord", "server_address").to_s
+  addr = CONFIG.dig("discord", "server_address").to_s
 
   desc = +""
   desc << "**#{motd.empty? ? '' : motd}**\n\n" unless motd.empty?
@@ -661,7 +641,7 @@ def server_embed(key, status, invite_url)
   desc << "\n\n🔗 #{invite_url}" if invite_url
 
   {
-    title: key == :java ? "☕ Servidor Java" : "🧱 Servidor Bedrock",
+    title: "☕ Servidor Java",
     description: desc.strip,
     color: online ? 0x2ECC71 : 0xE74C3C,
     inline: false
@@ -669,30 +649,19 @@ def server_embed(key, status, invite_url)
 end
 
 def command_server(text = nil)
-  statuses = query_both_servers
+  status = query_java_server
   invite_url = create_invite(INVITE_CHANNEL_ID, max_uses: 0)
 
-  target = text.to_s.downcase.strip.sub(/\A!servidor\s+/i, '').sub(/\A!server\s+/i, '').strip
-
-  if target == 'java' || target == 'bedrock'
-    key = target.to_sym
-    s = statuses[key] || { online: false, error: 'Servidor não encontrado', players: { online: 0, max: 0, sample: [] }, version: { name: '' } }
-    embed = server_embed(key, s, invite_url)
-    return { embeds: [embed.merge(title: "🎮 #{embed[:title]}", inline: nil, timestamp: Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ"), footer: { text: "RubyMC Launcher • Status" })] }
-  end
-
-  fields = statuses.map { |key, s| server_embed(key, s, invite_url) }
-
-  online_count = statuses.count { |_, s| s[:online] == true }
-  total = statuses.size
+  embed = server_embed(status, invite_url)
+  online = status[:online] == true
 
   {
     embeds: [{
-      title: "🎮 Servidores RubyMC",
-      description: "#{online_count}/#{total} servidores online",
-      color: 0x5865F2,
-      fields: fields,
-      footer: { text: "RubyMC Launcher • !servidor java ou !servidor bedrock" },
+      title: "☕ Servidor Java",
+      description: online ? "🟢 Online" : "🔴 Offline",
+      color: online ? 0x2ECC71 : 0xE74C3C,
+      fields: [embed],
+      footer: { text: "RubyMC Launcher • !servidor" },
       timestamp: Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     }]
   }
@@ -703,18 +672,8 @@ def command_topics
   simple_reply("✅ Assuntos reenviados para todos os canais configurados!", title: "Tópicos")
 end
 
-def parse_server_key(text)
-  t = text.to_s.downcase.strip
-  return :java if t.include?('java')
-  return :bedrock if t.include?('bedrock') || t.include?('bed') || t.include?('rock')
-  nil
-end
-
 def command_start_server(text)
-  key = parse_server_key(text)
-  return simple_reply("Use `!iniciar java` ou `!iniciar bedrock`.", color: 0xF39C12, title: "Iniciar") unless key
-
-  result = RubyMC::ServerManager.start(key)
+  result = RubyMC::ServerManager.start(:java)
   if result[:ok]
     simple_reply("✅ Servidor **#{key}** iniciado (PID: #{result[:pid]}).", title: "Servidor Iniciado")
   else
@@ -723,10 +682,7 @@ def command_start_server(text)
 end
 
 def command_stop_server(text)
-  key = parse_server_key(text)
-  return simple_reply("Use `!parar java` ou `!parar bedrock`.", color: 0xF39C12, title: "Parar") unless key
-
-  result = RubyMC::ServerManager.stop(key)
+  result = RubyMC::ServerManager.stop(:java)
   if result[:ok]
     simple_reply("⏹️ Servidor **#{key}** parado (#{result[:status]}).", title: "Servidor Parado")
   else
@@ -735,10 +691,7 @@ def command_stop_server(text)
 end
 
 def command_restart_server(text)
-  key = parse_server_key(text)
-  return simple_reply("Use `!restart java` ou `!restart bedrock`.", color: 0xF39C12, title: "Reiniciar") unless key
-
-  result = RubyMC::ServerManager.restart(key)
+  result = RubyMC::ServerManager.restart(:java)
   if result[:ok]
     simple_reply("🔄 Servidor **#{key}** reiniciado (PID: #{result[:pid]}).", title: "Servidor Reiniciado")
   else
@@ -749,10 +702,8 @@ end
 def command_server_log(text)
   t = text.to_s.downcase.strip
   count = t[/\d+/]&.to_i || 20
-  key = parse_server_key(text)
-  return simple_reply("Use `!log java` ou `!log bedrock`.", color: 0xF39C12, title: "Log") unless key
 
-  result = RubyMC::ServerManager.console(key, lines: count)
+  result = RubyMC::ServerManager.console(:java, lines: count)
   if result[:ok]
     log_text = result[:log].empty? ? "(log vazio)" : result[:log]
     log_text = log_text[-1500..] || log_text if log_text.length > 1500
@@ -766,10 +717,7 @@ def command_server_log(text)
 end
 
 def command_backup_server(text)
-  key = parse_server_key(text)
-  return simple_reply("Use `!backup java` ou `!backup bedrock`.", color: 0xF39C12, title: "Backup") unless key
-
-  result = RubyMC::ServerManager.backup(key)
+  result = RubyMC::ServerManager.backup(:java)
   if result[:ok]
     simple_reply(
       "✅ Backup do servidor **#{key}** concluído!\n" \
@@ -782,19 +730,13 @@ def command_backup_server(text)
 end
 
 def command_servidores
-  statuses = RubyMC::ServerManager.all_status
-
-  lines = statuses.map do |key, s|
-    emoji = s[:running] ? '🟢' : '🔴'
-    pid_info = s[:pid] ? " (PID: #{s[:pid]})" : ''
-    "#{emoji} **#{s[:name]}** — #{s[:running] ? 'Online' : 'Offline'}#{pid_info}"
-  end.join("\n")
-
-  running_count = statuses.count { |_, s| s[:running] }
+  status = RubyMC::ServerManager.status(:java)
+  emoji = status[:running] ? '🟢' : '🔴'
+  pid_info = status[:pid] ? " (PID: #{status[:pid]})" : ''
 
   simple_reply(
-    "📡 **#{running_count}/#{statuses.size} servidores online**\n\n#{lines}\n\n" \
-      "Use `!iniciar`, `!parar`, `!restart`, `!log` ou `!backup` com `java`/`bedrock`.\n" \
+    "📡 **Servidor Java** — #{status[:running] ? 'Online' : 'Offline'}#{pid_info}\n\n" \
+      "Use `!iniciar`, `!parar`, `!restart`, `!log` ou `!backup`.\n" \
       "Use `!servidor` para ver status do Minecraft.",
     title: "Gerenciamento de Servidores"
   )

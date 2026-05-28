@@ -29,6 +29,9 @@ module RubyMC
         return { ok: false, error: "Servidor '#{key}' não encontrado" } unless cfg
         return { ok: false, error: 'Já está rodando' } if running?(key)
 
+        settings = load_settings
+        ensure_server_properties(cfg, settings)
+
         cmd = build_cmd(key)
         return { ok: false, error: 'Comando de inicialização não disponível' } unless cmd
 
@@ -166,6 +169,34 @@ module RubyMC
       def default_java
         candidates = %w[/usr/lib/jvm/jdk-26-oracle-x64/bin/java /usr/lib/jvm/java-21-openjdk-amd64/bin/java java]
         candidates.find { |p| File.exist?(p) } || 'java'
+      end
+
+      def ensure_server_properties(cfg, settings)
+        path = File.join(cfg[:dir], "server.properties")
+        props = {}
+        if File.exist?(path)
+          File.read(path, encoding: "ISO-8859-1").each_line do |line|
+            stripped = line.strip
+            next if stripped.empty? || stripped.start_with?("#")
+            key, value = stripped.split("=", 2)
+            props[key] = value.to_s if key
+          end
+        end
+
+        props["online-mode"] ||= "false"
+        props["server-port"] = cfg[:port].to_s
+        props["enable-status"] ||= "true"
+        props["motd"] = settings.dig("servers", "java", "motd") || props["motd"] || "§x§E§0§1§1§5§FRubyMC §x§0§0§E§5§F§F❖ §f§lJAVA §7§o1.21.5"
+        props["max-players"] ||= "20"
+
+        content = props.map { |k, v| "#{k}=#{v}" }.join("\n") + "\n"
+        File.open(path, "w:ISO-8859-1") { |f| f.write(latin1_escape(content)) }
+      end
+
+      def latin1_escape(str)
+        str.each_char.map do |c|
+          c.ord <= 0xFF ? c : format("\\u%04x", c.ord)
+        end.join
       end
 
       def load_settings

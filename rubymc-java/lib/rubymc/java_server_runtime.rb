@@ -263,7 +263,7 @@ module RubyMC
 
     def ensure_server_properties(port:)
       path = File.join(server_dir, "server.properties")
-      props = parse_properties(File.exist?(path) ? File.read(path) : "")
+      props = parse_properties(File.exist?(path) ? File.read(path, encoding: "ISO-8859-1") : "")
 
       # Para LAN/dev com contas não Java oficiais, evita erro de sessão inválida.
       props["online-mode"] = ENV.fetch("RUBYMC_ONLINE_MODE", "false")
@@ -273,11 +273,17 @@ module RubyMC
       props["server-ip"] = ENV.fetch("RUBYMC_SERVER_IP", "")
       props["server-port"] = port.to_s
       props["enable-status"] ||= "true"
-      props["motd"] ||= "A Minecraft Server"
+      props["motd"] = settings.dig("servers", "java", "motd") || props["motd"] || "§x§E§0§1§1§5§FRubyMC §x§0§0§E§5§F§F❖ §f§lJAVA §7§o1.21.5"
       props["max-players"] ||= "20"
 
       content = props.map { |key, value| "#{key}=#{value}" }.join("\n") + "\n"
-      File.write(path, content)
+      File.open(path, "w:ISO-8859-1") { |f| f.write(latin1_escape(content)) }
+    end
+
+    def latin1_escape(str)
+      str.each_char.map do |c|
+        c.ord <= 0xFF ? c : format("\\u%04x", c.ord)
+      end.join
     end
 
     def parse_properties(content)
