@@ -146,18 +146,25 @@ module RubyMC
       end
 
       def build_cmd(key)
-        return nil unless key == :java
+        cfg = server_config(key)
+        return nil unless cfg
 
-        settings = load_settings
-        active_ver = settings.dig('servers', 'java', 'active_version')
-        return default_java_cmd unless active_ver
+        case key.to_sym
+        when :java
+          settings = load_settings
+          active_ver = settings.dig('servers', 'java', 'active_version')
+          return default_java_cmd unless active_ver
 
-        java_bin = settings.dig('servers', 'java', 'active_java')
-        java_bin = default_java if java_bin.nil? || java_bin.empty?
+          java_bin = settings.dig('servers', 'java', 'active_java')
+          java_bin = default_java if java_bin.nil? || java_bin.empty?
 
-        memory = settings.dig('servers', 'java', 'memory') || '-Xmx2G -Xms1G'
-
-        "#{java_bin} #{memory} -jar server.jar nogui"
+          memory = settings.dig('servers', 'java', 'memory') || '-Xmx2G -Xms1G'
+          "#{java_bin} #{memory} -jar server.jar nogui"
+        when :bedrock
+          cfg[:start_cmd]
+        else
+          nil
+        end
       end
 
       def default_java_cmd

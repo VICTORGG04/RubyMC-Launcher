@@ -26,7 +26,7 @@ module RubyMC
         request = "\x01" + ping_id + MAGIC + client_guid
         socket.send(request, 0)
 
-        raw = socket.recvfrom(2048).first
+        raw, _ = socket.recvfrom(2048)
         socket.close
 
         raise 'Resposta muito curta' if raw.bytesize < 35
@@ -34,10 +34,15 @@ module RubyMC
         response_type = raw.getbyte(0)
         raise "Tipo inesperado: #{response_type}" unless response_type == 0x1c
 
-        server_data_len = raw.byteslice(-2, 2).unpack1('n')
+        magic_offset = raw.index(MAGIC)
+        raise 'MAGIC não encontrado na resposta' unless magic_offset
+
+        len_offset = magic_offset + MAGIC.bytesize
+        server_data_len = raw.byteslice(len_offset, 2)&.unpack1('n') || 0
         raise 'Dados do servidor vazios' if server_data_len <= 0
 
-        server_data = raw.byteslice(-server_data_len, server_data_len)
+        server_data = raw.byteslice(len_offset + 2, server_data_len)
+        raise 'server_data é nil' if server_data.nil?
         parts = server_data.force_encoding('UTF-8').split(';').map(&:strip)
 
         latency_ms = ((Process.clock_gettime(Process::CLOCK_MONOTONIC) - started) * 1000).round

@@ -126,9 +126,23 @@ game_server_action() {
   bedrock_server_action "$action" "$version"
 }
 
+detect_bedrock_version() {
+  local dir="${HOME}/.minecraft_ruby_launcher/bedrock_servers"
+  if [ -d "$dir" ]; then
+    ls -1 "$dir" 2>/dev/null | sort -V | tail -1
+  fi
+}
+
 start_game_servers_for_project() {
   if [ "${AUTO_BEDROCK_SERVER}" = "true" ]; then
-    game_server_action start || true
+    local version
+    version="$(detect_bedrock_version)"
+    if [ -z "$version" ]; then
+      warn "Nenhuma versão do BDS encontrada em ~/.minecraft_ruby_launcher/bedrock_servers/"
+      return 1
+    fi
+    say "Iniciando servidor Bedrock versão $version..."
+    game_server_action start "$version" || true
   else
     say "Auto-start do servidor desativado."
   fi

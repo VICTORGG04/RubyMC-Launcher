@@ -1,0 +1,408 @@
+/* ==========================================================================
+   RubyMC Core Design System & Variables
+   ========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Cores Base */
+  --bg-main: #03040a;
+  --panel-glow: rgba(5, 7, 16, 0.94);
+  --text-main: #f6f8ff;
+  --text-muted: #9ca8bd;
+
+  /* Identidade Visual Neon */
+  --ruby: #ff174f;
+  --ruby-glow: rgba(255, 23, 79, 0.25);
+  --cyan: #35eaff;
+  --cyan-glow: rgba(53, 234, 255, 0.25);
+  --green: #62ff8f;
+
+  /* Layout Base */
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --transition-fast: 0.16s ease;
+}
+
+/* ==========================================================================
+   Reset & Raiz
+   ========================================================================== */
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background-color: var(--bg-main) !important;
+  font-family: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  color: var(--text-main);
+  overscroll-behavior: none;
+  overflow-x: hidden;
+}
+
+body {
+  background:
+          radial-gradient(circle at 18% 8%, rgba(255, 0, 80, 0.15), transparent 26%),
+          radial-gradient(circle at 78% 12%, rgba(142, 0, 255, 0.12), transparent 30%),
+          linear-gradient(90deg, #02030a, #050716, #02030a) !important;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+          linear-gradient(180deg, rgba(0,0,0,0.1), rgba(0,0,0,0.5)),
+          repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 4px);
+}
+
+button, input, select, textarea {
+  font: inherit;
+}
+
+/* ==========================================================================
+   Estrutura do Painel (Sidebar + Content)
+   ========================================================================== */
+.rubymc-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1440px, calc(100% - 40px));
+  margin: 24px auto 42px;
+}
+
+.launcher-window {
+  border: 1px solid rgba(255, 23, 79, 0.35);
+  border-radius: 13px;
+  background: linear-gradient(145deg, rgba(5,7,16,0.96), rgba(7,8,19,0.92));
+  box-shadow: 0 0 34px rgba(255,0,80,0.15), inset 0 0 80px rgba(0,0,0,0.36);
+  overflow: hidden;
+}
+
+.app-window {
+  min-height: 680px;
+  display: grid;
+  grid-template-columns: 188px 1fr;
+}
+
+/* Sidebar */
+.app-sidebar {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  background: linear-gradient(180deg, rgba(2,4,12,0.85), rgba(2,3,9,0.75));
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-title {
+  color: var(--ruby);
+  font-size: 14px;
+  font-weight: 900;
+  margin: 0 0 24px;
+  letter-spacing: 1px;
+}
+
+.tab-nav {
+  display: grid;
+  gap: 6px;
+}
+
+.tab-link {
+  min-height: 36px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: #dbe6f6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 0 12px;
+  font-weight: 800;
+  transition: var(--transition-fast);
+  cursor: pointer;
+}
+
+.tab-link:hover, .tab-link.active {
+  color: #fff;
+  background: linear-gradient(90deg, rgba(255,23,79,0.84), rgba(108,0,34,0.7));
+  box-shadow: 0 0 14px var(--ruby-glow);
+}
+
+/* Elementos de Formulários */
+.btn {
+  min-height: 34px;
+  padding: 0 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-weight: 900;
+  font-size: 13px;
+  transition: var(--transition-fast);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.15);
+}
+
+.btn-red {
+  background: linear-gradient(180deg, #ff2b5f, #a3002b);
+  box-shadow: 0 0 12px var(--ruby-glow);
+}
+
+.btn-cyan {
+  background: linear-gradient(180deg, var(--cyan), #0c94a8);
+  box-shadow: 0 0 10px rgba(53, 234, 255, 0.15);
+}
+
+input, select {
+  width: 100%;
+  max-width: 100%;
+  min-height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(4, 6, 12, 0.85);
+  color: var(--text-main);
+  padding: 0 12px;
+  outline: none;
+  font-size: 14px;
+}
+
+label {
+  display: block;
+  margin: 14px 0 6px;
+  color: #b6c2d4;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+
+/* Glassmorphism Balanceado */
+.glass-card {
+  border: 1px solid rgba(53, 234, 255, 0.15) !important;
+  border-radius: var(--radius-md) !important;
+  background:
+          radial-gradient(circle at 8% 12%, rgba(53, 234, 255, 0.05), transparent 32%),
+          linear-gradient(145deg, rgba(6, 9, 18, 0.85), rgba(4, 6, 15, 0.78)) !important;
+  backdrop-filter: blur(8px) !important;
+  box-shadow:
+          inset 0 0 30px rgba(0, 0, 0, 0.4),
+          0 0 20px rgba(53, 234, 255, 0.03) !important;
+  padding: 18px 20px;
+  width: 100%;
+}
+
+/* Força o card de instâncias e logs a ocupar a largura total do grid */
+.glass-card.wide-card {
+  grid-column: 1 / -1 !important;
+}
+
+.cyan-label {
+  color: var(--cyan);
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  font-size: 11px;
+  text-transform: uppercase;
+}
+
+/* ==========================================================================
+   Gerenciamento Dinâmico de Backgrounds das Abas
+   ========================================================================== */
+.app-content {
+  position: relative;
+  padding: 30px;
+  min-height: 680px;
+  transition: background 0.3s ease;
+}
+
+.tab-panel {
+  display: none;
+  animation: tabIn 0.2s ease both;
+  position: relative;
+  isolation: isolate;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+@keyframes tabIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tab-panel::before {
+  content: "";
+  position: absolute;
+  inset: -30px;
+  z-index: -1;
+  background: linear-gradient(90deg, rgba(5,7,16,0.97) 0%, rgba(5,7,16,0.85) 45%, rgba(0,0,0,0.3) 100%);
+  pointer-events: none;
+}
+
+body[data-current-tab="home"] .app-content { background: url("/assets/img/rubymc-home-temple-bg.png") center/cover no-repeat !important; }
+body[data-current-tab="modpacks"] .app-content { background: url("/assets/img/rubymc-page-modpacks-orb-bg.jpg") center/cover no-repeat !important; }
+body[data-current-tab="server"] .app-content { background: url("/assets/img/rubymc-page-server-bg.jpg") center/cover no-repeat !important; }
+body[data-current-tab="versions"] .app-content { background: url("/assets/img/rubymc-page-modpacks-orb-bg.jpg") center/cover no-repeat !important; }
+body[data-current-tab="discord"] .app-content { background: url("/assets/img/rubymc-page-discord-bg.jpg") center/cover no-repeat !important; }
+
+/* ==========================================================================
+   Grades de Conteúdo Assimétricas e Proporcionais (2 Colunas Fixas)
+   ========================================================================== */
+.server-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* Força duas colunas simétricas em telas grandes */
+  gap: 20px;
+  align-items: start;
+  max-width: 100%;
+}
+
+/* Exceções de Grid de Uma Coluna Focada */
+#tab-home .server-grid,
+#tab-display .server-grid {
+  grid-template-columns: 1fr !important;
+  max-width: 720px;
+}
+
+/* Grades de dados em tempo real (mini quadrados internos) */
+.server-live-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr); /* Alinha os 5 quadrados horizontalmente */
+  gap: 6px;
+  margin: 14px 0;
+  width: 100%;
+}
+
+.server-live-grid div {
+  padding: 8px 4px;
+  background: rgba(2, 4, 8, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-sm);
+  text-align: center;
+}
+
+.server-live-grid span {
+  display: block;
+  color: #8ea0b8;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.server-live-grid strong {
+  display: block;
+  color: var(--green);
+  font-size: 14px;
+}
+
+/* Badges */
+.bds-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+}
+.bds-badge-online {
+  color: #dfffe7;
+  background: rgba(98, 255, 143, 0.12);
+  border: 1px solid rgba(98, 255, 143, 0.25);
+}
+.bds-badge-offline {
+  color: #cbd4e5;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Correção Crítica da Linha de Servidores (Impede quebra vertical de botões) */
+.bds-server-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(0,0,0,0.25);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: var(--radius-sm);
+  width: 100%;
+}
+
+.bds-server-info-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.bds-server-actions-block {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0; /* Impede os botões de encolherem ou quebrarem */
+}
+
+.bds-server-actions-block .btn {
+  min-width: 80px; /* Garante tamanho horizontal confortável */
+  height: 32px;
+}
+
+/* Terminal de log */
+.terminal-container {
+  width: 100%;
+  max-width: 100%;
+}
+
+.terminal-display {
+  width: 100%;
+  min-height: 420px;
+  max-height: 520px;
+  overflow: auto;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #020307;
+  color: #62ff8f;
+  font-family: monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 14px;
+  white-space: pre-wrap;
+}
+
+/* Elemento de Input de Links/Comunidade na aba Configurações */
+.community-link-box {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  width: 100%;
+}
+
+/* ==========================================================
+   Responsividade
+   ========================================================== */
+@media (max-width: 1100px) {
+  .server-grid {
+    grid-template-columns: 1fr !important; /* Força empilhar em telas menores */
+  }
+  .server-live-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .app-window { grid-template-columns: 1fr; }
+  .tab-nav { grid-template-columns: 1fr 1fr; }
+  .server-live-grid { grid-template-columns: 1fr 1fr; }
+  .btn { width: 100%; }
+  .bds-server-item { flex-direction: column; align-items: stretch; gap: 12px; }
+  .bds-server-actions-block { justify-content: space-between; }
+  .bds-server-actions-block .btn { flex: 1; }
+}

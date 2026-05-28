@@ -65,7 +65,11 @@ end
 begin
   require_relative 'rubymc/minecraft_server_status'
 rescue LoadError
-  # Status live do servidor fica indisponível se o helper não estiver presente.
+end
+
+begin
+  require_relative 'rubymc/bedrock_server_status'
+rescue LoadError
 end
 
 begin
@@ -220,6 +224,10 @@ module RubyMC
         handle_bedrock_server_stop(req, res)
       when '/api/bedrock/servers/restart'
         handle_bedrock_server_restart(req, res)
+      when '/api/bedrock/servers/remove'
+        handle_bedrock_server_remove(req, res)
+      when '/api/bedrock/servers/logs'
+        handle_bedrock_server_logs(req, res)
       when '/api/bedrock/bds/available'
         handle_bedrock_server_available(req, res)
       when '/api/bedrock/bds/status'
@@ -234,6 +242,10 @@ module RubyMC
         handle_bedrock_server_stop(req, res)
       when '/api/bedrock/bds/restart'
         handle_bedrock_server_restart(req, res)
+      when '/api/bedrock/bds/remove'
+        handle_bedrock_server_remove(req, res)
+      when '/api/bedrock/bds/logs'
+        handle_bedrock_server_logs(req, res)
       when '/api/bedrock/open-manager'
         handle_bedrock_open_manager(req, res)
       when '/api/bedrock/import-apk'
@@ -370,9 +382,6 @@ module RubyMC
           end
         end
         json(res, { ok: true, message: 'Reiniciando servidor Bedrock...' })
-
-        # ── Ações finais ───────────────────────────────────────────────────────
-        json(res, { ok: true, message: 'Teste de log enviado ao Discord.', result: result })
 
         # ── Gerenciamento de Versões do Servidor ────────────────────────────
       when 'version_list_installed'
@@ -777,28 +786,43 @@ module RubyMC
       dirs.uniq.sort.reverse
     end
 
-    # ── Launch Minecraft (Java) ─────────────────────────────────────────────
-
-    def load_settings
-      YAML.safe_load_file(File.join(root, 'config', 'settings.yml'), permitted_classes: [Symbol], aliases: true) || {}
-    rescue
-      {}
-    end
-
     # ── Bedrock Server (BDS) Management ──────────────────────────────────────
     #
     # Estes endpoints rodam dentro do WebLauncherApp/WEBrick, sem Sinatra.
     # Eles atendem tanto a UI antiga (/api/bedrock/servers/*) quanto a UI nova
-    # que pode ter sido adicionada por patches (/api/bedrock/bds/*).
+    # (/api/bedrock/bds/*).
     #
     # Observação:
     # - Cliente Bedrock: use mcpelauncher-ui-qt ou importação de APK.
-    # - Servidor Bedrock: este bloco baixa o Bedrock Dedicated Server (BDS) Linux.
+    # - Servidor Bedrock: este bloco baixa, inicia, para, reinicia e remove BDS Linux.
 
     def bds_downloader
       @bds_downloader ||= RubyMC::BedrockServerDownloader.new(
+        project_root: root,
         servers_dir: File.expand_path('~/.minecraft_ruby_launcher/bedrock_servers')
       )
+    end
+
+    def bedrock_server_port(params = {})
+      direct = params['port'] || params[:port]
+      return direct.to_i if direct && direct.to_i.positive?
+
+      cfg = load_settings.dig('servers', 'bedrock') || {}
+      port = cfg['port'] || cfg[:port]
+
+      port.to_i.positive? ? port.to_i : 19_132
+    rescue StandardError
+      19_132
+    end
+
+    def bedrock_server_host
+      info = server_info
+      address = info[:address].to_s.strip
+
+      return '127.0.0.1' if address.empty? || address == 'não configurado'
+
+      host = address.split(':', 2).first.to_s.strip
+      host.empty? ? '127.0.0.1' : host
     end
 
     def handle_bedrock_server_available(_req, res)
@@ -808,16 +832,33 @@ module RubyMC
 
     def handle_bedrock_server_download(req, res)
       params = parse_json(req.body) || {}
-      version = (params['version'] || params['bedrock_version'] || params['server_version'] || req.query['version']).to_s.strip
-      url = (params['url'] || params['download_url'] || req.query['url']).to_s.strip
+
+      version = (
+        params['version'] ||
+        params['bedrock_version'] ||
+        params['server_version'] ||
+        req.query['version']
+      ).to_s.strip
+
+      url = (
+        params['url'] ||
+        params['download_url'] ||
+        req.query['url']
+      ).to_s.strip
+
       force = params['force'] == true || params['force'].to_s == 'true'
 
-      begin
-        result = bds_downloader.download(version: version, url: url, force: force)
-        json(res, result)
-      rescue StandardError => e
-        json(res, { ok: false, error: "#{e.class}: #{e.message}", version: version })
-      end
+      result = bds_downloader.download(
+        version: version.empty? ? nil : version,
+        url: url.empty? ? nil : url,
+        force: force
+      )
+
+      res.status = 422 unless result[:ok]
+      json(res, result)
+    rescue StandardError => e
+      res.status = 422
+      json(res, { ok: false, error: "#{e.class}: #{e.message}", version: version })
     end
 
     def handle_bedrock_server_installed(_req, res)
@@ -827,77 +868,176 @@ module RubyMC
 
     def handle_bedrock_server_start(req, res)
       params = parse_json(req.body) || {}
-      version = (params['version'] || params['bedrock_version'] || req.query['version']).to_s.strip
-      port = (params['port'] || req.query['port'] || 19_132).to_i
+
+      version = (
+        params['version'] ||
+        params['bedrock_version'] ||
+        params['server_version'] ||
+        req.query['version']
+      ).to_s.strip
 
       if version.empty?
+        res.status = 422
         return json(res, { ok: false, error: 'Versão não informada.' })
       end
 
-      begin
-        result = bds_downloader.start(version: version, port: port)
-        json(res, result)
-      rescue StandardError => e
-        json(res, { ok: false, error: "#{e.class}: #{e.message}" })
+      port = bedrock_server_port(params)
+      result = bds_downloader.start(version: version, port: port)
+
+      if result[:ok]
+        log('OK', "Servidor Bedrock #{version} iniciado.")
+      else
+        log('ERROR', "Falha ao iniciar Bedrock #{version}: #{result[:error]}")
+        res.status = 422
       end
+
+      json(res, result)
+    rescue StandardError => e
+      res.status = 422
+      json(res, { ok: false, error: "#{e.class}: #{e.message}" })
     end
 
     def handle_bedrock_server_stop(req, res)
       params = parse_json(req.body) || {}
-      version = (params['version'] || params['bedrock_version'] || req.query['version']).to_s.strip
 
-      begin
-        result = bds_downloader.stop(version: version.empty? ? nil : version)
-        json(res, result)
-      rescue StandardError => e
-        json(res, { ok: false, error: "#{e.class}: #{e.message}" })
+      version = (
+        params['version'] ||
+        params['bedrock_version'] ||
+        params['server_version'] ||
+        req.query['version']
+      ).to_s.strip
+
+      result = bds_downloader.stop(version: version.empty? ? nil : version)
+
+      if result[:ok]
+        log('OK', version.empty? ? 'Servidor(es) Bedrock parado(s).' : "Servidor Bedrock #{version} parado.")
+      else
+        log('ERROR', "Falha ao parar Bedrock: #{result[:error]}")
+        res.status = 422
       end
+
+      json(res, result)
+    rescue StandardError => e
+      res.status = 422
+      json(res, { ok: false, error: "#{e.class}: #{e.message}" })
     end
 
     def handle_bedrock_server_restart(req, res)
       params = parse_json(req.body) || {}
-      version = (params['version'] || params['bedrock_version'] || req.query['version']).to_s.strip
+
+      version = (
+        params['version'] ||
+        params['bedrock_version'] ||
+        params['server_version'] ||
+        req.query['version']
+      ).to_s.strip
 
       if version.empty?
+        res.status = 422
         return json(res, { ok: false, error: 'Versão não informada.' })
       end
 
-      begin
-        bds_downloader.stop(version: version)
-        result = bds_downloader.start(version: version, port: (params['port'] || req.query['port'] || 19_132).to_i)
-        json(res, result)
-      rescue StandardError => e
-        json(res, { ok: false, error: "#{e.class}: #{e.message}" })
+      port = bedrock_server_port(params)
+
+      bds_downloader.stop(version: version)
+      result = bds_downloader.start(version: version, port: port)
+
+      if result[:ok]
+        log('OK', "Servidor Bedrock #{version} reiniciado.")
+      else
+        log('ERROR', "Falha ao reiniciar Bedrock #{version}: #{result[:error]}")
+        res.status = 422
       end
+
+      json(res, result)
+    rescue StandardError => e
+      res.status = 422
+      json(res, { ok: false, error: "#{e.class}: #{e.message}" })
+    end
+
+    def handle_bedrock_server_remove(req, res)
+      params = parse_json(req.body) || {}
+
+      version = (
+        params['version'] ||
+        params['bedrock_version'] ||
+        params['server_version'] ||
+        req.query['version']
+      ).to_s.strip
+
+      if version.empty?
+        res.status = 422
+        return json(res, { ok: false, error: 'Versão não informada.' })
+      end
+
+      result = bds_downloader.remove(version: version)
+
+      if result[:ok]
+        log('OK', "Servidor Bedrock #{version} removido.")
+      else
+        log('ERROR', "Falha ao remover Bedrock #{version}: #{result[:error]}")
+        res.status = 422
+      end
+
+      json(res, result)
+    rescue StandardError => e
+      res.status = 422
+      json(res, { ok: false, error: "#{e.class}: #{e.message}" })
+    end
+
+    def handle_bedrock_server_logs(req, res)
+      params = parse_json(req.body) || {}
+
+      version = (
+        params['version'] ||
+        params['bedrock_version'] ||
+        params['server_version'] ||
+        req.query['version']
+      ).to_s.strip
+
+      lines = (params['lines'] || req.query['lines'] || 120).to_i
+      result = bds_downloader.logs(version: version.empty? ? nil : version, lines: lines.positive? ? lines : 120)
+
+      res.status = 422 unless result[:ok]
+      json(res, result)
+    rescue StandardError => e
+      res.status = 422
+      json(res, { ok: false, error: "#{e.class}: #{e.message}" })
     end
 
     def handle_bedrock_server_status(_req, res)
-      info = server_info
-      address = info[:address].to_s
-      host = address.split(':').first
-      bedrock_addr = "#{host}:19132"
+      bedrock_port = bedrock_server_port
+      host = bedrock_server_host
+      bedrock_addr = "#{host}:#{bedrock_port}"
 
       process_running = false
       pid = nil
       running_version = nil
+
       begin
         installed = bds_downloader.installed
         servers = installed[:servers] || installed['servers'] || []
         running = servers.find { |s| s[:running] || s['running'] }
+
         if running
           process_running = true
           pid = running[:pid] || running['pid']
           running_version = running[:version] || running['version']
         end
       rescue StandardError
-        # ignore
+        # Status degradado se a listagem falhar.
       end
 
       live = if defined?(RubyMC::BedrockServerStatus)
                RubyMC::BedrockServerStatus.query(bedrock_addr, timeout: 5)
              else
-               { ok: false, online: false, address: bedrock_addr, players: { online: 0, max: 0, sample: [] },
-                 error: 'RubyMC::BedrockServerStatus não carregado.' }
+               {
+                 ok: false,
+                 online: false,
+                 address: bedrock_addr,
+                 players: { online: 0, max: 0, sample: [] },
+                 error: 'RubyMC::BedrockServerStatus não carregado.'
+               }
              end
 
       online = live[:online] == true
@@ -910,7 +1050,7 @@ module RubyMC
         port_open: online,
         address: bedrock_addr,
         host: host,
-        port: 19_132,
+        port: bedrock_port,
         latency_ms: live[:latency_ms],
         version: live.dig(:version, :name) || live[:version] || running_version || '',
         pid: pid,
@@ -929,7 +1069,8 @@ module RubyMC
       end
 
       begin
-        pid = spawn(mcp_path, pgroup: true)
+        cmd = Shellwords.split(mcp_path)
+        pid = spawn(*cmd, pgroup: true)
         Process.detach(pid)
         log('OK', "mcpelauncher-ui-qt aberto (PID #{pid})")
         json(res, { ok: true, message: 'Gerenciador de versões aberto.' })
@@ -1013,4 +1154,17 @@ module RubyMC
       nil
     end
   end
+end
+
+if __FILE__ == $0
+  port = ENV['RUBYMC_PORT']&.to_i || 4567
+  host = ENV['RUBYMC_HOST'] || '127.0.0.1'
+  simulate = ARGV.include?('--simulate')
+  app = RubyMC::WebLauncherApp.new(
+    root: File.expand_path('../..', __FILE__),
+    host: host,
+    port: port,
+    simulate: simulate
+  )
+  app.start
 end
