@@ -11,11 +11,21 @@ RUN_DIR="$ROOT/tmp/rubymc"
 PID_FILE="$RUN_DIR/web.pid"
 LOG_FILE="$RUN_DIR/web.log"
 
+# Controle automático dos servidores de jogo quando o projeto sobe/desce.
+# Valores:
+#   all     -> controla Java e Bedrock configurado por RUBYMC_BEDROCK_VERSION
+#   java    -> controla apenas servidor Java
+#   bedrock -> controla apenas servidor Bedrock configurado por RUBYMC_BEDROCK_VERSION
+#   none    -> não controla servidores de jogo junto com o projeto
+AUTO_GAME_SERVERS="${RUBYMC_AUTO_SERVERS:-all}"
+BEDROCK_VERSION="${RUBYMC_BEDROCK_VERSION:-}"
+
 mkdir -p "$RUN_DIR"
 
 say() { echo "[RubyMC] $*"; }
 ok()  { echo "[OK] $*"; }
 warn(){ echo "[AVISO] $*"; }
+err() { echo "[ERRO] $*" >&2; }
 
 ensure_gemfile() {
   say "Verificando Gemfile..."
@@ -71,7 +81,255 @@ free_port() {
   fi
 }
 
+json_escape() {
+  # Escape simples para strings usadas nos payloads JSON desta CLI.
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+}
+
+require_curl() {
+  if ! command -v curl >/dev/null 2>&1; then
+    err "curl não encontrado. Instale curl para controlar servidores via API."
+    return 1
+  fi
+}
+
+web_pid_running() {
+  if [ -f "$PID_FILE" ]; then
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1
+    return
+  fi
+
+  return 1
+}
+
+wait_web_ready() {
+  local attempts="${1:-30}"
+  local i=0
+
+  require_curl || return 1
+
+  while [ "$i" -lt "$attempts" ]; do
+    if curl -fsS "${URL}/api/status" >/dev/null 2>&1 || curl -fsS "${URL}/" >/dev/null 2>&1; then
+      return 0
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+
+  return 1
+}
+
+api_post_json() {
+  local endpoint="$1"
+  local payload="$2"
+
+  require_curl || return 1
+
+  curl -fsS \
+    -X POST \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    --data "$payload" \
+    "${URL}${endpoint}"
+}
+
+api_get() {
+  local endpoint="$1"
+
+  require_curl || return 1
+
+  curl -fsS \
+    -H "Accept: application/json" \
+    "${URL}${endpoint}"
+}
+
+java_server_action() {
+  local action="$1"
+  local api_action
+
+  case "$action" in
+    start)   api_action="start_server" ;;
+    stop)    api_action="stop_server" ;;
+    restart) api_action="restart_server" ;;
+    *)
+      err "Ação Java inválida: $action"
+      return 1
+      ;;
+  esac
+
+  say "Executando servidor Java: ${action}"
+  if api_post_json "/api/action" "{\"action\":\"${api_action}\"}" >/tmp/rubymc_java_server_response.$$ 2>/tmp/rubymc_java_server_error.$$; then
+    cat /tmp/rubymc_java_server_response.$$
+    echo
+    ok "Servidor Java: ${action} solicitado."
+    rm -f /tmp/rubymc_java_server_response.$$ /tmp/rubymc_java_server_error.$$
+    return 0
+  fi
+
+  warn "Falha ao solicitar ${action} do servidor Java:"
+  cat /tmp/rubymc_java_server_error.$$ 2>/dev/null || true
+  echo
+  rm -f /tmp/rubymc_java_server_response.$$ /tmp/rubymc_java_server_error.$$
+  return 1
+}
+
+bedrock_server_action() {
+  local action="$1"
+  local version="${2:-$BEDROCK_VERSION}"
+  local endpoint=""
+  local payload=""
+
+  case "$action" in
+    start)
+      if [ -z "$version" ]; then
+        warn "Versão Bedrock não informada. Use: ./rubymc server start bedrock <versão>"
+        warn "Ou defina: RUBYMC_BEDROCK_VERSION=<versão> ./rubymc start"
+        return 0
+      fi
+      endpoint="/api/bedrock/servers/start"
+      payload="{\"version\":\"$(json_escape "$version")\"}"
+      ;;
+    stop)
+      # version vazio significa: backend decide parar o servidor Bedrock ativo.
+      endpoint="/api/bedrock/servers/stop"
+      payload="{\"version\":\"$(json_escape "$version")\"}"
+      ;;
+    restart)
+      bedrock_server_action stop "$version" || true
+      sleep 2
+      bedrock_server_action start "$version"
+      return $?
+      ;;
+    *)
+      err "Ação Bedrock inválida: $action"
+      return 1
+      ;;
+  esac
+
+  say "Executando servidor Bedrock: ${action}${version:+ (${version})}"
+  if api_post_json "$endpoint" "$payload" >/tmp/rubymc_bedrock_server_response.$$ 2>/tmp/rubymc_bedrock_server_error.$$; then
+    cat /tmp/rubymc_bedrock_server_response.$$
+    echo
+    ok "Servidor Bedrock: ${action} solicitado."
+    rm -f /tmp/rubymc_bedrock_server_response.$$ /tmp/rubymc_bedrock_server_error.$$
+    return 0
+  fi
+
+  warn "Falha ao solicitar ${action} do servidor Bedrock:"
+  cat /tmp/rubymc_bedrock_server_error.$$ 2>/dev/null || true
+  echo
+  rm -f /tmp/rubymc_bedrock_server_response.$$ /tmp/rubymc_bedrock_server_error.$$
+  return 1
+}
+
+game_server_action() {
+  local action="$1"
+  local target="${2:-all}"
+  local version="${3:-$BEDROCK_VERSION}"
+
+  if ! wait_web_ready 5; then
+    warn "Servidor web/API não está disponível em ${URL}. Inicie o projeto antes de controlar servidores de jogo."
+    return 1
+  fi
+
+  case "$target" in
+    java)
+      java_server_action "$action"
+      ;;
+    bedrock)
+      bedrock_server_action "$action" "$version"
+      ;;
+    all)
+      java_server_action "$action" || true
+      bedrock_server_action "$action" "$version" || true
+      ;;
+    *)
+      err "Servidor desconhecido: $target"
+      echo "Use: java, bedrock ou all"
+      return 1
+      ;;
+  esac
+}
+
+start_game_servers_for_project() {
+  local target="${1:-$AUTO_GAME_SERVERS}"
+  local version="${2:-$BEDROCK_VERSION}"
+
+  case "$target" in
+    none|off|false|0)
+      say "Auto-start de servidores de jogo desativado."
+      return 0
+      ;;
+    java|bedrock|all)
+      game_server_action start "$target" "$version" || true
+      ;;
+    *)
+      warn "RUBYMC_AUTO_SERVERS inválido: $target. Use all, java, bedrock ou none."
+      ;;
+  esac
+}
+
+stop_game_servers_for_project() {
+  local target="${1:-$AUTO_GAME_SERVERS}"
+  local version="${2:-$BEDROCK_VERSION}"
+
+  case "$target" in
+    none|off|false|0)
+      say "Auto-stop de servidores de jogo desativado."
+      return 0
+      ;;
+    java|bedrock|all)
+      if web_pid_running || wait_web_ready 2; then
+        game_server_action stop "$target" "$version" || true
+      else
+        warn "API web indisponível. Não foi possível enviar stop para os servidores de jogo."
+      fi
+      ;;
+    *)
+      warn "RUBYMC_AUTO_SERVERS inválido: $target. Use all, java, bedrock ou none."
+      ;;
+  esac
+}
+
+status_game_servers() {
+  echo
+  echo "Servidores de jogo:"
+
+  if ! wait_web_ready 2; then
+    echo "  API indisponível em ${URL}"
+    return 0
+  fi
+
+  if require_curl >/dev/null 2>&1; then
+    echo "  Java:"
+    api_get "/api/server/status" 2>/dev/null || echo "  Não foi possível consultar /api/server/status"
+    echo
+    echo "  Bedrock:"
+    api_get "/api/bedrock/servers/installed" 2>/dev/null || echo "  Não foi possível consultar /api/bedrock/servers/installed"
+    echo
+  fi
+}
+
 stop_server() {
+  local keep_game_servers=0
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --keep-servers|--no-servers)
+        keep_game_servers=1
+        ;;
+    esac
+    shift
+  done
+
+  if [ "$keep_game_servers" -eq 0 ]; then
+    say "Parando servidores de jogo vinculados ao projeto..."
+    stop_game_servers_for_project "$AUTO_GAME_SERVERS" "$BEDROCK_VERSION" || true
+  else
+    say "Mantendo servidores de jogo ativos."
+  fi
+
   say "Parando servidor web antigo, se existir..."
 
   if [ -f "$PID_FILE" ]; then
@@ -87,20 +345,51 @@ stop_server() {
   pkill -f "app/server.rb" >/dev/null 2>&1 || true
   free_port
 
-  ok "Servidor parado/liberado."
+  ok "Servidor web parado/liberado."
   stop_bot
 }
 
 start_server() {
   local simulate_flag=""
+  local auto_servers="$AUTO_GAME_SERVERS"
+  local bedrock_version="$BEDROCK_VERSION"
 
-  if [ "$1" = "--simulate" ] || [ "${RUBYMC_SIMULATE}" = "1" ]; then
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --simulate)
+        simulate_flag="--simulate"
+        ;;
+      --no-servers|--servers=none)
+        auto_servers="none"
+        ;;
+      --servers=*)
+        auto_servers="${1#--servers=}"
+        ;;
+      --bedrock-version=*)
+        bedrock_version="${1#--bedrock-version=}"
+        BEDROCK_VERSION="$bedrock_version"
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        warn "Opção ignorada no start: $1"
+        ;;
+    esac
+    shift
+  done
+
+  if [ "${RUBYMC_SIMULATE}" = "1" ]; then
     simulate_flag="--simulate"
+  fi
+
+  if [ -n "$simulate_flag" ]; then
     say "Modo simulação ativado! (20 jogadores + Discord mock)"
   fi
 
   install_deps
-  stop_server
+  stop_server --keep-servers
 
   say "Iniciando RubyMC Launcher em ${URL}"
 
@@ -111,12 +400,20 @@ start_server() {
   sleep 2
 
   if ! kill -0 "$new_pid" >/dev/null 2>&1; then
-    echo "[ERRO] O servidor não iniciou. Últimos logs:"
+    echo "[ERRO] O servidor web não iniciou. Últimos logs:"
     tail -n 80 "$LOG_FILE" || true
     exit 1
   fi
 
-  ok "Servidor iniciado. PID: $new_pid${simulate_flag:+ (modo simulação)}"
+  ok "Servidor web iniciado. PID: $new_pid${simulate_flag:+ (modo simulação)}"
+
+  if ! wait_web_ready 30; then
+    warn "Servidor web iniciou, mas a API ainda não respondeu em ${URL}."
+  fi
+
+  start_bot
+
+  start_game_servers_for_project "$auto_servers" "$bedrock_version"
 
   if command -v xdg-open >/dev/null 2>&1; then
     xdg-open "${URL}/?v=latest-update" >/dev/null 2>&1 || true
@@ -125,9 +422,14 @@ start_server() {
   echo
   say "Acesse: ${URL}/?v=latest-update"
   say "Use './rubymc logs' para ver logs."
-  say "Use './rubymc stop' para parar."
+  say "Use './rubymc stop' para parar projeto + servidores."
+  say "Use './rubymc server start java' ou './rubymc server start bedrock <versão>' para iniciar apenas um servidor."
+}
 
-  start_bot
+restart_server() {
+  local args=("$@")
+  stop_server
+  start_server "${args[@]}"
 }
 
 status_server() {
@@ -152,6 +454,7 @@ status_server() {
 
   echo
   status_bot
+  status_game_servers
 }
 
 show_logs() {
@@ -266,17 +569,94 @@ bot_logs() {
   tail -f "$BOT_LOG_FILE"
 }
 
+server_cli() {
+  local action="${1:-status}"
+  local target="${2:-all}"
+  local version="${3:-$BEDROCK_VERSION}"
+
+  case "$action" in
+    start|stop|restart)
+      game_server_action "$action" "$target" "$version"
+      ;;
+    status)
+      status_game_servers
+      ;;
+    logs)
+      show_logs
+      ;;
+    *)
+      echo "Uso: ./rubymc server [start|stop|restart|status] [java|bedrock|all] [versão-bedrock]"
+      echo ""
+      echo "Exemplos:"
+      echo "  ./rubymc server start java"
+      echo "  ./rubymc server stop java"
+      echo "  ./rubymc server restart java"
+      echo "  ./rubymc server start bedrock 1.21.80.03"
+      echo "  ./rubymc server stop bedrock"
+      echo "  ./rubymc server start all"
+      exit 1
+      ;;
+  esac
+}
+
+usage() {
+  cat <<USAGE
+Uso: ./rubymc [comando] [opções]
+
+Projeto:
+  start|web [opções]     Inicia web + bot + servidores de jogo configurados
+  stop                   Para servidores de jogo + web + bot
+  restart [opções]       Reinicia servidores de jogo + web + bot
+  status                 Mostra status do projeto, bot e servidores
+  logs                   Mostra logs da web
+  test                   Testes básicos
+  classic                Abre console clássico
+  organize               Instruções de organização
+  install                Instala dependências
+
+Servidores de jogo:
+  server start java
+  server stop java
+  server restart java
+  server start bedrock <versão>
+  server stop bedrock [versão]
+  server restart bedrock <versão>
+  server start all [versão-bedrock]
+  servers ...            Alias de server
+
+Bot:
+  bot [start|stop|restart|status|logs]
+
+IA:
+  ai "pergunta"
+  ai-chat|aic
+
+Opções do start/restart:
+  --simulate                         Ativa modo simulação
+  --no-servers                       Não inicia servidores de jogo junto
+  --servers=all|java|bedrock|none    Escolhe quais servidores subir junto
+  --bedrock-version=<versão>         Versão Bedrock para auto-start
+
+Variáveis:
+  RUBYMC_AUTO_SERVERS=all|java|bedrock|none
+  RUBYMC_BEDROCK_VERSION=<versão>
+  RUBYMC_HOST=127.0.0.1
+  RUBYMC_PORT=4567
+USAGE
+}
+
 case "${1:-start}" in
   start|web)
     shift
     start_server "$@"
     ;;
   stop)
-    stop_server
+    shift || true
+    stop_server "$@"
     ;;
   restart)
-    stop_server
-    start_server
+    shift
+    restart_server "$@"
     ;;
   status)
     status_server
@@ -301,6 +681,10 @@ case "${1:-start}" in
     ;;
   ai-chat|aic)
     ai_chat
+    ;;
+  server|servers|game-server|game-servers)
+    shift
+    server_cli "$@"
     ;;
   bot)
     cmd="${2:-start}"
@@ -327,12 +711,11 @@ case "${1:-start}" in
         ;;
     esac
     ;;
+  help|-h|--help)
+    usage
+    ;;
   *)
-    echo "Uso: ./rubymc [start|web|stop|restart|status|logs|test|classic|organize|install|ai|ai-chat|bot]"
-    echo ""
-    echo "  start [--simulate]  Inicia o servidor web (--simulate: modo simulação com 20 jogadores)"
-    echo "  web                 Atalho para start"
-    echo "  bot [comando]       Gerencia o bot Discord (start|stop|restart|status|logs)"
+    usage
     exit 1
     ;;
 esac

@@ -1,0 +1,17 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# frozen_string_literal: true
+
+require "sinatra"
+require "json"
+
+require_relative "server_java_routes"
+require_relative "bedrock_download_routes"
+
+root = File.expand_path('..', __dir__)
+port = Integer(ENV.fetch('RUBYMC_PORT', '4567'))
+host = ENV.fetch('RUBYMC_HOST', '127.0.0.1')
+simulate = ARGV.include?('--simulate') || ENV['RUBYMC_SIMULATE'] == '1'
+
+RubyMC::WebLauncherApp.new(root: root, host: host, port: port, simulate: simulate).start

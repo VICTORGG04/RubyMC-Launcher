@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RubyMC Launcher</title>
+  <link rel="stylesheet" href="/assets/css/launcher.css?v=rubymc-bg-unified-3">
+
+  <div class="rubymc-shell">
+    <section class="launcher-window app-window">
+      <aside class="app-sidebar">
+        <div class="app-title"><span>💎</span><strong>RUBYMC LAUNCHER</strong></div>
+        <nav class="tab-nav" aria-label="Abas do RubyMC Launcher">
+          <button class="tab-link active" data-tab="home">🏠 <span>Início</span></button>
+          <button class="tab-link" data-tab="server">🌐 <span>Servidor</span></button>
+          <button class="tab-link" data-tab="display">▣ <span>Display</span></button>
+        </nav>
+        <button class="tab-link settings-link" data-tab="settings">⚙️ <span>Configurações</span></button>
+        <footer class="sidebar-status"><span></span><small id="connection-status">Você está conectado</small></footer>
+      </aside>
+      <main class="app-content">
+        <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+        <section id="tab-home" class="tab-panel active" data-panel-title="Início">
+          <div class="panel-grid hero-grid">
+            <article class="panel-copy">
+              <span class="cyan-label">BEM-VINDO(A)!</span>
+              <h1>Pronto para jogar?</h1>
+              <p>Gerencie suas contas, modpacks, servidores e muito mais com o RubyMC Launcher.</p>
+              <label for="profile-select">Perfil ativo</label>
+              <select id="profile-select"><option value="vanilla">Vanilla / sem modpack</option></select>
+              <div class="actions"><button class="btn btn-red" data-action="play">Jogar Minecraft</button><button class="btn btn-dark" data-action="enter_server">Entrar no servidor</button></div>
+              <div class="bedrock-section" id="bedrock-section" style="display:none">
+                <hr class="bedrock-divider">
+                <h3 class="bedrock-heading">Bedrock Edition</h3>
+
+                <!-- Play Controls -->
+                <div class="bedrock-controls">
+                  <div class="field-box bedrock-version-box">
+                    <small>Versão</small>
+                    <select id="bedrock-version" disabled>
+                      <option>Carregando...</option>
+                    </select>
+                  </div>
+                  <div class="actions">
+                    <button class="btn btn-cyan" data-action="play_bedrock" disabled>Jogar Bedrock</button>
+                    <button class="btn btn-dark" data-action="play_bedrock_server" disabled>Entrar no servidor</button>
+                  </div>
+                </div>
+                <p class="bedrock-status" id="bedrock-status">Verificando instalação...</p>
+
+                <!-- Version Manager -->
+                <div class="bedrock-subsection">
+                  <h4>Gerenciar Versões</h4>
+                  <div class="actions">
+                    <button class="btn btn-dark" id="bedrock-open-manager">Abrir Gerenciador</button>
+                  </div>
+                  <small class="bedrock-hint">Abre o mcpelauncher-ui-qt para baixar novas versões via Google Play.</small>
+                </div>
+
+                <!-- Import APK -->
+                <div class="bedrock-subsection">
+                  <h4>Importar APK</h4>
+                  <div class="bedrock-import-apk">
+                    <input type="file" id="bedrock-apk-input" accept=".apk" class="bedrock-apk-input">
+                    <div class="actions">
+                      <button class="btn btn-dark" id="bedrock-apk-import">Extrair versão</button>
+                    </div>
+                    <p class="bedrock-import-status" id="bedrock-import-status"></p>
+                  </div>
+                  <small class="bedrock-hint">Requer <code>mcpelauncher-extract</code> no PATH. Forneça um APK do Minecraft Bedrock (x86).</small>
+                </div>
+
+                <!-- Bedrock Server -->
+                <div class="bedrock-subsection" id="bedrock-server-section">
+                  <h4>Servidor Bedrock (BDS)</h4>
+
+                  <!-- Running status -->
+                  <div class="bedrock-server-status" id="bedrock-server-status" style="display:none">
+                    <span class="bedrock-server-badge bedrock-server-online">● Online</span>
+                    <span id="bedrock-server-version-label"></span>
+                    <span class="bedrock-server-pid" id="bedrock-server-pid-label"></span>
+                    <span class="bedrock-server-live" id="bedrock-server-latency"></span>
+                    <span class="bedrock-server-live" id="bedrock-server-players"></span>
+                    <div class="bedrock-server-motd" id="bedrock-server-motd"></div>
+                    <button class="btn btn-red btn-sm" id="bedrock-server-stop">Parar servidor</button>
+                  </div>
+
+                  <!-- Available versions -->
+                  <div class="bedrock-server-available">
+                    <div class="bedrock-server-row">
+                      <select id="bedrock-server-version-select" class="bedrock-server-select"></select>
+                      <button class="btn btn-cyan btn-sm" id="bedrock-server-download">Baixar</button>
+                    </div>
+                    <p class="bedrock-server-download-status" id="bedrock-server-download-status"></p>
+                  </div>
+
+                  <!-- Installed servers -->
+                  <div id="bedrock-server-list" class="bedrock-server-list"></div>
+                </div>
+              </div>
+              <div class="hero-stats"><div><span>VERSÃO</span><strong id="minecraft-version">---</strong><em>Instalada</em></div><div><span>SERVIDOR</span><strong id="server-state">---</strong><em id="server-players">---</em></div><div><span>STATUS</span><strong id="launcher-state">---</strong><em>---</em></div></div>
+            </article>
+            <figure class="preview-frame">
+              <img src="/assets/img/rubymc-tela-inicio.png" alt="RubyMC Launcher">
+            </figure>
+          </div>
+        </section>
+        <section id="tab-server" class="tab-panel" data-panel-title="Servidor">
+          <header class="panel-heading"><h2>🌐 Servidor Bedrock (BDS)</h2><p>Gerencie seu servidor Bedrock dedicado.</p></header>
+          <div class="panel-grid"><article class="panel-copy">
+            <div class="bedrock-subsection" id="bedrock-server-section">
+              <h4>Servidor Bedrock (BDS)</h4>
+              <div class="bedrock-server-status" id="bedrock-server-status" style="display:none">
+                <span class="bedrock-server-badge bedrock-server-online">● Online</span>
+                <span id="bedrock-server-version-label"></span>
+                <span class="bedrock-server-pid" id="bedrock-server-pid-label"></span>
+                <span class="bedrock-server-live" id="bedrock-server-latency"></span>
+                <span class="bedrock-server-live" id="bedrock-server-players"></span>
+                <div class="bedrock-server-motd" id="bedrock-server-motd"></div>
+                <button class="btn btn-red btn-sm" id="bedrock-server-stop">Parar servidor</button>
+              </div>
+              <div class="bedrock-server-available">
+                <div class="bedrock-server-row">
+                  <select id="bedrock-server-version-select" class="bedrock-server-select"></select>
+                  <button class="btn btn-cyan btn-sm" id="bedrock-server-download">Baixar</button>
+                </div>
+                <p class="bedrock-server-download-status" id="bedrock-server-download-status"></p>
+              </div>
+              <div id="bedrock-server-list" class="bedrock-server-list"></div>
+            </div>
+          </article></div>
+        </section>
+        <section id="tab-display" class="tab-panel" data-panel-title="Display">
+          <header class="panel-heading with-actions"><div><h2>▣ Display Interno de Logs</h2><p>Acompanhe tudo que acontece no launcher em tempo real.</p></div><div class="actions"><button class="btn btn-dark" data-action="run_tests">Rodar testes</button><button class="btn btn-dark" data-action="clear_display">Limpar</button></div></header>
+          <div class="panel-grid display-grid"><pre id="display-log" class="terminal-display">[SYSTEM] RubyMC Web Launcher inicializando...
+[SYSTEM] Aguardando eventos do backend...</pre></div>
+        </section>
+        <section id="tab-settings" class="tab-panel settings-panel" data-panel-title="Configurações">
+          <header class="settings-page-header">
+            <div class="settings-title-group">
+              <span class="settings-icon">⚙️</span>
+              <div>
+                <h2>Configurações</h2>
+                <p>Personalize sua experiência no RubyMC Launcher.</p>
+              </div>
+            </div>
+          </header>
+
+          <div class="settings-page-grid">
+            <article class="settings-form-card">
+              <h3>Configurações</h3>
+              <p>Personalize sua experiência.</p>
+
+              <div class="field-box">
+                <small>Username Offline</small>
+                <input id="settings-username" type="text" value="VictorGG" placeholder="Seu nickname no jogo">
+              </div>
+
+              <footer class="settings-connected">
+                <span></span>
+                <small>Você está conectado</small>
+              </footer>
+            </article>
+
+            <div class="settings-right-column">
+              <article class="settings-accounts-card">
+                <h3>Contas Microsoft</h3>
+                <p>Adicione sua conta Microsoft para jogar online com seu personagem real.</p>
+                <div id="accounts-list" class="list-box">
+                  <span class="loading-dots">Carregando...</span>
+                </div>
+              <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-red" id="add-account-btn">Adicionar Conta Microsoft</button>
+                <button class="btn btn-dark" id="add-bedrock-btn">Adicionar Conta Bedrock</button>
+              </div>
+              </article>
+
+              <article class="settings-about-card">
+              <h3>Sobre o RubyMC Launcher</h3>
+
+              <div class="settings-about-brand">
+                <div class="settings-logo-orb">
+                  <img src="/assets/img/rubymc-discord-ruby-icon-64.png" alt="RubyMC">
+                </div>
+
+                <div class="settings-brand-text">
+                  <strong>RUBYMC</strong>
+                  <span>— LAUNCHER —</span>
+                </div>
+              </div>
+
+              <p>Versão: <strong id="launcher-version">1.0.0</strong></p>
+              <p>Feito com <strong class="heart">❤</strong> para a comunidade Minecraft.</p>
+
+              <button class="btn btn-dark settings-update-button" data-action="check_updates">Verificar atualizações</button>
+            </article>
+          </div>
+        </section>
+      </main>
+    </section>
+  </div>
+  <div id="auth-modal" class="modal-overlay" style="display:none">
+    <div class="modal-box">
+      <h3>Autenticação Microsoft</h3>
+      <p>1. Acesse <strong><a href="https://www.microsoft.com/link" target="_blank" id="auth-uri">www.microsoft.com/link</a></strong></p>
+      <p>2. Digite o código abaixo:</p>
+      <div class="auth-code" id="auth-code">------</div>
+      <p id="auth-status" class="auth-status">Aguardando aprovação no navegador...</p>
+      <div class="actions">
+        <button class="btn btn-dark" id="auth-cancel-btn">Cancelar</button>
+      </div>
+    </div>
+  </div>
+  <script src="/assets/js/utils.js?v=1"></script>
+  <script src="/assets/js/launcher.js?v=rubymc-bg-unified-3"></script>
+  <script src="/assets/js/bedrock-versions-page.js?v=1"></script>
+  <script src="/assets/js/server-runtime-selector.js?v=1"></script>
+</body>
+</html>

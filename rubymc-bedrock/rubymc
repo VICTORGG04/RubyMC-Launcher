@@ -1,0 +1,419 @@
+#!/usr/bin/env bash
+set -e
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
+
+HOST="${RUBYMC_HOST:-127.0.0.1}"
+PORT="${RUBYMC_PORT:-4567}"
+URL="http://${HOST}:${PORT}"
+RUN_DIR="$ROOT/tmp/rubymc"
+PID_FILE="$RUN_DIR/web.pid"
+LOG_FILE="$RUN_DIR/web.log"
+
+AUTO_BEDROCK_SERVER="${RUBYMC_AUTO_SERVERS:-true}"
+
+mkdir -p "$RUN_DIR"
+
+say() { echo "[RubyMC] $*"; }
+ok()  { echo "[OK] $*"; }
+warn(){ echo "[AVISO] $*"; }
+err() { echo "[ERRO] $*" >&2; }
+
+ensure_gemfile() {
+  if [ ! -f Gemfile.lock ]; then
+    bundle install --quiet || bundle install
+  fi
+}
+
+install_deps() {
+  ensure_gemfile
+}
+
+require_curl() {
+  if ! command -v curl &>/dev/null; then
+    echo "curl é necessário. Instale com: apt install curl"
+    return 1
+  fi
+}
+
+json_escape() {
+  printf '%s' "$1" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))' 2>/dev/null || printf '"%s"' "$1"
+}
+
+api_post_json() {
+  local endpoint="$1"
+  local data="$2"
+  curl -s -X POST "${URL}${endpoint}" \
+    -H 'Content-Type: application/json' \
+    -d "$data" \
+    --max-time 10
+}
+
+api_get() {
+  curl -s "$1" --max-time 10
+}
+
+web_pid_running() {
+  [ -f "$PID_FILE" ] || return 1
+  local pid
+  pid="$(cat "$PID_FILE" 2>/dev/null || echo "")"
+  [ -z "$pid" ] && return 1
+  kill -0 "$pid" 2>/dev/null
+}
+
+wait_web_ready() {
+  local max="${1:-10}"
+  local waited=0
+  while [ "$waited" -lt "$max" ]; do
+    if curl -sf "${URL}/api/ping" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  return 1
+}
+
+free_port() {
+  local pid
+  pid="$(lsof -ti :"$PORT" 2>/dev/null || true)"
+  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  sleep 1
+  pid="$(lsof -ti :"$PORT" 2>/dev/null || true)"
+  [ -n "$pid" ] && kill -9 "$pid" 2>/dev/null || true
+}
+
+bedrock_server_action() {
+  local action="$1"
+  local version="${2:-}"
+
+  case "$action" in
+    start)
+      if [ -z "$version" ]; then
+        err "Versão Bedrock não informada. Use: ./rubymc server start <versão>"
+        return 1
+      fi
+      api_post_json "/api/bedrock/servers/start" "{\"version\":\"$(json_escape "$version")\"}"
+      ;;
+    stop)
+      api_post_json "/api/bedrock/servers/stop" '{}'
+      ;;
+    restart)
+      bedrock_server_action stop "$version" || true
+      sleep 2
+      bedrock_server_action start "$version"
+      ;;
+    status)
+      api_get "${URL}/api/bedrock/servers/status"
+      ;;
+    *)
+      err "Ação inválida: $action"
+      return 1
+      ;;
+  esac
+}
+
+game_server_action() {
+  local action="$1"
+  local version="${2:-}"
+
+  if ! wait_web_ready 5; then
+    warn "API não disponível em ${URL}."
+    return 1
+  fi
+
+  bedrock_server_action "$action" "$version"
+}
+
+start_game_servers_for_project() {
+  if [ "${AUTO_BEDROCK_SERVER}" = "true" ]; then
+    game_server_action start || true
+  else
+    say "Auto-start do servidor desativado."
+  fi
+}
+
+stop_game_servers_for_project() {
+  if web_pid_running || wait_web_ready 2; then
+    game_server_action stop || true
+  else
+    warn "API indisponível."
+  fi
+}
+
+status_game_servers() {
+  echo
+  echo "Servidores:"
+
+  if ! wait_web_ready 2; then
+    echo "  API indisponível em ${URL}"
+    return 0
+  fi
+
+  if require_curl >/dev/null 2>&1; then
+    api_get "${URL}/api/server/status" 2>/dev/null || echo "  Não foi possível consultar status"
+    echo
+  fi
+}
+
+stop_server() {
+  local keep_game_servers=0
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --keep-servers|--no-servers)
+        keep_game_servers=1
+        ;;
+    esac
+    shift
+  done
+
+  if [ "$keep_game_servers" -eq 0 ]; then
+    say "Parando servidor..."
+    stop_game_servers_for_project || true
+  else
+    say "Mantendo servidor ativo."
+  fi
+
+  say "Parando servidor web antigo, se existir..."
+
+  if [ -f "$PID_FILE" ]; then
+    old_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    if [ -n "$old_pid" ]; then
+      kill "$old_pid" >/dev/null 2>&1 || true
+      sleep 1
+      kill -9 "$old_pid" >/dev/null 2>&1 || true
+    fi
+    rm -f "$PID_FILE"
+  fi
+
+  pkill -f "app/server.rb" >/dev/null 2>&1 || true
+  free_port
+
+  ok "Servidor web parado."
+}
+
+start_server() {
+  local simulate_flag=""
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --simulate)
+        simulate_flag="--simulate"
+        ;;
+      --no-servers)
+        AUTO_BEDROCK_SERVER="false"
+        ;;
+      --help|-h)
+        usage
+        exit 0
+        ;;
+      *)
+        warn "Opção ignorada no start: $1"
+        ;;
+    esac
+    shift
+  done
+
+  if [ "${RUBYMC_SIMULATE}" = "1" ]; then
+    simulate_flag="--simulate"
+  fi
+
+  install_deps
+
+  say "Iniciando servidor web..."
+
+  free_port
+
+  nohup bundle exec ruby lib/web_launcher_app.rb ${simulate_flag} > "$LOG_FILE" 2>&1 &
+  new_pid="$!"
+  echo "$new_pid" > "$PID_FILE"
+
+  sleep 2
+
+  if ! kill -0 "$new_pid" >/dev/null 2>&1; then
+    echo "[ERRO] O servidor web não iniciou. Últimos logs:"
+    tail -n 80 "$LOG_FILE" || true
+    exit 1
+  fi
+
+  ok "Servidor web iniciado. PID: $new_pid${simulate_flag:+ (modo simulação)}"
+
+  if ! wait_web_ready 30; then
+    warn "Servidor web iniciou, mas a API ainda não respondeu em ${URL}."
+  fi
+
+  start_game_servers_for_project
+
+  if command -v xdg-open >/dev/null 2>&1; then
+    xdg-open "${URL}/?v=latest-update" >/dev/null 2>&1 || true
+  fi
+
+  echo
+  say "Acesse: ${URL}/?v=latest-update"
+  say "Use './rubymc logs' para ver logs."
+  say "Use './rubymc stop' para parar projeto + servidor."
+}
+
+restart_server() {
+  local args=("$@")
+  stop_server
+  start_server "${args[@]}"
+}
+
+status_server() {
+  echo "Projeto: $ROOT"
+  echo "URL: ${URL}"
+
+  if [ -f "$PID_FILE" ]; then
+    pid="$(cat "$PID_FILE")"
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      echo "Servidor web: rodando (PID $pid)"
+    else
+      echo "Servidor web: PID salvo, mas processo morto"
+    fi
+  else
+    echo "Servidor web: sem PID salvo"
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    echo
+    lsof -nP -iTCP:${PORT} -sTCP:LISTEN || true
+  fi
+
+  echo
+  status_game_servers
+}
+
+show_logs() {
+  touch "$LOG_FILE"
+  tail -f "$LOG_FILE"
+}
+
+server_cli() {
+  local action="${1:-status}"
+  local version="${2:-}"
+
+  case "$action" in
+    start|stop|restart)
+      game_server_action "$action" "$version"
+      ;;
+    status)
+      status_game_servers
+      ;;
+    logs)
+      show_logs
+      ;;
+    *)
+      echo "Uso: ./rubymc server [start|stop|restart|status|logs] [versão]"
+      echo ""
+      echo "Exemplos:"
+      echo "  ./rubymc server start 1.21.80.03"
+      echo "  ./rubymc server stop"
+      echo "  ./rubymc server restart"
+      echo "  ./rubymc server status"
+      echo "  ./rubymc server logs"
+      return 1
+      ;;
+  esac
+}
+
+bedrock_cli() {
+  local action="${1:-status}"
+  local version="${2:-}"
+
+  case "$action" in
+    start|stop|restart)
+      bedrock_server_action "$action" "$version"
+      ;;
+    status)
+      api_get "${URL}/api/bedrock/servers/installed"
+      ;;
+    *)
+      echo "Uso: ./rubymc bedrock [start|stop|restart|status] [versão]"
+      return 1
+      ;;
+  esac
+}
+
+run_tests() {
+  install_deps
+  echo "[RubyMC] Verificando sintaxe Ruby..."
+  [ -f lib/web_launcher_app.rb ] && ruby -c lib/web_launcher_app.rb
+  echo "[RubyMC] Verificando bundle..."
+  bundle check
+  ok "Testes básicos concluídos."
+}
+
+usage() {
+  cat <<USAGE
+Uso: ./rubymc [comando] [opções]
+
+Projeto:
+  start|web [opções]     Inicia web + servidor Bedrock
+  stop                   Para servidor + web
+  restart [opções]       Reinicia servidor + web
+  status                 Mostra status do projeto e servidor
+  logs                   Mostra logs da web
+  test                   Testes básicos
+  install                Instala dependências
+
+Servidor:
+  server [start|stop|restart|status|logs]
+
+Bedrock:
+  bedrock [start|stop|restart|status] [versão]
+
+Opções do start/restart:
+  --simulate             Ativa modo simulação
+  --no-servers           Não inicia servidor junto
+
+Variáveis:
+  RUBYMC_AUTO_SERVERS=true|false
+  RUBYMC_HOST=127.0.0.1
+  RUBYMC_PORT=4567
+USAGE
+}
+
+case "${1:-start}" in
+  start|web)
+    shift
+    start_server "$@"
+    ;;
+  stop)
+    shift || true
+    stop_server "$@"
+    ;;
+  restart)
+    shift
+    restart_server "$@"
+    ;;
+  status)
+    status_server
+    ;;
+  logs)
+    show_logs
+    ;;
+  test)
+    run_tests
+    ;;
+  install)
+    install_deps
+    ;;
+  server|servers)
+    shift
+    server_cli "$@"
+    ;;
+  bedrock)
+    shift
+    bedrock_cli "$@"
+    ;;
+  help|-h|--help)
+    usage
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+esac

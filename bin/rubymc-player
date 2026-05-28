@@ -1,0 +1,252 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# =============================================================================
+# RubyMC Launcher — Player CLI
+#
+# Para jogadores do servidor/comunidade. Interface via terminal.
+#
+# Uso:
+#   bin/rubymc-player              → Menu interativo
+#   bin/rubymc-player play         → Iniciar Minecraft
+#   bin/rubymc-player modpacks     → Gerenciar modpacks
+#   bin/rubymc-player server       → Status do servidor
+#   bin/rubymc-player discord      → Informações do Discord
+#   bin/rubymc-player help         → Ajuda
+# =============================================================================
+
+require 'yaml'
+require 'json'
+require 'fileutils'
+require 'net/http'
+require 'uri'
+
+begin
+  require 'pastel'
+  require 'tty-prompt'
+  require 'tty-spinner'
+  require 'tty-box'
+rescue LoadError
+  puts "\e[31m[ERRO] Gems necessárias não encontradas.\e[0m"
+  puts "Execute: bundle install"
+  exit 1
+end
+
+ROOT = File.expand_path('..', __dir__)
+SETTINGS_PATH = File.join(ROOT, 'config', 'settings.yml')
+LIB_DIR = File.join(ROOT, 'lib', 'rubymc')
+
+$pastel = Pastel.new
+$prompt = TTY::Prompt.new
+BOX_OPTS = { padding: [1, 2], border: :thick, style: { border: { fg: :cyan } } }
+DISCORD_INVITE = 'https://discord.gg/rubymc'
+
+def load_settings
+  return {} unless File.file?(SETTINGS_PATH)
+  YAML.safe_load(File.read(SETTINGS_PATH), permitted_classes: [Symbol], aliases: true) || {}
+rescue
+  {}
+end
+
+def settings
+  @settings ||= load_settings
+end
+
+def server_address
+  addr = settings.dig('discord', 'server_address').to_s
+  addr.empty? ? 'não configurado' : addr
+end
+
+def discord_invite_url
+  settings.dig('discord', 'invite_url').to_s.tap { |s| return DISCORD_INVITE if s.empty? }
+end
+
+# --- Comandos ---
+
+def cmd_play
+  require File.join(LIB_DIR, 'launcher_cli')
+  LauncherCLI.new.run
+end
+
+def cmd_modpacks
+  require File.join(LIB_DIR, 'modpack_manager')
+  require File.join(LIB_DIR, 'discord_config')
+
+  discord = DiscordConfig.new(settings)
+  modpacks_dir = settings.dig('modpacks', 'install_dir').to_s
+  modpacks_dir = File.join(ROOT, 'modpacks') if modpacks_dir.empty?
+
+  manager = ModpackManager.new(
+    modpacks_dir: modpacks_dir,
+    discord_config: discord
+  )
+
+  puts $pastel.cyan.bold("\n📦 Modpacks disponíveis:\n")
+
+  packs = manager.list_installed
+  if packs.empty?
+    puts $pastel.yellow("  Nenhum modpack instalado ainda.")
+    puts $pastel.yellow("  Coloque arquivos .mrpack ou .zip em: #{modpacks_dir}")
+    return
+  end
+
+  packs.each_with_index do |pack, i|
+    puts "  #{i + 1}. #{pack[:name]}"
+    puts "     Versão: #{pack[:version]}" if pack[:version]
+    puts "     Path: #{pack[:path]}" if pack[:path]
+    puts
+  end
+
+  if $prompt.yes?($pastel.cyan("\nDeseja instalar um novo modpack?"))
+    file = $prompt.ask("Caminho do arquivo .mrpack ou .zip:")
+    if file && File.file?(file)
+      spin = TTY::Spinner.new("[:spinner] Instalando...", format: :classic)
+      spin.auto_spin
+      result = manager.install_modpack(file)
+      spin.stop
+      if result[:success]
+        puts $pastel.green("  #{result[:name]} instalado com sucesso!")
+      else
+        puts $pastel.red("  Erro: #{result[:error]}")
+      end
+    end
+  end
+end
+
+def cmd_server
+  address = server_address
+  box_content = []
+
+  puts TTY::Box.frame(
+    "🏰 Servidor da Comunidade",
+    **BOX_OPTS
+  )
+
+  puts "  Endereço: #{address}"
+  puts
+
+  if address != 'não configurado'
+    require File.join(LIB_DIR, 'minecraft_server_status')
+
+    spin = TTY::Spinner.new("[:spinner] Verificando status do servidor...", format: :classic)
+    spin.auto_spin
+
+    begin
+      status = MinecraftServerStatus.check(address)
+      spin.stop
+
+      if status[:online]
+        puts $pastel.green("  ✅ Servidor ONLINE")
+        puts "  Jogadores: #{status[:players_online]}/#{status[:players_max]}"
+        puts "  Versão: #{status[:version]}" if status[:version]
+        puts "  MOTD: #{status[:motd]}" if status[:motd]
+      else
+        puts $pastel.yellow("  ⏳ Servidor offline ou sem resposta")
+      end
+    rescue => e
+      spin.stop
+      puts $pastel.red("  Erro: #{e.message}")
+    end
+  end
+
+  puts "\n  #{$pastel.dim("Para jogar, use: bin/rubymc-player play")}"
+end
+
+def cmd_discord
+  puts TTY::Box.frame(
+    "💬 Discord da Comunidade",
+    **BOX_OPTS
+  )
+
+  puts "\n  Convite: #{$pastel.cyan.underline(discord_invite_url)}"
+  puts "\n  Entre no servidor Discord para:"
+  puts "    • Conversar com outros jogadores"
+  puts "    • Reportar bugs e sugerir melhorias"
+  puts "    • Receber notícias do projeto"
+  puts "    • Participar de eventos"
+  puts "    • Obter ajuda com o launcher"
+
+  guild_id = settings.dig('discord', 'guild_id').to_s
+  puts "\n  ID do servidor: #{guild_id}" unless guild_id.empty?
+end
+
+def cmd_help
+  puts TTY::Box.frame(
+    "RubyMC Launcher — Ajuda",
+    **BOX_OPTS
+  )
+
+  b = ->(t) { $pastel.bold.call(t) }
+  puts <<~HELP
+    #{b.call('COMANDOS')}
+      play         Abre o launcher para jogar Minecraft
+      modpacks     Lista e gerencia modpacks instalados
+      server       Mostra status do servidor da comunidade
+      discord      Informações e link do Discord
+      help         Exibe esta ajuda
+
+    #{b.call('EXEMPLOS')}
+      bin/rubymc-player              → Menu interativo
+      bin/rubymc-player play         → Iniciar diretamente
+      bin/rubymc-player server       → Ver status do servidor
+
+    #{b.call('PRÉ-REQUISITOS')}
+      Ruby 3.0+, Java 21+, Bundler
+      Execute bundle install na raiz do projeto
+  HELP
+end
+
+# --- Modo interativo ---
+
+def interactive_menu
+  loop do
+    puts TTY::Box.frame(
+      "🎮 RubyMC Launcher — Player",
+      " ",
+      "  #{'Servidor:'.dim} #{server_address}",
+      "  #{'Discord:'.dim}  #{discord_invite_url}",
+      **BOX_OPTS
+    )
+
+    choice = $prompt.select($pastel.cyan("O que deseja fazer?"), {
+      "🎮 Jogar Minecraft" => :play,
+      "📦 Gerenciar Modpacks" => :modpacks,
+      "🏰 Status do Servidor" => :server,
+      "💬 Discord da Comunidade" => :discord,
+      "❌ Sair" => :exit
+    })
+
+    case choice
+    when :play then cmd_play
+    when :modpacks then cmd_modpacks
+    when :server then cmd_server
+    when :discord then cmd_discord
+    when :exit
+      puts "\n  #{$pastel.green("Até mais! o/")}"
+      exit 0
+    end
+
+    puts "\n  #{$pastel.dim("Pressione Enter para voltar ao menu...")}"
+    gets
+  end
+end
+
+# --- Main ---
+
+cmd = ARGV[0]
+
+if cmd.nil? || cmd == 'menu' || cmd == 'interactive'
+  interactive_menu
+else
+  case cmd
+  when 'play' then cmd_play
+  when 'modpacks' then cmd_modpacks
+  when 'server' then cmd_server
+  when 'discord' then cmd_discord
+  when 'help', '--help', '-h' then cmd_help
+  else
+    puts "\e[31mComando desconhecido: #{cmd}\e[0m"
+    cmd_help
+    exit 1
+  end
+end

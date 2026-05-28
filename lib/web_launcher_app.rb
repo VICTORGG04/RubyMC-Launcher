@@ -9,11 +9,26 @@ require 'rbconfig'
 require 'socket'
 require 'timeout'
 require 'yaml'
+require 'open-uri'
+require 'zip'
+require 'digest'
+require 'cgi'
+
+begin
+  require_relative 'rubymc/bedrock_server_downloader'
+rescue LoadError
+end
 
 begin
   require_relative 'rubymc/minecraft_server_status'
 rescue LoadError
   # Status live do servidor fica indisponível se o helper não estiver presente.
+end
+
+begin
+  require_relative 'rubymc/server_manager'
+rescue LoadError
+  # Gerenciamento de processo do servidor fica indisponível.
 end
 require 'securerandom'
 
@@ -41,6 +56,20 @@ begin
   require_relative 'rubymc/rubymc_discord_panel_actions'
 rescue LoadError => e
   warn "RubyMC Discord panel actions não carregado: #{e.message}"
+end
+
+begin
+  require_relative 'rubymc/server_version_manager'
+rescue LoadError => e
+  warn "RubyMC Server Version Manager não carregado: #{e.message}"
+end
+
+begin
+  require_relative 'rubymc/microsoft_auth'
+  require_relative 'account_bank'
+  require_relative 'rubymc/minecraft_manager'
+rescue LoadError => e
+  warn "RubyMC módulos de autenticação/launch não carregados: #{e.message}"
 end
 
 module RubyMC
@@ -71,6 +100,10 @@ module RubyMC
       @log_file = File.join(@root, 'tmp', 'rubymc-display.log')
       FileUtils.mkdir_p(File.dirname(@log_file))
       FileUtils.touch(@log_file)
+      @last_server_online = nil
+      @server_action_mutex = Mutex.new
+      @server_action_busy = {}
+      @pending_auths = {}
     end
 
     def simulate?
@@ -151,6 +184,64 @@ module RubyMC
         handle_discord_validate(req, res)
       when '/api/discord/test-log'
         handle_discord_test_log(req, res)
+      when '/api/versions'
+        json(res, versions_payload)
+      when '/api/versions/available'
+        params = parse_json(req.body) || {}
+        loader = (params['loader'] || req.query['loader'] || 'vanilla').to_sym
+        limit = (params['limit'] || req.query['limit'] || 50).to_i
+        result = version_manager.list_available(loader: loader, limit: limit)
+        json(res, { ok: true, loader: loader, versions: result })
+      when '/api/launch'
+        handle_launch(req, res)
+      when '/api/accounts'
+        handle_accounts(req, res)
+      when '/api/accounts/start-auth'
+        handle_start_auth(req, res)
+      when '/api/accounts/poll-auth'
+        handle_poll_auth(req, res)
+      when '/api/accounts/remove'
+        handle_account_remove(req, res)
+      when '/api/bedrock/check'
+        handle_bedrock_check(req, res)
+      when '/api/bedrock/launch'
+        handle_bedrock_launch(req, res)
+      when '/api/bedrock/servers/available'
+        handle_bedrock_server_available(req, res)
+      when '/api/bedrock/servers/status'
+        handle_bedrock_server_status(req, res)
+      when '/api/bedrock/servers/download'
+        handle_bedrock_server_download(req, res)
+      when '/api/bedrock/servers/installed'
+        handle_bedrock_server_installed(req, res)
+      when '/api/bedrock/servers/start'
+        handle_bedrock_server_start(req, res)
+      when '/api/bedrock/servers/stop'
+        handle_bedrock_server_stop(req, res)
+      when '/api/bedrock/servers/restart'
+        handle_bedrock_server_restart(req, res)
+      when '/api/bedrock/bds/available'
+        handle_bedrock_server_available(req, res)
+      when '/api/bedrock/bds/status'
+        handle_bedrock_server_status(req, res)
+      when '/api/bedrock/bds/download'
+        handle_bedrock_server_download(req, res)
+      when '/api/bedrock/bds/installed'
+        handle_bedrock_server_installed(req, res)
+      when '/api/bedrock/bds/start'
+        handle_bedrock_server_start(req, res)
+      when '/api/bedrock/bds/stop'
+        handle_bedrock_server_stop(req, res)
+      when '/api/bedrock/bds/restart'
+        handle_bedrock_server_restart(req, res)
+      when '/api/bedrock/open-manager'
+        handle_bedrock_open_manager(req, res)
+      when '/api/bedrock/import-apk'
+        handle_bedrock_import_apk(req, res)
+      when '/api/server/bedrock/status'
+        handle_bedrock_server_status(req, res)
+      when '/api/server/bedrock/test'
+        handle_bedrock_server_status(req, res)
       else
         res.status = 404
         json(res, { ok: false, error: 'Rota não encontrada', path: req.path })
@@ -196,24 +287,24 @@ module RubyMC
 
       case action
 
-      # ── Painel UI: ações inline (rubymc_handle_ui_action) ────────────────
+        # ── Painel UI: ações inline (rubymc_handle_ui_action) ────────────────
       when 'clear_display', 'display_clear',
-           'validate_discord', 'discord_validate', 'validate_discord_settings',
-           'test_discord_logs', 'discord_test_logs', 'test_logs_channel',
-           'test_all_channels', 'discord_test_channels', 'test_channels',
-           'create_invite', 'discord_create_invite', 'generate_invite',
-           'open_docs', 'open_documentation',
-           'check_updates', 'update_check',
-           'join_server', 'server_join'
+        'validate_discord', 'discord_validate', 'validate_discord_settings',
+        'test_discord_logs', 'discord_test_logs', 'test_logs_channel',
+        'test_all_channels', 'discord_test_channels', 'test_channels',
+        'create_invite', 'discord_create_invite', 'generate_invite',
+        'open_docs', 'open_documentation',
+        'check_updates', 'update_check',
+        'join_server', 'server_join'
         json(res, rubymc_handle_ui_action(action))
 
-      # ── Log interno ───────────────────────────────────────────────────────
+        # ── Log interno ───────────────────────────────────────────────────────
       when 'clear_logs'
         File.write(log_file, '')
         log('SYSTEM', 'Display limpo. Aguardando novos eventos...')
         json(res, { ok: true, message: 'Display limpo.' })
 
-      # ── Status e modpacks ─────────────────────────────────────────────────
+        # ── Status e modpacks ─────────────────────────────────────────────────
       when 'refresh_status'
         log('ACTION', 'Status atualizado pelo painel.')
         json(res, { ok: true, message: 'Status atualizado.', status: status_payload })
@@ -222,7 +313,7 @@ module RubyMC
         log('ACTION', 'Lista de modpacks atualizada pelo painel.')
         json(res, { ok: true, message: 'Modpacks atualizados.', modpacks: list_modpack_payloads })
 
-      # ── Testes e organização ──────────────────────────────────────────────
+        # ── Testes e organização ──────────────────────────────────────────────
       when 'run_tests'
         run_async('Rodar testes') { run_project_checks }
         json(res, { ok: true, message: 'Testes iniciados. Veja o Display.' })
@@ -238,24 +329,102 @@ module RubyMC
         log('OK', 'Pasta do projeto aberta.')
         json(res, { ok: true, message: 'Pasta do projeto aberta.', path: target })
 
-      # ── Launcher Minecraft ────────────────────────────────────────────────
-      when 'launch_classic', 'play', 'start_minecraft', 'launch_minecraft'
-        pid = open_classic_launcher
-        json(res, { ok: true, message: "Launcher clássico aberto. PID: #{pid}", pid: pid })
+        # ── Launcher Minecraft (via /api/launch) ─────────────────────────────
+      when 'launch_classic', 'play', 'start_minecraft', 'launch_minecraft', 'enter_server'
+        params = parse_json(req.body) || {}
+        account_id = params.dig('settings', 'account') || params['account_id']
+        server_mode = (action == 'enter_server')
+        ram = (params.dig('settings', 'ram') || 2048).to_i
 
-      when 'enter_server'
-        pid = open_classic_launcher(extra_env: { 'RUBYMC_HINT' => 'server' })
-        json(res, { ok: true, message: "Launcher aberto para o servidor. PID: #{pid}", pid: pid })
+        if account_id && !account_id.to_s.empty?
+          # Launch com conta Microsoft
+          result = with_server_mutex('launch_minecraft') do
+            launch_with_account(account_id: account_id, ram_mb: ram, server_mode: server_mode)
+          end
+        else
+          # Launch offline — exige username
+          username = params.dig('settings', 'username').to_s.strip
+          if username.empty?
+            return json(res, { ok: false, error: 'Username offline não preenchido. Vá em Configurações.' })
+          end
+          result = with_server_mutex('launch_minecraft') do
+            launch_offline(username: username, ram_mb: ram, server_mode: server_mode)
+          end
+        end
+
+        if result[:pid]
+          json(res, { ok: true, message: "Minecraft iniciado (PID #{result[:pid]})", pid: result[:pid] })
+        else
+          json(res, { ok: false, error: result[:error] || 'Falha ao iniciar Minecraft.' })
+        end
+
+        # ── Launcher Bedrock (via /api/bedrock/launch) ─────────────────────────
+      when 'play_bedrock', 'play_bedrock_server'
+        params = parse_json(req.body) || {}
+        server_address = params.dig('settings', 'server_address') || params['server_address']
+        server_mode = (action == 'play_bedrock_server')
+
+        if server_mode && server_address.to_s.strip.empty?
+          # fallback: pegar do settings salvo
+          server_address = settings['server_address']
+        end
+
+        bedrock_version = params['bedrock_version'].to_s.strip
+
+        launch_params = {}
+        launch_params['server_address'] = server_address if server_address && !server_address.to_s.strip.empty?
+        launch_params['version'] = bedrock_version unless bedrock_version.empty?
+
+        result = handle_bedrock_launch_inner(launch_params)
+        if result[:ok]
+          json(res, { ok: true, message: "Bedrock iniciado (PID #{result[:pid]})", pid: result[:pid] })
+        else
+          json(res, { ok: false, error: result[:error] })
+        end
 
       when 'test_server', 'server_test', 'check_server'
         run_async('Testar servidor') { test_community_server }
         json(res, { ok: true, message: 'Teste do servidor iniciado. Veja o Display.' })
 
-      # ── Discord: simulação (sempre mock, independente de --simulate) ──────
+        # ── Gerenciamento do Servidor (start/stop/restart) ───────────────────
+      when 'start_server', 'server_start'
+        run_async('Iniciar servidor') do
+          result = with_server_mutex('start') { RubyMC::ServerManager.start(:java) }
+          if result[:ok]
+            log('OK', "Servidor Java iniciado (PID #{result[:pid]})")
+          else
+            log('ERROR', "Falha ao iniciar servidor: #{result[:error]}")
+          end
+        end
+        json(res, { ok: true, message: 'Iniciando servidor...' })
+
+      when 'stop_server', 'server_stop'
+        run_async('Parar servidor') do
+          result = with_server_mutex('stop') { RubyMC::ServerManager.stop(:java) }
+          if result[:ok]
+            log('OK', 'Servidor Java parado.')
+          else
+            log('ERROR', "Falha ao parar servidor: #{result[:error]}")
+          end
+        end
+        json(res, { ok: true, message: 'Parando servidor...' })
+
+      when 'restart_server', 'server_restart'
+        run_async('Reiniciar servidor') do
+          result = with_server_mutex('restart') { RubyMC::ServerManager.restart(:java) }
+          if result[:ok]
+            log('OK', 'Servidor Java reiniciado.')
+          else
+            log('ERROR', "Falha ao reiniciar servidor: #{result[:error]}")
+          end
+        end
+        json(res, { ok: true, message: 'Reiniciando servidor...' })
+
+        # ── Discord: simulação (sempre mock, independente de --simulate) ──────
       when 'simular_discord', 'discord_simulate'
         json(res, rubymc_simular_discord)
 
-      # ── Discord avançado (via módulos opcionais) ──────────────────────────
+        # ── Discord avançado (via módulos opcionais) ──────────────────────────
       when 'validate_discord_config'
         report = validate_discord_config(remote: true)
         json(res, {
@@ -268,12 +437,101 @@ module RubyMC
         result = test_discord_log
         json(res, { ok: true, message: 'Teste de log enviado ao Discord.', result: result })
 
-      # ── Ação desconhecida ─────────────────────────────────────────────────
-      else
-              discord_panel_result = rubymc_handle_discord_panel_action(action) if respond_to?(:rubymc_handle_discord_panel_action)
-      return json(res, discord_panel_result) if discord_panel_result
+        # ── Gerenciamento de Versões do Servidor ────────────────────────────
+      when 'version_list_installed'
+        json(res, { ok: true, installed: version_manager.list_installed })
 
-log('WARN', "Ação desconhecida recebida: #{action.inspect}")
+      when 'version_list_available'
+        params = parse_json(req.body) || {}
+        loader = (params['loader'] || req.query['loader'] || 'vanilla').to_sym
+        limit = (params['limit'] || req.query['limit'] || 50).to_i
+        result = version_manager.list_available(loader: loader, limit: limit)
+        json(res, { ok: true, loader: loader, versions: result })
+
+      when 'version_install'
+        params = parse_json(req.body) || {}
+        vid = params['version_id'] || req.query['version_id']
+        loader = (params['loader'] || req.query['loader'] || 'vanilla').to_sym
+        java_bin = params['java_bin'] || req.query['java_bin']
+
+        unless vid
+          return json(res, { ok: false, error: 'Informe version_id.' })
+        end
+
+        run_async("Instalar #{loader} #{vid}") do
+          result = version_manager.install(vid, loader: loader, java_bin: java_bin)
+          if result[:ok]
+            log('OK', "Versão '#{vid}' (#{loader}) instalada.")
+          else
+            log('ERROR', "Falha ao instalar '#{vid}': #{result[:error]}")
+          end
+        end
+        json(res, { ok: true, message: "Instalação de '#{vid}' (#{loader}) iniciada." })
+
+      when 'version_remove'
+        params = parse_json(req.body) || {}
+        vid = params['version_id'] || req.query['version_id']
+        return json(res, { ok: false, error: 'Informe version_id.' }) unless vid
+
+        result = version_manager.remove(vid)
+        if result[:ok]
+          log('OK', "Versão '#{vid}' removida.")
+        else
+          log('ERROR', "Falha ao remover '#{vid}': #{result[:error]}")
+        end
+        json(res, result)
+
+      when 'version_activate'
+        params = parse_json(req.body) || {}
+        vid = params['version_id'] || req.query['version_id']
+        return json(res, { ok: false, error: 'Informe version_id.' }) unless vid
+
+        result = version_manager.activate(vid)
+        if result[:ok]
+          log('OK', "Versão '#{vid}' ativada.")
+        else
+          log('ERROR', "Falha ao ativar '#{vid}': #{result[:error]}")
+        end
+        json(res, result)
+
+      when 'version_active'
+        mgr = version_manager
+        unless mgr
+          return json(res, { ok: false, error: 'Gerenciador de versões não disponível.' })
+        end
+        json(res, { ok: true, active: mgr.active_version })
+
+      when 'profile_select', 'activate_profile'
+        mgr = version_manager
+        unless mgr
+          return json(res, { ok: false, error: 'Gerenciador de versões não disponível.' })
+        end
+        params = parse_json(req.body) || {}
+        vid = params['version_id'] || req.query['version_id']
+        unless vid
+          return json(res, { ok: false, error: 'Informe version_id.' })
+        end
+        result = mgr.activate(vid)
+        if result[:ok]
+          log('OK', "Perfil alterado para versão '#{vid}'.")
+        else
+          log('ERROR', "Falha ao ativar perfil '#{vid}': #{result[:error]}")
+        end
+        json(res, result.merge(active: mgr.active_version))
+
+      when 'profile_current'
+        mgr = version_manager
+        unless mgr
+          return json(res, { ok: false, error: 'Gerenciador de versões não disponível.' })
+        end
+        json(res, { ok: true, active: mgr.active_version })
+
+        # ── Ação desconhecida ─────────────────────────────────────────────────
+      else
+        discord_panel_result = rubymc_handle_discord_panel_action(action) if respond_to?(:rubymc_handle_discord_panel_action)
+        return json(res, discord_panel_result) if discord_panel_result
+
+        log('WARN', "Ação desconhecida recebida: #{action.inspect}")
         json(res, { ok: false, error: "Ação desconhecida: #{action}" })
       end
     end
@@ -399,6 +657,7 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
 
     def status_payload
       modpacks = list_modpack_payloads
+      ver_mgr = version_manager
       {
         ok: true,
         display_connected: true,
@@ -408,9 +667,39 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
         modpacks: modpacks,
         server: server_info,
         discord: discord_status_payload,
+        versions: ver_mgr ? { active: ver_mgr.active_version, installed: ver_mgr.list_installed } : nil,
         project_root: root,
         time: Time.now.strftime('%H:%M:%S')
       }
+    end
+
+    def versions_payload
+      mgr = version_manager
+      return { ok: false, error: 'Version manager não disponível' } unless mgr
+
+      {
+        ok: true,
+        active: mgr.active_version,
+        installed: mgr.list_installed,
+        java_recommendations: RubyMC::ServerVersionManager::JAVA_VERSION_MAP.map { |r| { java_version: r[:java_version], java_path: r[:java_path], label: r[:label] } }
+      }
+    end
+
+    def version_manager
+      return @version_manager if @version_manager
+      return nil unless defined?(RubyMC::ServerVersionManager)
+
+      dir = '/home/victor/Servidores/ServidorMinecraftJava'
+      unless Dir.exist?(dir)
+        log('WARN', "Diretório do servidor não encontrado: #{dir}")
+        return nil
+      end
+
+      settings = defined?(RubyMC::Settings) ? RubyMC::Settings.new(root) : nil
+      @version_manager = RubyMC::ServerVersionManager.new(dir, settings)
+    rescue => e
+      log('ERROR', "Falha ao criar version manager: #{e.message}")
+      nil
     end
 
     def java_version
@@ -582,31 +871,38 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       info = server_info
       address = info[:address].to_s
 
-      if defined?(RubyMC::MinecraftServerStatus)
-        live = RubyMC::MinecraftServerStatus.query(address, timeout: 5)
-      else
-        live = {
-          ok: false,
-          online: false,
-          address: address,
-          players: { online: 0, max: 0, sample: [] },
-          error: 'RubyMC::MinecraftServerStatus não carregado.'
-        }
-      end
+      live = if defined?(RubyMC::MinecraftServerStatus)
+               RubyMC::MinecraftServerStatus.query(address, timeout: 5)
+             else
+               {
+                 ok: false, online: false, address: address, players: { online: 0, max: 0, sample: [] },
+                 error: 'RubyMC::MinecraftServerStatus não carregado.'
+               }
+             end
 
       if live[:online]
         players = live.dig(:players, :online).to_i
         max_players = live.dig(:players, :max).to_i
         latency = live[:latency_ms] || '--'
-        log('CHECK', "Servidor online: #{players}/#{max_players} jogadores | ping #{latency} ms")
+        unless @last_server_online == true
+          log('CHECK', "Servidor online: #{players}/#{max_players} jogadores | ping #{latency} ms")
+        end
+        @last_server_online = true
       else
-        log('WARN', "Servidor offline/indisponível: #{live[:error]}")
+        unless @last_server_online == false
+          log('WARN', "Servidor offline/indisponível: #{live[:error]}")
+        end
+        @last_server_online = false
       end
+
+      process_running = defined?(RubyMC::ServerManager) && RubyMC::ServerManager.running?(:java)
 
       {
         ok: live[:online] == true,
         server: info,
         server_live: live,
+        process_running: process_running,
+        process_status: process_running ? 'running' : 'stopped',
         server_status: live[:online] ? 'Online' : 'Offline',
         server_players: live[:online] ? "#{live.dig(:players, :online).to_i}/#{live.dig(:players, :max).to_i} jogadores" : '0 jogadores',
         time: Time.now.strftime('%H:%M:%S')
@@ -773,6 +1069,12 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
           next
         end
         begin
+          unless service.text_channel?(ch_id)
+            log('CHANNEL', "⏭️ #{'PULANDO'.ljust(7)} #{label} (#{key}) — canal não suporta mensagem de texto")
+            results[:details][key] = { label: label, ok: true, skipped: 'non-text' }
+            results[:tested] += 1
+            next
+          end
           service.send_channel_message(ch_id, "🧪 Teste automático do canal **#{label}** — RubyMC Launcher #{Time.now.strftime('%d/%m/%Y %H:%M:%S')}")
           log('CHANNEL', "✅ #{'OK'.ljust(7)} #{label} (#{key}): #{ch_id}")
           results[:details][key] = { label: label, ok: true }
@@ -792,7 +1094,7 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
         log('WARN', "#{results[:tested]} testados, #{results[:failed]} falhas.")
       end
 
-      { ok: results[:ok], message: "Teste de canais: #{results[:tested]} ok, #{results[:failed]} falhas.", test_results: results }
+      { ok: results[:ok], message: "Teste de canais: #{results[:tested]} ok, #{results[:failed]} falhas.", test_results: results, discord: discord_status_payload }
     rescue StandardError => e
       log('ERROR', "Falha ao testar canais: #{e.class}: #{e.message}")
       { ok: false, message: e.message }
@@ -825,12 +1127,12 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       log('ACTION', 'Simulação Discord solicitada pelo painel.')
       cfg = discord_config
       discord_payload = if cfg
-        cfg.validation_report[:summary].merge(
-          configured: true, status: 'configurado'
-        )
-      else
-        { configured: false, status: 'indisponível' }
-      end
+                          cfg.validation_report[:summary].merge(
+                            configured: true, status: 'configurado'
+                          )
+                        else
+                          { configured: false, status: 'indisponível' }
+                        end
 
       service = RubyMC::DiscordBotService.new(load_settings, simulate: true)
       remote = service.validate_remote!
@@ -927,6 +1229,21 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       File.open(log_file, 'a') do |file|
         file.puts("[#{Time.now.strftime('%H:%M:%S')}] #{type.to_s.upcase.ljust(7)} #{message}")
       end
+    end
+
+    def with_server_mutex(action)
+      key = action.to_s
+      @server_action_mutex.synchronize do
+        if @server_action_busy[key]
+          return { ok: false, error: "Ação '#{action}' já está em execução." }
+        end
+        @server_action_busy[key] = true
+      end
+      yield
+    rescue => e
+      { ok: false, error: e.message }
+    ensure
+      @server_action_mutex.synchronize { @server_action_busy.delete(key) }
     end
 
     def run_async(label)
@@ -1044,9 +1361,11 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
       launcher = File.join(root, 'launcher.rb')
       raise 'launcher.rb não encontrado na raiz do projeto.' unless File.file?(launcher)
 
-      ruby = RbConfig.ruby
+      bundle = `which bundle 2>/dev/null`.strip
+      bundle = nil if bundle.empty?
       env_part = extra_env.map { |k, v| "#{k}=#{shell_escape(v)}" }.join(' ')
-      command = %(cd #{shell_escape(root)} && #{env_part} #{shell_escape(ruby)} #{shell_escape(launcher)}; echo; read -p "Pressione ENTER para fechar...")
+      prefix = bundle ? "#{shell_escape(bundle)} exec " : ''
+      command = %(cd #{shell_escape(root)} && #{env_part}#{prefix}#{shell_escape(RbConfig.ruby)} #{shell_escape(launcher)}; echo; read -p "Pressione ENTER para fechar...")
 
       terminal_cmd = terminal_command(command)
       log('COMMAND', terminal_cmd.join(' '))
@@ -1133,6 +1452,553 @@ log('WARN', "Ação desconhecida recebida: #{action.inspect}")
 
     def shell_escape(value)
       "'" + value.to_s.gsub("'", "'\\\\''") + "'"
+    end
+
+    # ── Contas Microsoft ─────────────────────────────────────────────────
+    def handle_accounts(req, res)
+      bank = AccountBank.new
+      accounts = bank.all.map do |a|
+        {
+          email: a[:email], username: a[:username], uuid: a[:uuid],
+          edition: a[:edition] || 'java',
+          last_used: a[:last_used], is_valid: a[:mc_access_token] && a[:mc_expires_at] && a[:mc_expires_at] > Time.now.to_i
+        }
+      end
+      json(res, { ok: true, accounts: accounts })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_start_auth(req, res)
+      device = MicrosoftAuth.request_device_code
+      dc = device[:device_code]
+      @pending_auths[dc] = {
+        device_code: dc, interval: device[:interval],
+        expires_at: Time.now + device[:expires_in]
+      }
+      json(res, {
+        ok: true,
+        user_code: device[:user_code],
+        verification_uri: device[:verification_uri],
+        device_code: dc,
+        interval: device[:interval]
+      })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_poll_auth(req, res)
+      params = parse_json(req.body) || {}
+      dc = params['device_code'].to_s
+      edition = params['edition'].to_s
+      edition = 'java' unless %w[java bedrock].include?(edition)
+      pending = @pending_auths[dc]
+      return json(res, { ok: false, error: 'Código expirado ou inválido.' }) unless pending
+
+      result = MicrosoftAuth.check_token(device_code: dc)
+
+      case result[:status]
+      when :success
+        ms = { access_token: result[:access_token], refresh_token: result[:refresh_token], expires_in: result[:expires_in] }
+        profile = edition == 'bedrock' ? MicrosoftAuth.full_bedrock_flow(ms[:access_token]) : MicrosoftAuth.full_auth_flow(ms[:access_token])
+
+        bank = AccountBank.new
+        email = "#{profile[:username]}@microsoft"
+        bank.save_account(
+          email: email, username: profile[:username], uuid: profile[:uuid],
+          ms_access_token: ms[:access_token], ms_refresh_token: ms[:refresh_token],
+          ms_expires_in: ms[:expires_in],
+          mc_access_token: profile[:mc_access_token], mc_expires_in: profile[:mc_expires_in],
+          edition: edition
+        )
+        @pending_auths.delete(dc)
+        log('OK', "Conta #{edition.upcase} adicionada: #{profile[:username]}")
+        json(res, { ok: true, complete: true, edition: edition, account: { email: email, username: profile[:username], uuid: profile[:uuid] } })
+      when :pending
+        json(res, { ok: true, complete: false })
+      when :declined
+        @pending_auths.delete(dc)
+        json(res, { ok: false, error: 'Login recusado pelo usuário.' })
+      when :expired
+        @pending_auths.delete(dc)
+        json(res, { ok: false, error: 'Código expirado. Reinicie o processo.' })
+      else
+        @pending_auths.delete(dc)
+        json(res, { ok: false, error: result[:message] || 'Falha na autenticação.' })
+      end
+    end
+
+    def handle_account_remove(req, res)
+      params = parse_json(req.body) || {}
+      email = params['email'] || req.query['email']
+      return json(res, { ok: false, error: 'Informe o email da conta.' }) unless email
+
+      bank = AccountBank.new
+      bank.remove(email)
+      log('OK', "Conta removida: #{email}")
+      json(res, { ok: true })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    # ── Bedrock (mcpelauncher) ──────────────────────────────────────────────
+    def handle_bedrock_check(req, res)
+      mcp_path = detect_mcpelauncher
+      versions = list_bedrock_versions
+
+      json(res, {
+        ok: true,
+        installed: !mcp_path.nil?,
+        path: mcp_path,
+        versions: versions
+      })
+    end
+
+    def handle_bedrock_launch(req, res)
+      params = parse_json(req.body) || {}
+      launch_params = {}
+      server_address = params['server_address'].to_s.strip
+      launch_params['server_address'] = server_address unless server_address.empty?
+      bedrock_version = params['bedrock_version'].to_s.strip
+      launch_params['version'] = bedrock_version unless bedrock_version.empty?
+      result = handle_bedrock_launch_inner(launch_params)
+      if result[:ok]
+        json(res, { ok: true, pid: result[:pid] })
+      else
+        json(res, { ok: false, error: result[:error] })
+      end
+    end
+
+    def handle_bedrock_launch_inner(params)
+      mcp_path = detect_mcpelauncher
+      return { ok: false, error: 'mcpelauncher não encontrado.' } unless mcp_path
+
+      cmd = mcp_path.dup
+
+      # Add version directory if provided
+      version = params['version'].to_s.strip
+      unless version.empty?
+        version_dir = resolve_bedrock_version_dir(version)
+        if version_dir
+          cmd << '-dg' << version_dir
+        else
+          log('WARN', "Diretório da versão Bedrock #{version} não encontrado")
+        end
+      end
+
+      # Add server address if provided
+      server_address = params['server_address'].to_s.strip
+      unless server_address.empty?
+        host, port = server_address.split(':')
+        port ||= '19132'
+        cmd << '--server' << host << '--port' << port
+      end
+
+      pid = spawn(*cmd, pgroup: true)
+      Process.detach(pid)
+      log('OK', "Bedrock (mcpelauncher) iniciado (PID #{pid})")
+      { ok: true, pid: pid }
+    rescue => e
+      { ok: false, error: e.message }
+    end
+
+    def resolve_bedrock_version_dir(version)
+      base = File.expand_path('~/.local/share/mcpelauncher')
+      candidates = [
+        File.join(base, 'versions', version),
+        File.join(base, 'apps', version),
+        File.join(base, 'arms', version)
+      ]
+      candidates.find { |d| Dir.exist?(d) }
+    end
+
+    def detect_mcpelauncher
+      # 1. PATH
+      path = `which mcpelauncher-ui-qt 2>/dev/null`.strip
+      return path unless path.empty?
+      # 2. Flatpak
+      flatpak_check = `flatpak info io.mrarm.mcpelauncher 2>/dev/null`
+      return 'flatpak run io.mrarm.mcpelauncher' unless flatpak_check.empty?
+      nil
+    end
+
+    def list_bedrock_versions
+      dirs = []
+      base = File.expand_path('~/.local/share/mcpelauncher')
+      %w[versions arms apps].each do |sub|
+        dir = File.join(base, sub)
+        next unless Dir.exist?(dir)
+        dirs += Dir.children(dir).select { |f| File.directory?(File.join(dir, f)) }
+      end
+      dirs.uniq.sort.reverse
+    end
+
+    # ── Launch Minecraft (Java) ─────────────────────────────────────────────
+    def handle_launch(req, res)
+      params = parse_json(req.body) || {}
+      account_id = params['account_id'] || params.dig('settings', 'account')
+      server_mode = params['server_mode'] == true
+      ram = (params['ram_mb'] || params.dig('settings', 'ram') || 2048).to_i
+
+      if account_id && !account_id.to_s.empty?
+        result = with_server_mutex('launch_minecraft') { launch_with_account(account_id: account_id, ram_mb: ram, server_mode: server_mode) }
+      else
+        username = params['username'] || params.dig('settings', 'username').to_s.strip
+        return json(res, { ok: false, error: 'Username não preenchido.' }) if username.empty?
+        result = with_server_mutex('launch_minecraft') { launch_offline(username: username, ram_mb: ram, server_mode: server_mode) }
+      end
+
+      if result[:pid]
+        json(res, { ok: true, message: "Minecraft iniciado (PID #{result[:pid]})", pid: result[:pid] })
+      else
+        json(res, { ok: false, error: result[:error] || 'Falha ao iniciar Minecraft.' })
+      end
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def launch_with_account(account_id:, ram_mb: 2048, server_mode: false)
+      bank = AccountBank.new
+      account = bank.find(account_id)
+      raise "Conta '#{account_id}' não encontrada." unless account
+
+      token = account[:mc_access_token]
+      username = account[:username]
+      uuid = account[:uuid]
+
+      # Renova se expirado
+      if !bank.mc_token_valid?(account) && account[:ms_refresh_token]
+        log('ACTION', "Renovando sessão Microsoft para #{username}...")
+        ms = MicrosoftAuth.refresh_token(account[:ms_refresh_token])
+        mc = MicrosoftAuth.full_auth_flow(ms[:access_token])
+        bank.update_tokens(
+          email: account[:email],
+          ms_access_token: ms[:access_token], ms_refresh_token: ms[:refresh_token],
+          ms_expires_in: ms[:expires_in],
+          mc_access_token: mc[:mc_access_token], mc_expires_in: mc[:mc_expires_in],
+          username: mc[:username], uuid: mc[:uuid]
+        )
+        token = mc[:mc_access_token]
+        username = mc[:username]
+        uuid = mc[:uuid]
+      end
+
+      bank.touch(account[:email])
+      version_id = resolve_launch_version
+
+      mc_mgr = MinecraftManager.new
+      mc_mgr.ensure_version_dependencies(version_id)
+      java = detect_java_for_client(version_id)
+      raise "Java não encontrado para a versão #{version_id}" unless java
+
+      server_address = server_mode ? load_settings.dig('discord', 'server_address') : nil
+
+      pid = mc_mgr.launch(
+        version_id: version_id, username: username, uuid: uuid,
+        mc_access_token: token, java_path: java, ram_mb: ram_mb,
+        server_address: server_address
+      )
+      Process.detach(pid)
+      msg = server_mode ? "conectado ao servidor" : "com conta Microsoft"
+      log('OK', "Minecraft #{version_id} #{msg} (PID #{pid}, #{username})")
+      { pid: pid }
+    rescue => e
+      log('ERROR', "Falha ao lançar Minecraft: #{e.message}")
+      { error: e.message }
+    end
+
+    def launch_offline(username:, ram_mb: 2048, server_mode: false)
+      uuid = SecureRandom.uuid.gsub('-', '')
+      token = '0'
+      version_id = resolve_launch_version
+
+      mc_mgr = MinecraftManager.new
+      mc_mgr.ensure_version_dependencies(version_id)
+      java = detect_java_for_client(version_id)
+      raise "Java não encontrado para a versão #{version_id}" unless java
+
+      server_address = server_mode ? load_settings.dig('discord', 'server_address') : nil
+
+      pid = mc_mgr.launch(
+        version_id: version_id, username: username, uuid: uuid,
+        mc_access_token: token, java_path: java, ram_mb: ram_mb,
+        server_address: server_address
+      )
+      Process.detach(pid)
+      msg = server_mode ? "conectado ao servidor" : "offline"
+      log('OK', "Minecraft #{version_id} #{msg} (PID #{pid}, #{username})")
+      { pid: pid }
+    rescue => e
+      log('ERROR', "Falha ao lançar Minecraft: #{e.message}")
+      { error: e.message }
+    end
+
+    def resolve_launch_version
+      active = version_manager&.active_version
+      return active[:id] if active&.dig(:id)
+      '1.21.4'
+    end
+
+    def detect_java_for_client(version_id)
+      if defined?(RubyMC::ServerVersionManager)
+        rec = RubyMC::ServerVersionManager.recommended_java(version_id)
+        return rec[:java_path] if rec && rec[:java_path] && File.executable?(rec[:java_path])
+      end
+      settings = load_settings rescue {}
+      path = settings.dig('servers', 'java', 'active_java').to_s
+      return path if File.executable?(path)
+      if ENV['JAVA_HOME']
+        candidate = File.join(ENV['JAVA_HOME'], 'bin', 'java')
+        return candidate if File.executable?(candidate)
+      end
+      jvms = Dir.glob('/usr/lib/jvm/*/bin/java').select { |f| File.executable?(f) }
+      return jvms.max_by { |f| extract_java_major_version(f) } unless jvms.empty?
+      path = `which java 2>/dev/null`.strip
+      return path unless path.empty?
+      _, _, status = Open3.capture3('java', '-version')
+      status.success? ? 'java' : nil
+    end
+
+    def extract_java_major_version(java_path)
+      out, _, _ = Open3.capture3(java_path.to_s, '-version')
+      match = out.match(/version "(?:1\.)?(\d+)/)
+      match ? match[1].to_i : 0
+    rescue
+      0
+    end
+
+    def load_settings
+      YAML.safe_load_file(File.join(root, 'config', 'settings.yml'), permitted_classes: [Symbol], aliases: true) || {}
+    rescue
+      {}
+    end
+
+    # ── Bedrock Server (BDS) Management ──────────────────────────────────────
+    #
+    # Estes endpoints rodam dentro do WebLauncherApp/WEBrick, sem Sinatra.
+    # Eles atendem tanto a UI antiga (/api/bedrock/servers/*) quanto a UI nova
+    # que pode ter sido adicionada por patches (/api/bedrock/bds/*).
+    #
+    # Observação:
+    # - Cliente Bedrock: use mcpelauncher-ui-qt ou importação de APK.
+    # - Servidor Bedrock: este bloco baixa o Bedrock Dedicated Server (BDS) Linux.
+
+    def bds_downloader
+      @bds_downloader ||= RubyMC::BedrockServerDownloader.new(
+        servers_dir: File.expand_path('~/.minecraft_ruby_launcher/bedrock_servers')
+      )
+    end
+
+    def handle_bedrock_server_available(_req, res)
+      result = bds_downloader.available
+      json(res, result)
+    end
+
+    def handle_bedrock_server_download(req, res)
+      params = parse_json(req.body) || {}
+      version = (params['version'] || params['bedrock_version'] || params['server_version'] || req.query['version']).to_s.strip
+      url = (params['url'] || params['download_url'] || req.query['url']).to_s.strip
+      force = params['force'] == true || params['force'].to_s == 'true'
+
+      begin
+        result = bds_downloader.download(version: version, url: url, force: force)
+        json(res, result)
+      rescue StandardError => e
+        json(res, { ok: false, error: "#{e.class}: #{e.message}", version: version })
+      end
+    end
+
+    def handle_bedrock_server_installed(_req, res)
+      result = bds_downloader.installed
+      json(res, result)
+    end
+
+    def handle_bedrock_server_start(req, res)
+      params = parse_json(req.body) || {}
+      version = (params['version'] || params['bedrock_version'] || req.query['version']).to_s.strip
+      port = (params['port'] || req.query['port'] || 19_132).to_i
+
+      if version.empty?
+        return json(res, { ok: false, error: 'Versão não informada.' })
+      end
+
+      begin
+        result = bds_downloader.start(version: version, port: port)
+        json(res, result)
+      rescue StandardError => e
+        json(res, { ok: false, error: "#{e.class}: #{e.message}" })
+      end
+    end
+
+    def handle_bedrock_server_stop(req, res)
+      params = parse_json(req.body) || {}
+      version = (params['version'] || params['bedrock_version'] || req.query['version']).to_s.strip
+
+      begin
+        result = bds_downloader.stop(version: version.empty? ? nil : version)
+        json(res, result)
+      rescue StandardError => e
+        json(res, { ok: false, error: "#{e.class}: #{e.message}" })
+      end
+    end
+
+    def handle_bedrock_server_restart(req, res)
+      params = parse_json(req.body) || {}
+      version = (params['version'] || params['bedrock_version'] || req.query['version']).to_s.strip
+
+      if version.empty?
+        return json(res, { ok: false, error: 'Versão não informada.' })
+      end
+
+      begin
+        bds_downloader.stop(version: version)
+        result = bds_downloader.start(version: version, port: (params['port'] || req.query['port'] || 19_132).to_i)
+        json(res, result)
+      rescue StandardError => e
+        json(res, { ok: false, error: "#{e.class}: #{e.message}" })
+      end
+    end
+
+    def handle_bedrock_server_status(_req, res)
+      info = server_info
+      address = info[:address].to_s
+      host = address.split(':').first
+      bedrock_addr = "#{host}:19132"
+
+      process_running = false
+      pid = nil
+      running_version = nil
+      begin
+        installed = bds_downloader.installed
+        servers = installed[:servers] || installed['servers'] || []
+        running = servers.find { |s| s[:running] || s['running'] }
+        if running
+          process_running = true
+          pid = running[:pid] || running['pid']
+          running_version = running[:version] || running['version']
+        end
+      rescue StandardError
+        # ignore
+      end
+
+      live = if defined?(RubyMC::BedrockServerStatus)
+               RubyMC::BedrockServerStatus.query(bedrock_addr, timeout: 5)
+             else
+               { ok: false, online: false, address: bedrock_addr, players: { online: 0, max: 0, sample: [] },
+                 error: 'RubyMC::BedrockServerStatus não carregado.' }
+             end
+
+      online = live[:online] == true
+
+      json(res, {
+        ok: process_running,
+        online: online,
+        running: process_running,
+        process_running: process_running,
+        port_open: online,
+        address: bedrock_addr,
+        host: host,
+        port: 19_132,
+        latency_ms: live[:latency_ms],
+        version: live.dig(:version, :name) || live[:version] || running_version || '',
+        pid: pid,
+        players: live[:players] || { online: 0, max: 0, sample: [] },
+        description: live[:description] || live[:motd] || '',
+        message: online ? "Servidor Bedrock online (#{live[:latency_ms]} ms)" : (process_running ? 'Processo ativo, mas sem resposta UDP' : 'Servidor Bedrock offline'),
+        error: live[:error],
+        checked_at: Time.now.strftime('%H:%M:%S')
+      })
+    end
+
+    def handle_bedrock_open_manager(req, res)
+      mcp_path = detect_mcpelauncher
+      unless mcp_path
+        return json(res, { ok: false, error: 'mcpelauncher não encontrado. Instale via Flatpak: flatpak install io.mrarm.mcpelauncher' })
+      end
+
+      begin
+        pid = spawn(mcp_path, pgroup: true)
+        Process.detach(pid)
+        log('OK', "mcpelauncher-ui-qt aberto (PID #{pid})")
+        json(res, { ok: true, message: 'Gerenciador de versões aberto.' })
+      rescue => e
+        json(res, { ok: false, error: "Falha ao abrir gerenciador: #{e.message}" })
+      end
+    end
+
+    # ── Bedrock: Import APK ─────────────────────────────────────────────────
+
+    def handle_bedrock_import_apk(req, res)
+      extract_path = `which mcpelauncher-extract 2>/dev/null`.strip
+      unless File.exist?(extract_path)
+        return json(res, { ok: false, error: 'mcpelauncher-extract não encontrado no PATH. Use o Gerenciador de Versões (mcpelauncher-ui-qt) para baixar versões via Google Play.' })
+      end
+
+      upload = req.query['apk']
+      unless upload
+        return json(res, { ok: false, error: 'Envie um arquivo .apk no campo "apk".' })
+      end
+
+      filename = upload_filename(upload)
+      body = upload_body(upload)
+
+      unless body && body.bytesize > 1000
+        return json(res, { ok: false, error: 'Arquivo APK inválido ou vazio.' })
+      end
+
+      temp_apk = File.join(Dir.tmpdir, "bedrock_apk_#{Time.now.to_i}_#{safe_basename(filename)}")
+      File.binwrite(temp_apk, body)
+
+      version = req.query['version'].to_s.strip
+      if version.empty?
+        version = detect_apk_version(temp_apk) || filename.sub(/\.apk$/i, '').strip
+      end
+
+      if version.empty?
+        FileUtils.rm_f(temp_apk)
+        return json(res, { ok: false, error: 'Não foi possível detectar a versão. Informe o parâmetro "version".' })
+      end
+
+      target_dir = File.expand_path("~/.local/share/mcpelauncher/versions/#{version}")
+      if Dir.exist?(target_dir) && Dir.children(target_dir).any?
+        FileUtils.rm_f(temp_apk)
+        return json(res, { ok: false, error: "Versão #{version} já existe em #{target_dir}." })
+      end
+
+      FileUtils.mkdir_p(File.dirname(target_dir))
+
+      begin
+        log('BDS', "Extraindo #{filename} para versão #{version}...")
+        stdout, stderr, status = Open3.capture3(extract_path, temp_apk, target_dir)
+        unless status.success?
+          raise "mcpelauncher-extract falhou: #{stderr.strip}"
+        end
+        log('OK', "APK #{filename} extraído como versão #{version}")
+        json(res, { ok: true, message: "Versão #{version} instalada com sucesso!" })
+      rescue => e
+        FileUtils.rm_rf(target_dir) if Dir.exist?(target_dir)
+        json(res, { ok: false, error: "Falha ao extrair APK: #{e.message}" })
+      ensure
+        FileUtils.rm_f(temp_apk)
+      end
+    end
+
+    def detect_apk_version(apk_path)
+      aapt = `which aapt 2>/dev/null`.strip
+      if File.exist?(aapt)
+        output = `#{aapt} dump badging #{apk_path} 2>/dev/null`
+        match = output.match(/versionName='([^']+)'/)
+        return match[1] if match
+      end
+
+      begin
+        manifest_xml = `unzip -p #{apk_path} AndroidManifest.xml 2>/dev/null | strings`
+        match = manifest_xml.match(/versionName[[:space:]]*=[[:space:]]*"([^"]+)"/)
+        return match[1] if match
+      rescue
+      end
+
+      nil
     end
   end
 end
