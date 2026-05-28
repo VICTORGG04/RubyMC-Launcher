@@ -1,0 +1,141 @@
+/* ==========================================================================
+   RubyMC BDS - Patch de Correção de Botões, Margens e Divisão Vertical 50/50
+   ========================================================================== */
+
+/* Força a aba de Versões a ocupar 100% da largura útil do painel */
+#tab-versions {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* 1. Divisão Exata da Página (50% para a esquerda / 50% para a direita) */
+#tab-versions .server-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important; /* Divide a tela exatamente ao meio */
+  gap: 24px !important;
+  align-items: start !important;
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* Garante que os cards expandam e preencham toda a sua respectiva metade */
+#tab-versions .glass-card,
+#tab-versions .bds-card {
+  max-width: 100% !important;
+  width: 100% !important;
+}
+
+/* 2. Espaçamento Interno Confortável (Afastar textos da borda esquerda) */
+.glass-card,
+.bds-main-card,
+.bds-card,
+.settings-about-card {
+  padding: 26px 30px !important; /* Espaço generoso para os títulos respirarem */
+  box-sizing: border-box !important;
+}
+
+/* Alinhamento fino para títulos e parágrafos dentro dos cards */
+.glass-card h1, .bds-main-card h1,
+.glass-card h2, .bds-card h2,
+.glass-card h3, .bds-card h3,
+.glass-card p, .bds-card p,
+.glass-card label, .bds-card label {
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+}
+
+/* 3. Reset Completo dos Botões Secundários Gerais (Aparência Escura Premium) */
+.app-content button:not(.btn-red):not(.btn-cyan),
+.app-content .btn:not(.btn-red):not(.btn-cyan),
+#tab-home .actions .btn:first-child,
+#tab-server .actions .btn:last-child,
+#tab-versions .actions .btn,
+#tab-display header .btn {
+  background: rgba(2, 4, 12, 0.75) !important;
+  border: 1px solid rgba(53, 234, 255, 0.25) !important;
+  color: #35eaff !important; /* Texto em Ciano Neon */
+  box-shadow: inset 0 0 10px rgba(53, 234, 255, 0.05), 0 0 8px rgba(0, 0, 0, 0.4) !important;
+  text-shadow: 0 0 4px rgba(53, 234, 255, 0.2);
+  font-weight: 800;
+  transition: all 0.15s ease-in-out !important;
+}
+
+/* Efeito Hover nos Botões Secundários */
+.app-content button:not(.btn-red):not(.btn-cyan):hover,
+.app-content .btn:not(.btn-red):not(.btn-cyan):hover {
+  background: rgba(53, 234, 255, 0.12) !important;
+  border-color: #35eaff !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 12px rgba(53, 234, 255, 0.25) !important;
+  transform: translateY(-1px);
+}
+
+/* 4. Blindagem do Botão Principal Vermelho */
+.btn-red,
+button.btn-red {
+  background: linear-gradient(180deg, #ff174f, #990024) !important;
+  border: 1px solid rgba(255, 23, 79, 0.5) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 14px rgba(255, 23, 79, 0.3), inset 0 0 8px rgba(255,255,255,0.1) !important;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.btn-red:hover {
+  background: linear-gradient(180deg, #ff3c6e, #bc002d) !important;
+  border-color: #ff174f !important;
+  box-shadow: 0 0 18px rgba(255, 23, 79, 0.5) !important;
+}
+
+/* 5. Blindagem do Botão Principal Ciano */
+.btn-cyan,
+button.btn-cyan {
+  background: linear-gradient(180deg, #35eaff, #008fa3) !important;
+  border: 1px solid rgba(53, 234, 255, 0.5) !important;
+  color: #03040a !important;
+  font-weight: 900;
+  box-shadow: 0 0 12px rgba(53, 234, 255, 0.25) !important;
+}
+
+.btn-cyan:hover {
+  background: linear-gradient(180deg, #60efff, #00a9c1) !important;
+  border-color: #35eaff !important;
+  box-shadow: 0 0 16px rgba(53, 234, 255, 0.45) !important;
+}
+
+/* 6. Layout de Instâncias da Aba Servidor (Garante alinhamento horizontal) */
+.bds-server-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 16px;
+  background: rgba(4, 6, 14, 0.7) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px;
+  padding: 12px 18px !important;
+  width: 100% !important;
+}
+
+.bds-server-actions-block {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+.bds-server-actions-block .btn {
+  min-width: 85px !important;
+  height: 32px !important;
+}
+
+/* Estilização Geral dos Inputs e Selects */
+input, select {
+  background: rgba(2, 3, 7, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #f6f8ff !important;
+  padding-left: 12px !important;
+}
+input:focus, select:focus {
+  border-color: #35eaff !important;
+  box-shadow: 0 0 8px rgba(53, 234, 255, 0.2) !important;
+}

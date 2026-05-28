@@ -1,0 +1,7 @@
+/* RubyMC Bedrock - remove fluxo de importação APK da interface */
+.bedrock-import-apk,
+#bedrock-apk-input,
+#bedrock-apk-import,
+#bedrock-import-status {
+  display: none !important;
+}

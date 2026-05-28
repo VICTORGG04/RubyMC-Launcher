@@ -1,0 +1,170 @@
+/* =========================================================
+   RubyMC Bedrock Game Version UI Fix
+   ========================================================= */
+
+#rubymc-bedrock-game-version-panel {
+  width: 100%;
+  max-width: 760px;
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px solid rgba(53,234,255,.22);
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 12% 0%, rgba(53,234,255,.10), transparent 28%),
+    linear-gradient(145deg, rgba(5,7,16,.92), rgba(8,11,24,.78));
+  box-shadow: inset 0 0 42px rgba(0,0,0,.24), 0 0 24px rgba(53,234,255,.08);
+}
+
+.rubymc-bedrock-game-header,
+.rubymc-bedrock-installed-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.rubymc-bedrock-kicker {
+  display: block;
+  color: #35eaff;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  margin-bottom: 4px;
+}
+
+#rubymc-bedrock-game-version-panel h3,
+#rubymc-bedrock-game-version-panel h4 {
+  margin: 0 0 8px;
+}
+
+#rubymc-bedrock-game-version-panel p,
+#rubymc-bedrock-game-version-panel small {
+  color: #a8b6cc;
+  line-height: 1.45;
+}
+
+.rubymc-bedrock-game-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.rubymc-bedrock-game-box {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 12px;
+  background: rgba(4,7,16,.62);
+}
+
+.rubymc-bedrock-game-box label {
+  display: block;
+  margin: 8px 0 6px;
+  color: #cbd8ea;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+
+.rubymc-bedrock-game-box select,
+.rubymc-bedrock-game-box input {
+  width: 100%;
+  min-height: 38px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(2,5,12,.74);
+  color: #f2f7ff;
+  padding: 0 10px;
+}
+
+.rubymc-bedrock-actions,
+.rubymc-bedrock-manual-row,
+.rubymc-bds-version-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rubymc-bedrock-manual-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.rubymc-bedrock-status {
+  min-height: 18px;
+  margin: 10px 0 0;
+  font-size: 12px;
+}
+
+.rubymc-bedrock-installed-box {
+  margin-top: 14px;
+}
+
+.rubymc-bedrock-bds-installed-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.rubymc-bds-version-row,
+.bedrock-version-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  background: rgba(2,5,12,.62);
+}
+
+.rubymc-bds-version-info strong {
+  display: block;
+  color: #fff;
+}
+
+.rubymc-bds-version-info small {
+  display: block;
+  color: #8792a7;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.rubymc-bds-status {
+  display: inline-flex;
+  margin-bottom: 4px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.rubymc-bds-status.running {
+  color: #dfffe7;
+  background: rgba(98,255,143,.12);
+  border: 1px solid rgba(98,255,143,.25);
+}
+
+.rubymc-bds-status.stopped {
+  color: #c7d2e5;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+@media (max-width: 760px) {
+  .rubymc-bedrock-game-grid,
+  .rubymc-bedrock-manual-row,
+  .rubymc-bds-version-row,
+  .bedrock-version-item {
+    grid-template-columns: 1fr;
+  }
+
+  .rubymc-bedrock-game-header,
+  .rubymc-bedrock-installed-head {
+    display: grid;
+  }
+}

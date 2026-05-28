@@ -1,0 +1,297 @@
+/* =========================================================
+   RubyMC BDS Server-Only Dashboard
+   Remove fluxo de cliente Bedrock/mcpelauncher da interface.
+   ========================================================= */
+
+body[data-rubymc-edition="bedrock-bds"] {
+  background:
+    radial-gradient(circle at 16% 8%, rgba(0, 224, 255, .12), transparent 28%),
+    radial-gradient(circle at 84% 40%, rgba(255, 22, 94, .14), transparent 34%),
+    #050611;
+}
+
+.bds-window {
+  border-color: rgba(0, 224, 255, .28);
+  box-shadow: 0 0 0 1px rgba(255, 22, 94, .18), 0 0 48px rgba(0, 224, 255, .08);
+}
+
+.app-sidebar .app-title strong {
+  letter-spacing: 1.2px;
+}
+
+.bds-hero-grid,
+.bds-two-column {
+  grid-template-columns: minmax(0, 1fr) minmax(360px, .9fr);
+  gap: 24px;
+}
+
+.bds-main-card,
+.bds-card {
+  border: 1px solid rgba(0, 224, 255, .22);
+  background:
+    radial-gradient(circle at 0 0, rgba(0,224,255,.10), transparent 28%),
+    radial-gradient(circle at 100% 0, rgba(255,22,94,.12), transparent 30%),
+    rgba(5, 8, 18, .84);
+  border-radius: 18px;
+  box-shadow: inset 0 0 32px rgba(0,0,0,.32);
+}
+
+.bds-main-card h1 {
+  margin-top: 8px;
+}
+
+.bds-wide-card {
+  margin-top: 24px;
+}
+
+.cyan-label {
+  color: #29e8ff;
+  font-weight: 900;
+  letter-spacing: 1.4px;
+  font-size: 12px;
+}
+
+.bds-summary-grid,
+.server-live-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.server-live-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.bds-summary-grid > div,
+.server-live-grid > div {
+  min-width: 0;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(0,0,0,.28);
+}
+
+.bds-summary-grid span,
+.server-live-grid span {
+  display: block;
+  color: #8b97aa;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+
+.bds-summary-grid strong,
+.server-live-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: #fff;
+  font-size: 18px;
+}
+
+.bds-summary-grid em {
+  display: block;
+  color: #7d8798;
+  font-size: 12px;
+  font-style: normal;
+  margin-top: 4px;
+}
+
+.bds-preview-frame {
+  display: grid;
+  place-items: center;
+  min-height: 360px;
+}
+
+.bds-server-visual {
+  width: min(320px, 80%);
+  aspect-ratio: 1;
+  border: 1px solid rgba(0, 224, 255, .28);
+  border-radius: 28px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background:
+    radial-gradient(circle, rgba(0,224,255,.20), transparent 55%),
+    linear-gradient(145deg, rgba(4,8,18,.96), rgba(20,4,18,.88));
+  box-shadow: 0 0 54px rgba(0, 224, 255, .14);
+}
+
+.bds-server-visual span {
+  font-size: 64px;
+}
+
+.bds-server-visual strong {
+  display: block;
+  font-size: 54px;
+  letter-spacing: 3px;
+}
+
+.bds-server-visual em {
+  color: #29e8ff;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.bds-install-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+  margin: 10px 0 14px;
+}
+
+.bds-sub-actions {
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bds-status-text,
+.bds-hint {
+  color: #9ca8bd;
+  line-height: 1.45;
+}
+
+.bds-hint code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: rgba(0,224,255,.12);
+  color: #dffcff;
+}
+
+.bds-server-list,
+.bds-installed-list {
+  display: grid;
+  gap: 12px;
+}
+
+.bds-server-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 16px;
+  padding: 14px;
+  background: rgba(0,0,0,.28);
+}
+
+.bds-server-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.bds-server-title strong {
+  color: #fff;
+  font-size: 18px;
+}
+
+.bds-server-title small {
+  color: #8490a6;
+  word-break: break-all;
+}
+
+.bds-server-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.bds-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  border: 1px solid rgba(255,255,255,.14);
+}
+
+.bds-badge-online {
+  color: #dfffe7;
+  border-color: rgba(98,255,143,.30);
+  background: rgba(98,255,143,.13);
+}
+
+.bds-badge-offline,
+.bds-badge-muted {
+  color: #cbd4e5;
+  background: rgba(255,255,255,.06);
+}
+
+.bds-active-box {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255,255,255,.10);
+  border-radius: 14px;
+  padding: 14px;
+  margin: 10px 0 16px;
+  background: rgba(0,0,0,.26);
+}
+
+.bds-active-box strong {
+  color: #fff;
+  font-size: 20px;
+}
+
+.bds-active-box small {
+  color: #8b97aa;
+}
+
+.status-box {
+  margin-top: 16px;
+}
+
+.loading-dots {
+  color: #8b97aa;
+  font-style: italic;
+}
+
+.bds-empty,
+.bds-error {
+  color: #9ca8bd;
+  padding: 16px;
+  border: 1px dashed rgba(255,255,255,.14);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.bds-error {
+  color: #ff8aa7;
+  border-color: rgba(255, 22, 94, .24);
+}
+
+@media (max-width: 1100px) {
+  .bds-hero-grid,
+  .bds-two-column {
+    grid-template-columns: 1fr;
+  }
+
+  .bds-summary-grid,
+  .server-live-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .bds-summary-grid,
+  .server-live-grid,
+  .bds-install-row,
+  .bds-server-item {
+    grid-template-columns: 1fr;
+  }
+
+  .bds-server-actions {
+    justify-content: stretch;
+  }
+
+  .bds-server-actions .btn {
+    width: 100%;
+  }
+}

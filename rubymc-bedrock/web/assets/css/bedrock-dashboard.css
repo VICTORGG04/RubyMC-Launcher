@@ -1,0 +1,179 @@
+/* =========================================================
+   RubyMC Bedrock Dashboard Final
+   Remove aparência Java e organiza Cliente + BDS.
+   ========================================================= */
+body[data-rubymc-edition="bedrock"] .app-title strong::after {
+  content: "";
+}
+
+body[data-rubymc-edition="bedrock"] .bedrock-window {
+  border-color: rgba(53, 234, 255, .28);
+}
+
+body[data-rubymc-edition="bedrock"] .cyan-label,
+body[data-rubymc-edition="bedrock"] .bedrock-heading {
+  color: #35eaff;
+}
+
+.bedrock-two-column {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.bedrock-card,
+.bedrock-main-card {
+  border: 1px solid rgba(53, 234, 255, .16);
+  background:
+    radial-gradient(circle at 10% 0%, rgba(53,234,255,.10), transparent 28%),
+    linear-gradient(145deg, rgba(5,7,16,.90), rgba(8,11,24,.80));
+}
+
+.bedrock-card h3,
+.bedrock-card h4 {
+  margin-top: 0;
+}
+
+.bedrock-version-section label,
+.bedrock-card label {
+  display: block;
+  margin: 10px 0 6px;
+  color: #cbd8ea;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+
+.bedrock-server-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.bedrock-server-row input,
+.bedrock-server-row select,
+.bedrock-card input,
+.bedrock-card select {
+  min-height: 40px;
+  width: 100%;
+}
+
+.bedrock-client-version-list,
+#bedrock-client-version-list-secondary,
+#bedrock-version-installed-list,
+#bedrock-server-list {
+  display: grid;
+  gap: 10px;
+}
+
+.bedrock-client-version-row,
+.bedrock-version-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 11px 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 12px;
+  background: rgba(2,5,12,.62);
+}
+
+.bedrock-client-version-row strong,
+.bedrock-version-item strong {
+  display: block;
+  color: #fff;
+}
+
+.bedrock-client-version-row small,
+.bedrock-version-item small,
+.bedrock-version-item-pid {
+  display: block;
+  color: #8792a7;
+  margin-top: 2px;
+}
+
+.bedrock-client-version-actions,
+.bedrock-version-item-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.bedrock-version-item-status {
+  display: inline-flex;
+  margin-bottom: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.bedrock-version-item-status.running {
+  color: #dfffe7;
+  background: rgba(98,255,143,.12);
+  border: 1px solid rgba(98,255,143,.25);
+}
+
+.bedrock-version-item-status.stopped {
+  color: #c7d2e5;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+}
+
+.bedrock-version-active-card,
+.bedrock-version-active-none {
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(2,5,12,.62);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.bedrock-version-active-badge {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+  margin-right: 8px;
+}
+
+.bedrock-version-active-badge.online {
+  color: #dfffe7;
+  background: rgba(98,255,143,.12);
+  border: 1px solid rgba(98,255,143,.25);
+}
+
+.bedrock-version-active-version {
+  font-weight: 900;
+  color: #fff;
+}
+
+.bedrock-version-active-pid {
+  display: block;
+  color: #8792a7;
+  margin-top: 6px;
+}
+
+body[data-rubymc-edition="bedrock"] #tab-versions .panel-grid,
+body[data-rubymc-edition="bedrock"] #tab-client .panel-grid,
+body[data-rubymc-edition="bedrock"] #tab-server .panel-grid {
+  max-width: 1120px;
+}
+
+@media (max-width: 920px) {
+  .bedrock-two-column,
+  .bedrock-server-row,
+  .bedrock-client-version-row,
+  .bedrock-version-item {
+    grid-template-columns: 1fr;
+  }
+
+  .bedrock-client-version-actions,
+  .bedrock-version-item-actions {
+    justify-content: flex-start;
+  }
+}
