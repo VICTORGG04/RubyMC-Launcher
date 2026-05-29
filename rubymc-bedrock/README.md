@@ -8,10 +8,9 @@
 ![Linux](https://img.shields.io/badge/Linux-Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)
 ![BDS](https://img.shields.io/badge/BDS-Manager-00E5FF?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Status-Development-00E0FF?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
 
 </div>
-```
-
 
 ---
 
@@ -358,7 +357,7 @@ Use arquivos separados para produção.
 
 # 📄 Licença
 
-MIT
+Este projeto está licenciado sob a **MIT License** — consulte o arquivo [LICENSE](../LICENSE) para detalhes.
 
 ---
 

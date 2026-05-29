@@ -7,6 +7,7 @@
 ![Discord](https://img.shields.io/badge/Discord-Bot-5865F2?style=for-the-badge&logo=discord&logoColor=white)
 ![IA](https://img.shields.io/badge/IA-Ollama-009688?style=for-the-badge&logo=ollama&logoColor=white)
 ![Status](https://img.shields.io/badge/status-em%20desenvolvimento-00E0FF?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
 
 Launcher para **Minecraft Java Edition** em Ruby, com interface **Admin (Web)** e **Player (Terminal)**, integração com **Discord Bot**, **IA local via Ollama**, suporte a modpacks e servidor da comunidade.
 
@@ -247,4 +248,4 @@ ai_support:
 
 ## 📄 Licença
 
-MIT
+Este projeto está licenciado sob a **MIT License** — consulte o arquivo [LICENSE](../LICENSE) para detalhes.

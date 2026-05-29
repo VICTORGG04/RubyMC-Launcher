@@ -9,6 +9,7 @@
 ![Discord](https://img.shields.io/badge/Discord-Integration-5865F2?style=for-the-badge\&logo=discord\&logoColor=white)
 ![IA](https://img.shields.io/badge/IA-Ollama-009688?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Status-Development-00E0FF?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
 
 Ecossistema Ruby para gerenciamento de servidores Minecraft Java e Minecraft Bedrock Dedicated Server.
 
@@ -410,7 +411,7 @@ ss -ltnp | grep 4567
 
 # 📄 Licença
 
-MIT
+Este projeto está licenciado sob a **MIT License** — consulte o arquivo [LICENSE](LICENSE) para detalhes.
 
 ---
 
