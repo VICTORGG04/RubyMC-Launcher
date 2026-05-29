@@ -1,41 +1,74 @@
-# RubyMC Launcher
+# 💎 RubyMC Launcher
 
-<p align="center">
-  <strong>RubyMC Launcher</strong><br>
-  Ecossistema Ruby para gerenciamento de servidores Minecraft Java e Minecraft Bedrock Dedicated Server.
-</p>
+<div align="center">
 
-<p align="center">
-  <a href="#visão-geral">Visão geral</a> •
-  <a href="#rubymc-java">RubyMC Java</a> •
-  <a href="#rubymc-bedrock-bds">RubyMC Bedrock</a> •
-  <a href="#discord">Discord</a> •
-  <a href="#ia-local">IA Local</a> •
-  <a href="#instalação">Instalação</a>
-</p>
+![Ruby](https://img.shields.io/badge/Ruby-3.2+-CC342D?style=for-the-badge\&logo=ruby\&logoColor=white)
+![Minecraft](https://img.shields.io/badge/Minecraft-Ecosystem-62B47A?style=for-the-badge\&logo=minecraft\&logoColor=white)
+![Java](https://img.shields.io/badge/Java-Launcher-FF9800?style=for-the-badge\&logo=openjdk\&logoColor=white)
+![Bedrock](https://img.shields.io/badge/Bedrock-BDS-00AEEF?style=for-the-badge\&logo=minecraft\&logoColor=white)
+![Discord](https://img.shields.io/badge/Discord-Integration-5865F2?style=for-the-badge\&logo=discord\&logoColor=white)
+![IA](https://img.shields.io/badge/IA-Ollama-009688?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Development-00E0FF?style=for-the-badge)
 
----
+Ecossistema Ruby para gerenciamento de servidores Minecraft Java e Minecraft Bedrock Dedicated Server.
 
-## Visão geral
-
-O **RubyMC Launcher** é um projeto organizado em dois ambientes principais:
-
-1. **RubyMC Java** — launcher voltado para Minecraft Java, com interface web, modpacks, Discord, display de logs, configurações e suporte com IA local.
-2. **RubyMC Bedrock BDS** — gerenciador dedicado ao **Minecraft Bedrock Dedicated Server**, com instalação de versões, controle de instâncias, conexão UDP, monitor ativo e painel operacional.
-
-A proposta é manter uma base visual e técnica RubyMC para os dois modelos, usando Ruby no backend e uma interface web moderna em estilo dark/neon.
+</div>
 
 ---
 
-## Estrutura do repositório
+# 🖼️ Showcase do Projeto
 
-```text
+<div align="center">
+
+| 🏠 Bedrock Início                                                   | 🌐 Servidor BDS                                                       |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| <img src="docs/assets/bedrock/bedrock-home-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-server-panel.png" width="100%"> |
+
+| 📦 Versões BDS                                                          | 📜 Display                                                             |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| <img src="docs/assets/bedrock/bedrock-versions-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-display-panel.png" width="100%"> |
+
+| 📁 Projeto                                                             | ⚙️ Configurações                                                        |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| <img src="docs/assets/bedrock/bedrock-project-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-settings-panel.png" width="100%"> |
+
+</div>
+
+---
+
+# 🚀 Visão geral
+
+O **RubyMC Launcher** é um ecossistema dividido em dois ambientes principais:
+
+| Projeto               | Objetivo                                                             |
+| --------------------- | -------------------------------------------------------------------- |
+| 💎 RubyMC Java        | Launcher Minecraft Java com modpacks, Discord, IA local e painel web |
+| 💎 RubyMC Bedrock BDS | Gerenciador visual para Minecraft Bedrock Dedicated Server           |
+
+O objetivo é fornecer:
+
+* gerenciamento visual;
+* interface dark/neon;
+* integração Discord;
+* IA local;
+* gerenciamento de servidores;
+* monitoramento em tempo real;
+* suporte operacional;
+* organização modular em Ruby.
+
+---
+
+# 🏗️ Estrutura do repositório
+
+```text id="2qzj1x"
 RubyMC-Launcher/
 ├── README.md
 ├── docs/
 │   └── assets/
 │       └── bedrock/
+│
 ├── rubymc-java/
+│   ├── README.md
 │   ├── bot_daemon.rb
 │   ├── launcher.rb
 │   ├── launcher_gui.rb
@@ -43,6 +76,7 @@ RubyMC-Launcher/
 │   ├── lib/
 │   ├── scripts/
 │   └── web/
+│
 ├── rubymc-bedrock/
 │   ├── README.md
 │   ├── config/
@@ -50,135 +84,119 @@ RubyMC-Launcher/
 │   ├── scripts/
 │   ├── web/
 │   └── docs/
+│
 └── scripts/
 ```
 
 ---
 
-# RubyMC Java
+# 💎 RubyMC Java
 
-O **RubyMC Java** é o modelo voltado para a experiência tradicional de launcher Minecraft.
+O **RubyMC Java** é o launcher voltado para Minecraft Java Edition.
 
 ## Recursos
 
-- Painel web do launcher.
-- Gerenciamento de perfis.
-- Sistema de modpacks.
-- Integração Discord.
-- Rich Presence.
-- Display interno de logs.
-- Configurações gerais.
-- Suporte com IA local via Ollama.
-- Organização de scripts e documentação.
+* launcher web;
+* sistema de modpacks;
+* Discord Bot;
+* Rich Presence;
+* IA local;
+* display de logs;
+* gerenciamento de perfis;
+* ambiente RubyMC.
 
-## Páginas principais
+## Módulos principais
 
-```text
-RubyMC Java
-├── Início
-├── Modpacks
-├── Servidor
-├── Discord
-├── Display
-├── Projeto
-└── Configurações
+```text id="l1r7u9"
+Início
+Modpacks
+Servidor
+Discord
+IA
+Display
+Projeto
+Configurações
 ```
 
 ## Modpacks
 
-O sistema de modpacks foi pensado para trabalhar com arquivos:
+O sistema suporta:
 
-- `.mrpack`
-- `.zip`
+* `.mrpack`
+* `.zip`
 
-Fluxo esperado:
+Fluxo operacional:
 
-```text
+```text id="7krg4n"
 Selecionar arquivo
 → Validar formato
-→ Importar para pasta local
+→ Importar modpack
 → Criar perfil
-→ Atualizar lista
-→ Jogar com o perfil
+→ Atualizar launcher
+→ Executar instância
 ```
 
-## Discord no modelo Java
+## IA Local
 
-O painel Discord pode validar configurações, testar canal de logs, exibir status do bot e preparar integração com suporte por IA.
+Modelo utilizado:
 
-## IA no modelo Java
+```text id="jz4z5r"
+qwen3.5:9b
+```
 
-A IA local pode auxiliar com:
+A IA pode:
 
-- explicação de erros;
-- leitura de logs;
-- orientação de instalação;
-- suporte técnico;
-- respostas para dúvidas do projeto.
+* interpretar logs;
+* explicar erros;
+* auxiliar configuração;
+* responder dúvidas;
+* apoiar suporte técnico.
 
 ---
 
-# RubyMC Bedrock BDS
+# 💎 RubyMC Bedrock BDS
 
-O **RubyMC Bedrock BDS** é o gerenciador operacional do **Minecraft Bedrock Dedicated Server** para Linux.
+O **RubyMC Bedrock BDS** é o ambiente administrativo do Minecraft Bedrock Dedicated Server.
 
 ## Recursos
 
-- Instalação de versões oficiais BDS.
-- Listagem de versões instaladas.
-- Inicialização de servidor.
-- Parada de servidor.
-- Reinício de instância.
-- Abertura de logs.
-- Remoção de instância.
-- Validação de conexão UDP.
-- Monitor ativo com PID.
-- Link de entrada da comunidade.
-- Mapeamento de diretórios físicos.
+* instalação de versões BDS;
+* gerenciamento de instâncias;
+* monitoramento UDP;
+* controle de processos;
+* gerenciamento Linux;
+* monitor ativo;
+* logs em tempo real;
+* painel operacional.
+
+## Páginas principais
+
+```text id="1dbz0j"
+Início
+Servidor BDS
+Versões BDS
+Display
+Projeto
+Configurações
+```
 
 ---
 
-## Screenshots do RubyMC Bedrock BDS
+# 🌐 Servidor BDS
 
-### Início
+A aba Servidor fornece:
 
-![RubyMC Bedrock BDS - Início](docs/assets/bedrock/bedrock-home-panel.png)
+* IP/porta;
+* validação UDP;
+* status online;
+* PID ativo;
+* capacidade;
+* ping;
+* ações rápidas.
 
-### Servidor BDS
+## Ações disponíveis
 
-![RubyMC Bedrock BDS - Servidor](docs/assets/bedrock/bedrock-server-panel.png)
-
-### Versões BDS
-
-![RubyMC Bedrock BDS - Versões](docs/assets/bedrock/bedrock-versions-panel.png)
-
-### Display
-
-![RubyMC Bedrock BDS - Display](docs/assets/bedrock/bedrock-display-panel.png)
-
-### Projeto
-
-![RubyMC Bedrock BDS - Projeto](docs/assets/bedrock/bedrock-project-panel.png)
-
-### Configurações
-
-![RubyMC Bedrock BDS - Configurações](docs/assets/bedrock/bedrock-settings-panel.png)
-
----
-
-## Páginas do Bedrock
-
-### Início
-
-Apresenta o ambiente Bedrock, status do processo, versão ativa e atalhos para atualizar status ou gerenciar o servidor.
-
-### Servidor BDS
-
-Controla a conexão UDP, endereço IP/porta, validação real do BDS, monitor ativo e instâncias disponíveis.
-
-Ações por instância:
-
-```text
+```text id="b7fx2s"
 Iniciar
 Parar
 Reiniciar
@@ -186,296 +204,216 @@ Logs
 Remover
 ```
 
-### Versões BDS
+---
 
-Permite carregar versões, instalar versões oficiais, atualizar lista, selecionar versão mais recente e administrar diretórios físicos.
+# 📦 Versões BDS
 
-### Display
+O sistema permite:
 
-Console de eventos em tempo real para acompanhar comandos, mensagens internas, erros e logs operacionais.
-
-### Projeto
-
-Área para acessar a raiz operacional, subpastas e binários executáveis nativos do BDS Linux.
-
-### Configurações
-
-Mostra ambiente, gerenciador core, binários do servidor, conexão de clientes e link de entrada da comunidade.
+* instalar versões oficiais;
+* atualizar lista;
+* selecionar versões;
+* iniciar versões instaladas;
+* remover instâncias;
+* visualizar diretórios físicos.
 
 ---
 
-## Estrutura de instâncias Bedrock
+# 📜 Display
 
-```text
-~/.minecraft_ruby_launcher/
-└── bedrock_servers/
-    ├── 1.26.23/
-    ├── 1.26.23.1/
-    └── 1.21.101.1/
-```
+O Display funciona como console operacional.
 
-Cada instância pode conter:
+## Recursos
 
-```text
-bedrock_server
-server.properties
-permissions.json
-allowlist.json
-worlds/
-logs/
-```
+* logs em tempo real;
+* atualização dinâmica;
+* limpeza rápida;
+* monitoramento interno;
+* depuração do backend.
 
 ---
 
-## Conexão UDP
+# 💬 Discord
 
-O Minecraft Bedrock usa UDP.
+O ecossistema RubyMC possui integração completa com Discord.
 
-Exemplo:
+## Recursos
 
-```text
-192.168.0.9:19132
-```
+* Discord Bot;
+* Rich Presence;
+* validação de canais;
+* logs operacionais;
+* suporte automatizado;
+* geração de convites;
+* gerenciamento de cargos.
 
-Campos monitorados:
+## Configuração
 
-```text
-ONLINE
-CAPACIDADE
-PING
-VERSÃO
-CHECK
-```
-
-Erros como `NetworkError when attempting to fetch resource` normalmente indicam falha entre frontend/backend, rota indisponível, bloqueio de rede ou API local indisponível.
-
----
-
-# Discord
-
-O projeto usa configuração por `settings.yml`.
-
-```yaml
+```yaml id="0m0smv"
 discord:
   rich_presence: true
-  client_id: 'ID_DA_APLICACAO'
   bot_enabled: true
   bot_token: '${RUBYMC_DISCORD_BOT_TOKEN}'
-  guild_id: 'ID_DO_SERVIDOR_DISCORD'
-
-  channels:
-    welcome_channel_id: '...'
-    rules_channel_id: '...'
-    announcements_channel_id: '...'
-    updates_channel_id: '...'
-    new_members_channel_id: '...'
-    general_channel_id: '...'
-    support_channel_id: '...'
-    logs_channel_id: '...'
-    modpacks_channel_id: '...'
-
-  roles:
-    member_role_id: '...'
-    player_role_id: '...'
-    staff_role_id: '...'
-    admin_role_id: '...'
-    bot_role_id: '...'
+  guild_id: 'DISCORD_GUILD_ID'
 ```
 
-## Token seguro
+## Segurança
 
-Nunca publique token real no GitHub.
+Nunca publique tokens reais.
 
-Use:
+Use variável de ambiente:
 
-```bash
-export RUBYMC_DISCORD_BOT_TOKEN='SEU_TOKEN_NOVO_AQUI'
-bundle exec ruby bot_daemon.rb
+```bash id="m4d5sh"
+export RUBYMC_DISCORD_BOT_TOKEN='SEU_TOKEN'
 ```
 
 ---
 
-# IA local
+# 🧠 IA Local
 
-O projeto está preparado para usar IA local com Ollama.
-
-## Modelo
-
-```text
-qwen3.5:9b
-```
+O projeto suporta IA local usando Ollama.
 
 ## Instalação
 
-```bash
+```bash id="f6l1o6"
 ollama pull qwen3.5:9b
 ollama serve
 ```
 
 ## Configuração
 
-```yaml
+```yaml id="g8l7x4"
 ai_support:
   enabled: true
   provider: ollama
   host: 'http://127.0.0.1:11434'
   model: 'qwen3.5:9b'
-  model_hash: '6488c96fa5fa'
-  timeout_seconds: 120
-  temperature: 0.35
-  num_ctx: 8192
 ```
 
 ---
 
-# Instalação
+# ⚙️ Instalação
 
-```bash
+Clone o repositório:
+
+```bash id="3sh8ph"
 git clone https://github.com/VICTORGG04/RubyMC-Launcher.git
+```
+
+Entre na pasta:
+
+```bash id="31o0d2"
 cd RubyMC-Launcher
+```
+
+Instale dependências:
+
+```bash id="l8tl8m"
 bundle install
 ```
 
 ---
 
-# Executar RubyMC Java
+# 💎 Executar RubyMC Java
 
-```bash
+```bash id="kwzpk6"
 cd rubymc-java
-bundle install
 ./rubymc restart
 ```
 
-Acesse:
+Painel:
 
-```text
+```text id="w1c3h2"
 http://127.0.0.1:4567
 ```
 
 ---
 
-# Executar RubyMC Bedrock
+# 💎 Executar RubyMC Bedrock
 
-```bash
+```bash id="lq7xsy"
 cd rubymc-bedrock
-bundle install
 ./rubymc restart
 ```
 
-Acesse:
+Painel:
 
-```text
+```text id="i7q4oe"
 http://127.0.0.1:4567
-```
-
-Caso a porta esteja ocupada:
-
-```bash
-sudo fuser -k 4567/tcp
-./rubymc restart
 ```
 
 ---
 
-# Validação
+# 🧩 Dependências
 
 ## Ruby
 
-```bash
+```text id="8m2gpr"
+Ruby 3.x
+```
+
+## Gems principais
+
+* sinatra
+* puma
+* yaml
+* json
+* discordrb
+* websocket-client-simple
+* fileutils
+
+---
+
+# 🛠️ Validação
+
+## Ruby
+
+```bash id="w5xmx4"
 ruby -c bot_daemon.rb
-ruby -c lib/discord_config.rb
 ruby -c lib/web_launcher_app.rb
 ```
 
 ## Bundler
 
-```bash
+```bash id="q5f8l2"
 bundle check
 ```
 
 ## Porta do painel
 
-```bash
+```bash id="3k7d7u"
 ss -ltnp | grep 4567
 ```
 
-## Processos Bedrock
-
-```bash
-ps aux | grep bedrock_server
-```
-
-## UDP Bedrock
-
-```bash
-ss -lunp | grep 19132
-```
-
 ---
 
-# Boas práticas
-
-- Não versionar tokens reais.
-- Não subir `settings.yml` com credenciais.
-- Usar variável de ambiente para Discord.
-- Manter screenshots em `docs/assets`.
-- Separar documentação Java e Bedrock.
-- Validar sintaxe Ruby antes de commit.
-- Testar painel local antes de publicar.
-
----
-
-# Status atual
+# 🗺️ Roadmap
 
 ## RubyMC Java
 
-- Interface web em evolução.
-- Modpacks em estruturação.
-- Discord integrado.
-- IA local planejada/implementável.
-- Logs e configurações em desenvolvimento.
+* melhorias no launcher;
+* sistema avançado de modpacks;
+* integração IA completa;
+* sincronização multiplayer;
+* marketplace RubyMC.
 
 ## RubyMC Bedrock
 
-- Painel BDS funcional.
-- Instâncias listadas.
-- Monitor ativo.
-- Controle iniciar/parar/reiniciar.
-- Versões BDS organizadas.
-- Display operacional.
-- Configurações visuais implementadas.
+* auto-update BDS;
+* monitoramento avançado;
+* integração IA;
+* painel multiusuário;
+* gerenciamento remoto;
+* backup automático.
 
 ---
 
-# Roadmap
+# 📄 Licença
 
-## Java
-
-- Melhorar sistema de versões.
-- Finalizar fluxo de modpacks.
-- Integrar IA ao painel.
-- Melhorar login e perfis.
-- Ampliar suporte Discord.
-
-## Bedrock
-
-- Corrigir carregamento remoto de versões oficiais quando houver falha de rede.
-- Melhorar API de status.
-- Exibir jogadores online reais.
-- Criar backup automático.
-- Adicionar agendamento de reinício.
-- Permitir edição visual de `server.properties`.
-- Integrar alertas Discord.
-- Integrar diagnósticos por IA.
+MIT
 
 ---
 
-# Autor
+# 👨‍💻 Autor
 
 Desenvolvido por **Victor Marcial**.
-
----
-
-# Licença
-
-Projeto RubyMC. Defina a licença conforme o uso pretendido do repositório.
