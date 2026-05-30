@@ -5015,3 +5015,113 @@ button.is-loading,
     min-width: 120px;
   }
 }
+
+/* ==========================================================================
+   📦 PATCH CORREÇÃO: DISCORD NA HOME PAGE (SEM QUEBRAS DE LAYOUT)
+   ========================================================================== */
+
+/* Container Principal do Discord inserido na Home */
+#tab-home .home-discord-section {
+  width: 100% !important;
+  margin-top: 30px !important;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+/* Forçar os cards internos a ocuparem 100% da largura útil sem bugar */
+#tab-home #admin-discord-actions,
+#tab-home #verification-box,
+#tab-home #member-status-card {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  margin-bottom: 0 !important;
+}
+
+/* ─── CORREÇÃO: Caixa de Verificação (Token) ─── */
+#tab-home #verification-box .vstep-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px !important; /* Devolve o espaçamento vertical entre as etapas */
+  margin-top: 15px;
+}
+
+#tab-home #verification-box .vstep {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 15px;
+}
+
+/* Consertando a linha do código de verificação (os inputs que colaram) */
+#tab-home .vstep-code-row {
+  display: flex !important;
+  gap: 12px !important; /* Espaço exato e crucial entre os campos e botões */
+  align-items: center !important;
+  justify-content: flex-start !important;
+  flex-wrap: wrap !important;
+  margin-top: 12px !important;
+}
+
+/* Input do Token individual */
+#tab-home .vstep-code-input {
+  width: 110px !important;
+  height: 38px !important;
+  text-align: center !important;
+  font-size: 16px !important;
+  letter-spacing: 2px !important;
+  font-weight: bold !important;
+  background: rgba(0, 0, 0, 0.4) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 4px !important;
+  color: #fff !important;
+}
+
+/* ─── CORREÇÃO: Comportamento dos Botões ─── */
+/* Impede que o botão de vinculação ou confirmação estique 100% da tela */
+#tab-home .btn-discord,
+#tab-home #verification-box .btn,
+#tab-home #member-status-card .btn {
+  width: auto !important; /* Quebra a herança flexiva que esticava o botão */
+  min-width: 180px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 10px 20px !important;
+  height: 38px !important;
+  font-weight: 600 !important;
+  border-radius: 4px !important;
+  box-sizing: border-box !important;
+}
+
+/* Botão grande final de "Tornar-se Membro Ruby" (Esse sim deve ser cheio e espaçado) */
+#tab-home #complete-verification-btn {
+  width: 100% !important;
+  height: 48px !important;
+  margin-top: 25px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 16px !important;
+}
+
+/* ─── CORREÇÃO: Card de Status do Membro (Premium) ─── */
+#tab-home #member-status-card {
+  position: relative;
+  overflow: hidden;
+}
+
+#tab-home #member-status-card .msc-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#tab-home #member-status-card .msc-stats {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+  margin: 10px 0;
+}
