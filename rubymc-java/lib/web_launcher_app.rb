@@ -13,6 +13,9 @@ require 'open-uri'
 require 'zip'
 require 'digest'
 require 'cgi'
+require 'net/http'
+require 'uri'
+require 'set'
 
 begin
   require_relative 'rubymc/minecraft_server_status'
@@ -87,7 +90,7 @@ module RubyMC
     # que chamam project_root — ambos apontam para o mesmo diretório raiz.
     alias project_root root
 
-    def initialize(root:, host: '127.0.0.1', port: 4567, simulate: false)
+    def initialize(root:, host: '0.0.0.0', port: 4567, simulate: false)
       @root = File.expand_path(root)
       @host = host
       @port = Integer(port)
@@ -99,6 +102,10 @@ module RubyMC
       @server_action_mutex = Mutex.new
       @server_action_busy = {}
       @pending_auths = {}
+      @session_file = File.join(@root, 'tmp', 'sessions.json')
+      @sessions_mutex = Mutex.new
+      @sessions = {}
+      load_sessions
     end
 
     def simulate?
@@ -130,7 +137,24 @@ module RubyMC
 
     private
 
+    ADMIN_ONLY_PATHS = %w[
+      /api/logs
+      /api/modpacks/import /api/modpacks/remove
+      /api/discord/status /api/discord/validate /api/discord/test-log
+      /api/accounts /api/accounts/start-auth /api/accounts/poll-auth /api/accounts/remove
+      /api/versions /api/versions/available
+      /api/ai/context
+    ].to_set.freeze
+
     def route(req, res)
+      if ADMIN_ONLY_PATHS.include?(req.path)
+        user = authenticated_user(req)
+        unless user && user[:role] == :admin
+          res.status = 401
+          return json(res, { ok: false, error: 'Acesso restrito a administradores.' })
+        end
+      end
+
       case req.path
       when '/'
         serve_file(res, File.join(root, 'web', 'index.html'))
@@ -179,6 +203,33 @@ module RubyMC
         handle_discord_validate(req, res)
       when '/api/discord/test-log'
         handle_discord_test_log(req, res)
+      when '/api/client/versions'
+        json(res, client_versions_payload)
+      when '/api/client/versions/available'
+        tipo = (req.query['type'] || 'release').to_sym
+        limit = (req.query['limit'] || 30).to_i
+        client_mgr = MinecraftManager.new
+        list = client_mgr.list_versions(tipo: tipo, limit: limit)
+        installed = client_mgr.list_local_versions
+        json(res, { ok: true, versions: list, installed: installed })
+      when '/api/client/versions/install'
+        params = parse_json(req.body) || {}
+        version_id = (params['version_id'] || req.query['version_id']).to_s.strip
+        if version_id.empty?
+          return json(res, { ok: false, error: 'version_id é obrigatório.' })
+        end
+        Thread.new do
+          begin
+            client_mgr = MinecraftManager.new
+            client_mgr.install_version(version_id) { |msg| log('DOWNLOAD', msg) }
+            log('OK', "Versão #{version_id} instalada com sucesso.")
+          rescue => e
+            log('ERROR', "Falha ao instalar #{version_id}: #{e.message}")
+          end
+        end
+        json(res, { ok: true, message: "Instalação de #{version_id} iniciada." })
+      when '/api/user/version-status'
+        json(res, user_version_status_payload)
       when '/api/versions'
         json(res, versions_payload)
       when '/api/versions/available'
@@ -197,6 +248,36 @@ module RubyMC
         handle_poll_auth(req, res)
       when '/api/accounts/remove'
         handle_account_remove(req, res)
+      when '/api/vip/status'
+        handle_vip_status(req, res)
+      when '/api/vip/plans'
+        handle_vip_plans(req, res)
+      when '/api/vip/history'
+        handle_vip_history(req, res)
+      when '/api/vip/checkout'
+        handle_vip_checkout(req, res)
+      when '/api/auth/status'
+        handle_auth_status(req, res)
+      when '/api/auth/discord/login'
+        handle_discord_login(req, res)
+      when '/api/auth/discord/callback'
+        handle_discord_callback(req, res)
+      when '/api/auth/logout'
+        handle_auth_logout(req, res)
+      when '/api/auth/verify/status'
+        handle_verify_status(req, res)
+      when '/api/auth/verify/accept-terms'
+        handle_verify_accept_terms(req, res)
+      when '/api/auth/verify/check-guild-membership'
+        handle_verify_check_guild(req, res)
+      when '/api/auth/verify/send-discord-code'
+        handle_verify_send_discord_code(req, res)
+      when '/api/auth/verify/confirm-discord-code'
+        handle_verify_confirm_discord_code(req, res)
+      when '/api/auth/verify/complete'
+        handle_verify_complete(req, res)
+      when '/termos'
+        serve_file(res, File.join(root, 'web', 'termos.html'))
       else
         res.status = 404
         json(res, { ok: false, error: 'Rota não encontrada', path: req.path })
@@ -234,23 +315,68 @@ module RubyMC
       res.body = File.binread(file)
     end
 
+    ROLE_HIERARCHY = { member: 0, player: 1, staff: 2, admin: 3 }.freeze
+
+    def require_role(req, res, min_role)
+      user = authenticated_user(req)
+      role = user&.dig(:role)&.to_sym
+      role_weight = ROLE_HIERARCHY[role] || -1
+      min_weight = ROLE_HIERARCHY[min_role.to_sym] || 99
+      return true if role_weight >= min_weight
+
+      msg = if role == :member && min_role == :player
+              'Sua conta precisa ser Membro Ruby para usar esta função. Complete a verificação no painel.'
+            else
+              "Acesso restrito. Função necessária: #{min_role}."
+            end
+      res.status = 401
+      json(res, { ok: false, error: msg })
+      false
+    end
+
     def handle_action(req, res)
       data = parse_json(req.body)
       action = (data['action'] || req.query['action'] || req.query['name']).to_s
 
       log('ACTION', "Botão recebido pelo backend: #{action}") unless action == 'clear_logs'
 
+      # ── Role-based permission ───────────────────────────────────────────
+      player_actions = %w[
+        play start_minecraft launch_minecraft enter_server
+        profile_select activate_profile profile_current
+      ].to_set.freeze
+
+      admin_actions = %w[
+        start_server server_start stop_server server_stop restart_server server_restart
+        version_install version_remove version_activate
+        organize_project organize run_tests
+        open_project_folder project_folder
+        validate_discord_config test_discord_log
+        import_modpack remove_modpack
+      ].to_set.freeze
+
+      unless action == 'clear_logs'
+        if admin_actions.include?(action)
+          return unless require_role(req, res, :admin)
+        elsif player_actions.include?(action)
+          return unless require_role(req, res, :player)
+        end
+      end
+
       case action
 
         # ── Painel UI: ações inline (rubymc_handle_ui_action) ────────────────
+      when 'join_server', 'server_join'
+        user = authenticated_user(req)
+        json(res, rubymc_handle_ui_action(action, discord_user_id: user&.dig(:user_id)))
+
       when 'clear_display', 'display_clear',
         'validate_discord', 'discord_validate', 'validate_discord_settings',
         'test_discord_logs', 'discord_test_logs', 'test_logs_channel',
         'test_all_channels', 'discord_test_channels', 'test_channels',
         'create_invite', 'discord_create_invite', 'generate_invite',
         'open_docs', 'open_documentation',
-        'check_updates', 'update_check',
-        'join_server', 'server_join'
+        'check_updates', 'update_check'
         json(res, rubymc_handle_ui_action(action))
 
         # ── Log interno ───────────────────────────────────────────────────────
@@ -604,6 +730,19 @@ module RubyMC
       }
     end
 
+    def client_versions_payload
+      client_mgr = MinecraftManager.new
+      { ok: true, installed: client_mgr.list_local_versions }
+    rescue => e
+      { ok: false, error: e.message }
+    end
+
+    def user_version_status_payload
+      mgr = version_manager
+      return { ok: false, error: 'Version manager não disponível' } unless mgr
+      { ok: true, active: mgr.active_version, installed: mgr.list_installed }
+    end
+
     def versions_payload
       mgr = version_manager
       return { ok: false, error: 'Version manager não disponível' } unless mgr
@@ -771,15 +910,19 @@ module RubyMC
 
     def discord_members_payload
       cfg = discord_config
-      return { members_count: 0, presence_count: 0 } unless cfg
-      return { members_count: 0, presence_count: 0 } unless defined?(RubyMC::DiscordBotService)
+      return { guild_name: '---', members_count: 0, presence_count: 0 } unless cfg
+      return { guild_name: '---', members_count: 0, presence_count: 0 } unless defined?(RubyMC::DiscordBotService)
 
       service = RubyMC::DiscordBotService.new(load_settings, simulate: simulate?)
       result = service.validate_remote!
-      { members_count: result[:members_count] || 0, presence_count: result[:presence_count] || 0 }
+      {
+        guild_name: result.dig(:guild, :name) || '---',
+        members_count: result[:members_count] || 0,
+        presence_count: result[:presence_count] || 0
+      }
     rescue StandardError => e
       log('WARN', "discord_members_payload: #{e.message}")
-      { members_count: 0, presence_count: 0 }
+      { guild_name: '---', members_count: 0, presence_count: 0 }
     end
 
     def discord_status_payload
@@ -844,7 +987,7 @@ module RubyMC
 
 
     # RubyMC Backend Actions Final Fix
-    def rubymc_handle_ui_action(action)
+    def rubymc_handle_ui_action(action, discord_user_id: nil)
       normalized = action.to_s.strip
 
       case normalized
@@ -872,7 +1015,7 @@ module RubyMC
         rubymc_check_updates_final
 
       when 'join_server', 'server_join'
-        rubymc_join_server_final
+        rubymc_join_server_final(discord_user_id: discord_user_id)
 
       else
         nil
@@ -1103,7 +1246,7 @@ module RubyMC
       { ok: true, message: 'Atualizações verificadas.', git_status: status }
     end
 
-    def rubymc_join_server_final
+    def rubymc_join_server_final(discord_user_id: nil)
       info = respond_to?(:server_info) ? server_info : {}
       address = (info[:address] || info['address'] || '').to_s.strip
 
@@ -1112,10 +1255,22 @@ module RubyMC
         return { ok: false, message: 'Servidor não configurado.' }
       end
 
-      log('ACTION', "Abrindo servidor Minecraft: #{address}") if respond_to?(:log)
-      system('xdg-open', "minecraft://?addExternalServer=RubyMC|#{address}", out: File::NULL, err: File::NULL)
-      log('OK', "Comando para entrar no servidor enviado: #{address}") if respond_to?(:log)
-      { ok: true, message: "Abrindo servidor #{address}.", address: address }
+      if discord_user_id
+        begin
+          require_relative 'rubymc/discord_bot_service'
+          service = RubyMC::DiscordBotService.new(CONFIG, simulate: respond_to?(:simulate?) ? simulate? : false)
+          link = "minecraft://?addExternalServer=RubyMC|#{address}"
+          service.send_dm(discord_user_id, "🎮 Clique no link para entrar no servidor RubyMC!\n\n#{link}\n\nSe o link não abrir automaticamente, copie e cole no navegador.")
+          log('OK', "Link do servidor enviado via DM para #{discord_user_id}") if respond_to?(:log)
+          { ok: true, message: 'Link do servidor enviado no seu DM do Discord! Verifique suas mensagens.' }
+        rescue => e
+          log('WARN', "Falha ao enviar DM: #{e.message}") if respond_to?(:log)
+          { ok: true, message: "Link: minecraft://?addExternalServer=RubyMC|#{address}", address: address }
+        end
+      else
+        log('OK', "Endereço do servidor: #{address}") if respond_to?(:log)
+        { ok: true, message: "Servidor: #{address}", address: address }
+      end
     end
 
 
@@ -1610,6 +1765,549 @@ module RubyMC
       YAML.safe_load_file(File.join(root, 'config', 'settings.yml'), permitted_classes: [Symbol], aliases: true) || {}
     rescue
       {}
+    end
+
+    # ── VIP / Pagamentos ──────────────────────────────────
+    def handle_vip_status(req, res)
+      user = authenticated_user(req)
+      if user
+        current_role = refresh_user_role(user[:user_id])
+        if current_role
+          user[:role] = current_role
+          @sessions.each { |_, v| v[:role] = current_role if v[:user_id] == user[:user_id] }
+          save_sessions
+        end
+        if user[:role] == :admin
+          return json(res, {
+            ok: true, active: true,
+            plan: 'vip_vitalicio',
+            plan_label: 'VIP Vitalício (Gratuito pela Equipe)',
+            role_granted: true,
+            expires_at: nil
+          })
+        end
+      end
+      vip_data = load_vip_data
+      if vip_data && vip_data[:active]
+        json(res, {
+          ok: true, active: true,
+          plan: vip_data[:plan],
+          plan_label: vip_data[:plan_label],
+          expires_at: vip_data[:expires_at]
+        })
+      else
+        json(res, { ok: true, active: false })
+      end
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_vip_plans(req, res)
+      user = authenticated_user(req)
+      plans = [
+        { id: 'vip_mensal', name: 'VIP Mensal', price: '4,90', period: 'mês', description: 'Cargo VIP no servidor, comandos exclusivos e prioridade.' },
+        { id: 'vip_trimestral', name: 'VIP Trimestral', price: '9,90', period: 'trimestre', description: 'Todos os benefícios VIP com 3 meses de duração.' },
+        { id: 'vip_vitalicio', name: 'VIP Vitalício', price: '19,90', period: 'vitalício', description: 'Acesso VIP permanente com todos os benefícios.' }
+      ]
+      if user && user[:role] == :staff
+        plans = plans.map do |p|
+          discounted = format('%.2f', p[:price].sub(',', '.').to_f / 2).sub('.', ',')
+          p.merge(price: discounted)
+        end
+      end
+      json(res, { ok: true, plans: plans, staff_discount: user && user[:role] == :staff })
+    end
+
+    def handle_vip_history(_req, res)
+      vip_data = load_vip_data
+      payments = vip_data && vip_data[:payments] ? vip_data[:payments] : []
+      json(res, { ok: true, payments: payments })
+    rescue => e
+      json(res, { ok: false, error: e.message, payments: [] })
+    end
+
+    def handle_vip_checkout(req, res)
+      user = authenticated_user(req)
+      if user && user[:role] == :admin
+        return json(res, { ok: false, error: 'Administradores já possuem acesso VIP Vitalício gratuito.' })
+      end
+
+      params = parse_json(req.body) || {}
+      price_id = params['price_id'] || req.query['price_id']
+      unless price_id
+        return json(res, { ok: false, error: 'price_id não informado.' })
+      end
+
+      cfg = load_settings.dig('stripe') || {}
+
+      if cfg['secret_key'] && !cfg['secret_key'].empty? && defined?(Stripe)
+        Stripe.api_key = cfg['secret_key']
+        base = "http://#{request_host(req)}"
+        session = Stripe::Checkout::Session.create({
+          mode: 'payment',
+          line_items: [{ price: price_id, quantity: 1 }],
+          success_url: "#{base}/?vip=success",
+          cancel_url: "#{base}/?vip=cancel"
+        })
+        return json(res, { ok: true, url: session.url })
+      end
+
+      json(res, { ok: true, url: "https://checkout.stripe.com/pay/#{price_id}", sandbox: true })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def load_vip_data
+      file = File.join(root, 'tmp', 'vip_data.json')
+      return nil unless File.exist?(file)
+      JSON.parse(File.read(file), symbolize_names: true)
+    rescue
+      nil
+    end
+
+    # ── Auth / Sessão ────────────────────────────────────
+    def authenticated_user(req)
+      cookie = parse_cookie(req)
+      session_id = cookie['rubymc_session']
+      return nil unless session_id
+      session = @sessions[session_id]
+      return nil unless session
+      if session[:expires_at] && Time.now > session[:expires_at]
+        @sessions.delete(session_id)
+        save_sessions
+        return nil
+      end
+      session
+    end
+
+    def parse_cookie(req)
+      return {} unless req['Cookie']
+      req['Cookie'].split(';').each_with_object({}) do |pair, hash|
+        k, v = pair.strip.split('=', 2)
+        hash[k] = v if k && v
+      end
+    rescue
+      {}
+    end
+
+    def set_session_cookie(res, session_id)
+      res['Set-Cookie'] = "rubymc_session=#{session_id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400"
+    end
+
+    def save_sessions
+      @sessions_mutex.synchronize do
+        data = @sessions.transform_values do |s|
+          s.merge(expires_at: s[:expires_at]&.iso8601)
+        end
+        File.write(@session_file, JSON.generate(data))
+      end
+    rescue StandardError => e
+      log('WARN', "save_sessions: #{e.message}")
+    end
+
+    def load_sessions
+      return unless File.exist?(@session_file)
+
+      @sessions_mutex.synchronize do
+        raw = JSON.parse(File.read(@session_file))
+        @sessions = raw.transform_values do |s|
+          s.transform_keys(&:to_sym).tap do |sym|
+            sym[:expires_at] = Time.parse(sym[:expires_at]) if sym[:expires_at].is_a?(String)
+          end
+        end
+      end
+    rescue StandardError => e
+      log('WARN', "load_sessions: #{e.message}")
+      @sessions = {}
+    end
+
+    def clear_session_cookie(res)
+      res['Set-Cookie'] = "rubymc_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+    end
+
+    def launcher_role_for(discord_role_ids)
+      settings = load_settings
+      admin_ids = settings.dig('launcher', 'roles', 'admin_ids') || []
+      staff_ids = settings.dig('launcher', 'roles', 'staff_ids') || []
+      player_ids = settings.dig('launcher', 'roles', 'player_ids') || []
+      member_ids = settings.dig('launcher', 'roles', 'member_ids') || []
+      return :admin unless (discord_role_ids & admin_ids).empty?
+      return :staff unless (discord_role_ids & staff_ids).empty?
+      return :player unless (discord_role_ids & player_ids).empty?
+      return :member unless (discord_role_ids & member_ids).empty?
+      :member
+    end
+
+    def refresh_user_role(user_id)
+      settings = load_settings
+      guild_id = settings.dig('discord', 'guild_id')
+      bot_token = settings.dig('discord', 'bot_token')
+      return nil unless guild_id && bot_token
+      uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{user_id}")
+      req = Net::HTTP::Get.new(uri)
+      req['Authorization'] = "Bot #{bot_token}"
+      resp = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+      return nil unless resp.code.to_i == 200
+      member_data = JSON.parse(resp.body)
+      launcher_role_for(member_data['roles'] || [])
+    rescue => e
+      log('WARN', "refresh_user_role falhou: #{e.message}")
+      nil
+    end
+
+    def dynamic_redirect_uri(req, oauth)
+      configured = oauth['redirect_uri'].to_s.strip
+      return configured unless configured.empty?
+
+      "http://127.0.0.1:4567/api/auth/discord/callback"
+    end
+
+    def request_host(req)
+      h = req['Host']
+      h && !h.empty? ? h : "#{host}:#{port}"
+    end
+
+    def host
+      @host
+    end
+
+    def port
+      @port
+    end
+
+    def handle_auth_status(req, res)
+      user = authenticated_user(req)
+      if user
+        json(res, {
+          ok: true, authenticated: true,
+          user: { id: user[:user_id], username: user[:username], avatar: user[:avatar] },
+          role: user[:role]
+        })
+      else
+        json(res, { ok: true, authenticated: false })
+      end
+    end
+
+    def handle_discord_login(req, res)
+      settings = load_settings
+      oauth = settings.dig('discord', 'oauth') || {}
+      client_id = oauth['client_id']
+      redirect_uri = CGI.escape(dynamic_redirect_uri(req, oauth))
+      url = "https://discord.com/api/oauth2/authorize?client_id=#{client_id}&redirect_uri=#{redirect_uri}&response_type=code&scope=identify"
+      res.status = 302
+      res['Location'] = url
+    end
+
+    def handle_discord_callback(req, res)
+      code = req.query['code']
+      error = req.query['error']
+      if error || !code
+        res.status = 302
+        res['Location'] = "/?login=error&reason=#{CGI.escape(error || 'no_code')}"
+        return
+      end
+
+      settings = load_settings
+      oauth = settings.dig('discord', 'oauth') || {}
+      guild_id = settings.dig('discord', 'guild_id')
+      bot_token = settings.dig('discord', 'bot_token')
+
+      unless oauth['client_id'] && oauth['client_secret'] && guild_id && bot_token
+        res.status = 302
+        res['Location'] = '/?login=error&reason=missing_config'
+        return
+      end
+
+      # 1. Exchange code for token
+      redirect_uri = dynamic_redirect_uri(req, oauth)
+      token_uri = URI('https://discord.com/api/v10/oauth2/token')
+      token_resp = Net::HTTP.post_form(token_uri, {
+        client_id: oauth['client_id'],
+        client_secret: oauth['client_secret'],
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: redirect_uri
+      })
+
+      unless token_resp.code.to_i == 200
+        res.status = 302
+        res['Location'] = '/?login=error&reason=token_exchange_failed'
+        return
+      end
+
+      token_data = JSON.parse(token_resp.body)
+      access_token = token_data['access_token']
+
+      # 2. Get user info
+      user_uri = URI('https://discord.com/api/v10/users/@me')
+      user_req = Net::HTTP::Get.new(user_uri)
+      user_req['Authorization'] = "Bearer #{access_token}"
+      user_resp = Net::HTTP.start(user_uri.hostname, user_uri.port, use_ssl: true) { |http| http.request(user_req) }
+
+      unless user_resp.code.to_i == 200
+        res.status = 302
+        res['Location'] = '/?login=error&reason=userinfo_failed'
+        return
+      end
+
+      user_data = JSON.parse(user_resp.body)
+      user_id = user_data['id']
+
+      # 3. Get guild member info (via bot token) — optional
+      #     If user is not in the guild, they still get a :member session
+      #     and must complete verification (enter server + DM code) to unlock features.
+      member_uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{user_id}")
+      member_req = Net::HTTP::Get.new(member_uri)
+      member_req['Authorization'] = "Bot #{bot_token}"
+
+      begin
+        member_resp = Net::HTTP.start(member_uri.hostname, member_uri.port, use_ssl: true) { |http| http.request(member_req) }
+        if member_resp.code.to_i == 200
+          member_data = JSON.parse(member_resp.body)
+          discord_roles = member_data['roles'] || []
+        else
+          discord_roles = []
+          puts "[LOGIN] #{user_data['username']} (#{user_id}) não está no servidor — acesso limitado a :member"
+        end
+      rescue => e
+        discord_roles = []
+        puts "[LOGIN] Erro ao verificar guild member para #{user_id}: #{e.message} — acesso limitado a :member"
+      end
+
+      # 4. Determine launcher role
+      role = launcher_role_for(discord_roles)
+
+      # 5. Create session
+      session_id = SecureRandom.hex(32)
+      @sessions[session_id] = {
+        user_id: user_id,
+        username: user_data['username'],
+        avatar: user_data['avatar'],
+        role: role,
+        expires_at: Time.now + 86400
+      }
+      save_sessions
+
+      set_session_cookie(res, session_id)
+      res.status = 302
+      res['Location'] = '/?login=success'
+    end
+
+    def handle_auth_logout(req, res)
+      cookie = parse_cookie(req)
+      session_id = cookie['rubymc_session']
+      if session_id
+        @sessions.delete(session_id)
+        save_sessions
+      end
+      clear_session_cookie(res)
+      json(res, { ok: true })
+    end
+
+    # ── Verificação (Membro → Membro Ruby) ────────────────
+    def handle_verify_status(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      state = vdata[uid] || {}
+
+      json(res, {
+        ok: true,
+        terms_accepted: state['terms_accepted'] == true,
+        discord_verified: state['discord_verified'] == true,
+        overall_complete: state['terms_accepted'] == true && state['discord_verified'] == true
+      })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_verify_accept_terms(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+      unless user[:role] == :member
+        return json(res, { ok: false, error: 'Apenas Membros podem se verificar.' })
+      end
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      vdata[uid] ||= {}
+      vdata[uid]['terms_accepted'] = true
+      save_verification_data(vdata)
+
+      json(res, { ok: true, terms_accepted: true })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_verify_check_guild(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+
+      uid = user[:user_id].to_s
+      settings = load_settings
+      guild_id = settings.dig('discord', 'guild_id')
+      bot_token = settings.dig('discord', 'bot_token')
+
+      unless guild_id && bot_token
+        return json(res, { ok: false, error: 'Discord não configurado.' })
+      end
+
+      uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{uid}")
+      req_check = Net::HTTP::Get.new(uri)
+      req_check['Authorization'] = "Bot #{bot_token}"
+      resp = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req_check) }
+
+      json(res, { ok: true, in_guild: resp.code.to_i == 200 })
+    rescue => e
+      json(res, { ok: true, in_guild: false })
+    end
+
+    def handle_verify_send_discord_code(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+      unless user[:role] == :member
+        return json(res, { ok: false, error: 'Apenas Membros podem se verificar.' })
+      end
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      unless vdata.dig(uid, 'terms_accepted')
+        return json(res, { ok: false, error: 'Aceite os Termos de Uso primeiro.' })
+      end
+
+      # Verifica se o usuário está no servidor Discord
+      settings = load_settings
+      guild_id = settings.dig('discord', 'guild_id')
+      bot_token = settings.dig('discord', 'bot_token')
+      if guild_id && bot_token
+        member_uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{uid}")
+        member_req = Net::HTTP::Get.new(member_uri)
+        member_req['Authorization'] = "Bot #{bot_token}"
+        member_resp = Net::HTTP.start(member_uri.hostname, member_uri.port, use_ssl: true) { |http| http.request(member_req) }
+        unless member_resp.code.to_i == 200
+          return json(res, { ok: false, error: 'Você precisa entrar no servidor Discord da RubyMC primeiro para receber o código.' })
+        end
+      end
+
+      code = format('%06d', rand(1_000_00..999_999))
+      expires = (Time.now + 300).to_i
+
+      vdata[uid] ||= {}
+      vdata[uid]['discord_code'] = code
+      vdata[uid]['discord_code_expires'] = expires
+      save_verification_data(vdata)
+
+      if defined?(RubyMC::DiscordBotService)
+        begin
+          service = RubyMC::DiscordBotService.new(load_settings, simulate: simulate?)
+          service.send_dm(uid, "🔐 Seu código de verificação RubyMC é: **#{code}**\nEle expira em 5 minutos. Insira-o no launcher para completar a verificação.")
+        rescue => e
+          log('WARN', "Falha ao enviar DM: #{e.message}")
+          return json(res, { ok: false, error: "Falha ao enviar DM: #{e.message}" })
+        end
+      end
+
+      json(res, { ok: true, message: 'Código enviado via DM no Discord.' })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_verify_confirm_discord_code(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+
+      params = parse_json(req.body) || {}
+      code = params['code'].to_s.strip
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      entry = vdata[uid] || {}
+
+      unless entry['discord_code']
+        return json(res, { ok: false, error: 'Nenhum código foi solicitado. Clique em "Verificar via Discord" primeiro.' })
+      end
+
+      if entry['discord_code_expires'].to_i < Time.now.to_i
+        return json(res, { ok: false, error: 'Código expirado. Solicite um novo.' })
+      end
+
+      unless entry['discord_code'] == code
+        return json(res, { ok: false, error: 'Código inválido. Tente novamente.' })
+      end
+
+      vdata[uid]['discord_verified'] = true
+      save_verification_data(vdata)
+
+      json(res, { ok: true, discord_verified: true })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_verify_complete(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+      unless user[:role] == :member
+        return json(res, { ok: false, error: 'Apenas Membros podem se verificar.' })
+      end
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      state = vdata[uid] || {}
+
+      unless state['terms_accepted'] && state['discord_verified']
+        return json(res, { ok: false, error: 'Complete todas as etapas de verificação primeiro.' })
+      end
+
+      # Assign Membro Ruby role via bot
+      if defined?(RubyMC::DiscordBotService)
+        begin
+          service = RubyMC::DiscordBotService.new(load_settings, simulate: simulate?)
+          service.assign_role(uid, 'player_role_id')
+        rescue => e
+          log('ERROR', "Falha ao atribuir cargo Membro Ruby: #{e.message}")
+          return json(res, { ok: false, error: "Falha ao atribuir cargo: #{e.message}" })
+        end
+      end
+
+      # Update session
+      @sessions.each { |_, v| v[:role] = :player if v[:user_id] == uid }
+      save_sessions
+
+      # Clean up verification data
+      vdata.delete(uid)
+      save_verification_data(vdata)
+
+      json(res, { ok: true, role: 'player', message: 'Parabéns! Agora você é Membro Ruby.' })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def load_verification_data
+      file = File.join(root, 'tmp', 'verification_data.json')
+      return {} unless File.exist?(file)
+      JSON.parse(File.read(file))
+    rescue
+      {}
+    end
+
+    def save_verification_data(data)
+      file = File.join(root, 'tmp', 'verification_data.json')
+      FileUtils.mkdir_p(File.dirname(file))
+      File.write(file, JSON.generate(data))
     end
 
   end

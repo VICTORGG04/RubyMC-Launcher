@@ -56,6 +56,13 @@
     "restart_server"
   ]);
 
+  const ROLE_TABS = {
+    admin: ['home', 'server', 'versions', 'modpacks', 'ai', 'vip', 'display', 'project', 'settings'],
+    staff: ['home', 'server', 'versions', 'modpacks', 'ai', 'vip', 'display', 'project', 'settings'],
+    player: ['home', 'server', 'versions', 'modpacks', 'ai', 'vip', 'display', 'project', 'settings'],
+    member: ['home', 'modpacks', 'display', 'settings']
+  };
+
   const runningActions = new Set();
 
   function setValue(id, value) {
@@ -171,6 +178,11 @@
   function activateTab(tab) {
     if (!tab) return;
 
+    const allowedTabs = ROLE_TABS[window._userRole] || ROLE_TABS.player;
+    if (!allowedTabs.includes(tab)) {
+      return activateTab('home');
+    }
+
     document.body.dataset.currentTab = tab;
 
     $$(".tab-link, .side-link").forEach((button) => {
@@ -189,6 +201,7 @@
       setTimeout(loadVersions, 160);
     }
     if (tab === "versions") setTimeout(loadVersions, 100);
+    if (tab === "vip") setTimeout(loadVipData, 100);
     if (tab === "settings") setTimeout(loadAccounts, 200);
   }
 
@@ -216,12 +229,6 @@
     for (const alias of aliases) {
       try {
         return await apiPost("/api/action", actionPayload(alias));
-      } catch (error) {
-        lastError = error;
-      }
-
-      try {
-        return await apiPost(`/api/${alias}`, actionPayload(alias));
       } catch (error) {
         lastError = error;
       }
@@ -313,6 +320,8 @@
     setText("launcher-version", status.launcher_version || status.version);
     setValue("server-address", status.server_address || status.community_server || status.address);
 
+    if (status.modpacks_count !== undefined) setText("home-modpacks-count", status.modpacks_count);
+
     if (status.versions && status.versions.active) {
       const active = status.versions.active;
       setText("minecraft-version", active.id);
@@ -347,16 +356,10 @@
 
     const discord = status.discord || {};
     if (Object.keys(discord).length) {
-      const botOnline = discord.bot_enabled === true || discord.bot === true || discord.status === "ativo" || discord.bot_state === "ativo";
-      setText("discord-bot-state", botOnline ? "Ativo" : (discord.bot_state || "Inativo"));
-      setText("discord-channel-count", discord.channels || discord.channel_count || discord.channels_count ||
-          (discord.channels_configured !== undefined ? `${discord.channels_configured}/${discord.channels_total}` : undefined));
-      setText("discord-role-count", discord.roles || discord.role_count || discord.roles_count ||
-          (discord.roles_configured !== undefined ? `${discord.roles_configured}/${discord.roles_total}` : undefined));
+      setText("home-discord-members", discord.members_count);
+      setText("discord-bot-state", discord.bot_enabled === true || discord.bot === true || discord.status === "ativo" || discord.bot_state === "ativo" ? "Ativo" : (discord.bot_state || "Inativo"));
       setText("logs-channel-state", discord.logs_channel || discord.logs_channel_id ? "configurado" : "pendente");
       setText("discord-config-state", discord.configured === false ? "pendente" : "configurado");
-      setText("discord-member-count", discord.members_count);
-      setText("discord-online-count", discord.presence_count);
     }
   }
 
@@ -679,7 +682,7 @@
 
   async function loadVersions() {
     try {
-      const data = await apiFetch("/api/versions");
+      const data = await apiFetch("/api/user/version-status");
       if (!data.ok) throw new Error(data.error || "Falha ao carregar versões");
 
       activeVersion = data.active || null;
@@ -688,8 +691,125 @@
       renderActiveVersion();
       renderInstalledVersions();
       renderServerVersionSelect();
+
+      const isAdmin = window._userRole === 'admin';
+      document.querySelectorAll('#version-server-panel .version-section').forEach(el => {
+        el.style.display = isAdmin ? '' : 'none';
+      });
+      const serverPanel = document.getElementById('version-server-panel');
+      const serverNavBtn = document.querySelector('.version-subnav-link[data-panel="server"]');
+      if (serverPanel) serverPanel.style.display = isAdmin ? '' : 'none';
+      if (serverNavBtn) serverNavBtn.style.display = isAdmin ? '' : 'none';
+      if (!isAdmin) {
+        const clientBtn = document.querySelector('.version-subnav-link[data-panel="client"]');
+        if (clientBtn) clientBtn.classList.add('active');
+        const clientPanel = document.getElementById('version-client-panel');
+        if (clientPanel) clientPanel.style.display = '';
+      }
+      initVersionSubnav();
+      loadClientVersions();
     } catch (error) {
       log("ERROR", "Versões: " + error.message);
+    }
+  }
+
+  let clientInstalledVersions = [];
+  let clientVersionType = 'release';
+
+  function initVersionSubnav() {
+    const subnavBtns = document.querySelectorAll('.version-subnav-link');
+    subnavBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        subnavBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const panel = btn.dataset.panel;
+        document.getElementById('version-server-panel').style.display = panel === 'server' ? '' : 'none';
+        document.getElementById('version-client-panel').style.display = panel === 'client' ? '' : 'none';
+        if (panel === 'client') loadClientVersions();
+      });
+    });
+  }
+
+  async function loadClientVersions() {
+    try {
+      const [listRes, availRes] = await Promise.all([
+        apiFetch('/api/client/versions'),
+        apiFetch('/api/client/versions/available?type=' + clientVersionType + '&limit=30')
+      ]);
+      if (listRes.ok) clientInstalledVersions = listRes.installed || [];
+      const available = availRes.ok ? (availRes.versions || []) : [];
+      renderClientAvailable(available);
+      renderClientInstalled();
+    } catch (e) {
+      log('ERROR', 'Cliente: ' + e.message);
+    }
+  }
+
+  function renderClientAvailable(available) {
+    const grid = document.getElementById('client-versions-grid');
+    if (!grid) return;
+    const installedSet = new Set(clientInstalledVersions);
+    if (!available.length) {
+      grid.innerHTML = '<span class="empty-state">Nenhuma versão encontrada.</span>';
+      return;
+    }
+    grid.innerHTML = available.map(v => {
+      const isInstalled = installedSet.has(v.id);
+      return `
+        <div class="client-version-card ${isInstalled ? 'installed' : ''}">
+          <div class="client-version-info">
+            <strong>${esc(v.id)}</strong>
+            <span class="client-version-type">${esc(v.type)}</span>
+          </div>
+          ${isInstalled
+            ? '<span class="client-version-badge">Instalado</span>'
+            : `<button class="btn btn-red btn-sm" data-client-install="${esc(v.id)}">Instalar</button>`
+          }
+        </div>
+      `;
+    }).join('');
+    grid.querySelectorAll('[data-client-install]').forEach(btn => {
+      btn.addEventListener('click', () => installClientVersion(btn.dataset.clientInstall));
+    });
+  }
+
+  function renderClientInstalled() {
+    const list = document.getElementById('client-installed-list');
+    if (!list) return;
+    if (!clientInstalledVersions.length) {
+      list.innerHTML = '<span class="empty-state">Nenhuma versão instalada.</span>';
+      return;
+    }
+    list.innerHTML = clientInstalledVersions.map(v => `
+      <div class="version-item">
+        <div class="version-item-info">
+          <strong>${esc(v)}</strong>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  async function installClientVersion(versionId) {
+    const btn = document.querySelector(`[data-client-install="${versionId}"]`);
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Baixando...';
+    }
+    try {
+      const res = await apiPost('/api/client/versions/install', { version_id: versionId });
+      if (res.ok) {
+        log('OK', `Instalação de ${versionId} iniciada.`);
+        setTimeout(loadClientVersions, 3000);
+      } else {
+        alert(res.error || 'Falha ao iniciar instalação.');
+      }
+    } catch (e) {
+      alert('Erro de rede: ' + e.message);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Instalar';
+      }
     }
   }
 
@@ -720,6 +840,7 @@
       return;
     }
 
+    const isAdmin = window._userRole === 'admin';
     element.innerHTML = installedVersions.map((version) => {
       const isActive = activeVersion && activeVersion.id === version.id;
       return `
@@ -729,13 +850,16 @@
             <span class="version-item-loader">${esc(version.loader_label || version.loader || "vanilla")}</span>
             <small>${esc(version.size_kb || "")} KB</small>
           </div>
-          <div class="version-item-actions">
-            ${isActive
-          ? '<span class="version-active-badge">Ativa</span>'
-          : `<button class="btn btn-red btn-sm" data-version-activate="${esc(version.id)}">Ativar</button>`
-      }
-            <button class="btn btn-dark btn-sm" data-version-remove="${esc(version.id)}" ${isActive ? 'disabled title="Desative primeiro"' : ""}>Remover</button>
-          </div>
+          ${isAdmin
+            ? `<div class="version-item-actions">
+                ${isActive
+                  ? '<span class="version-active-badge">Ativa</span>'
+                  : `<button class="btn btn-red btn-sm" data-version-activate="${esc(version.id)}">Ativar</button>`
+                }
+                <button class="btn btn-dark btn-sm" data-version-remove="${esc(version.id)}" ${isActive ? 'disabled title="Desative primeiro"' : ""}>Remover</button>
+              </div>`
+            : ''
+          }
         </div>
       `;
     }).join("");
@@ -866,6 +990,7 @@
       log("OK", `Instalação de ${versionId} (${loader}) iniciada.`);
       setTimeout(async () => {
         await loadVersions();
+        refreshStatus();
         await loadAvailableVersions(document.getElementById("version-loader")?.value || "vanilla");
         if (button) {
           button.textContent = "Instalar";
@@ -887,6 +1012,7 @@
       if (data.ok) {
         log("OK", `Versão ${versionId} ativada.`);
         await loadVersions();
+        refreshStatus();
         renderServerVersionSelect();
       } else {
         log("ERROR", `Falha ao ativar ${versionId}: ${data.error || "erro desconhecido"}`);
@@ -1180,6 +1306,16 @@
       });
     }
 
+    // Client version filter buttons
+    document.querySelectorAll('.btn-filter').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.btn-filter').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        clientVersionType = btn.dataset.type;
+        loadClientVersions();
+      });
+    });
+
     document.addEventListener("click", handleDelegatedClick, true);
   }
 
@@ -1266,6 +1402,12 @@
       removeAccount(removeAccountButton.dataset.accountRemove);
       return;
     }
+
+    const vipCheckout = event.target.closest("[data-vip-price-id]");
+    if (vipCheckout) {
+      vipCheckoutVIP(vipCheckout.dataset.vipPriceId, vipCheckout);
+      return;
+    }
   }
 
   function bindDiscordSimulation(button) {
@@ -1279,8 +1421,6 @@
     }
 
     function applySimulation(data) {
-      setText("discord-member-count", data.members_count);
-      setText("discord-online-count", data.presence_count);
       button.classList.add(simClass);
       button.textContent = labelOff;
     }
@@ -1293,10 +1433,7 @@
       event.stopImmediatePropagation();
 
       if (button.classList.contains(simClass)) {
-        ["discord-member-count", "discord-online-count"].forEach((id) => setText(id, "--"));
         setText("discord-bot-state", "Inativo");
-        setText("discord-channel-count", "--/--");
-        setText("discord-role-count", "--/--");
         resetSimulation();
         return;
       }
@@ -1308,20 +1445,522 @@
     });
   }
 
+  /* ── VIP ──────────────────────────────────────────── */
+  async function loadVipData() {
+    await Promise.allSettled([
+      loadVipStatus(),
+      loadVipPlans(),
+      loadVipHistory()
+    ]);
+  }
+
+  async function loadVipStatus() {
+    const detail = document.getElementById("vip-status-detail");
+    if (!detail) return;
+
+    try {
+      const data = await apiFetch("/api/vip/status");
+      if (!data.ok) throw new Error(data.error || "Falha");
+
+      if (data.active) {
+        const badge = data.role_granted
+          ? '<span class="vip-role-badge team">Gratuito pela Equipe</span>'
+          : '';
+        detail.innerHTML = `
+          <span class="vip-status-badge active">👑 ${esc(data.plan)}</span>
+          <span class="vip-status-plan">${esc(data.plan_label || data.plan)}</span>
+          ${badge}
+          ${data.expires_at ? `<span class="vip-status-expires">Expira em ${esc(data.expires_at)}</span>` : ""}
+        `;
+      } else {
+        detail.innerHTML = `
+          <span class="vip-status-badge none">Nenhum plano ativo</span>
+          <span style="color:var(--muted);font-size:13px;">Adquira um plano abaixo para desbloquear benefícios VIP no servidor.</span>
+        `;
+      }
+    } catch (error) {
+      detail.innerHTML = `<span style="color:var(--muted);font-style:italic;">Erro ao carregar status: ${esc(error.message)}</span>`;
+    }
+  }
+
+  async function loadVipPlans() {
+    const grid = document.getElementById("vip-plans-grid");
+    if (!grid) return;
+
+    try {
+      const data = await apiFetch("/api/vip/plans");
+      if (!data.ok) throw new Error(data.error || "Falha");
+
+      const plans = data.plans || [];
+      if (!plans.length) {
+        grid.innerHTML = '<span style="color:var(--muted);font-style:italic;">Nenhum plano disponível no momento.</span>';
+        return;
+      }
+
+      grid.innerHTML = plans.map((plan) => `
+        <div class="vip-plan-card${data.staff_discount ? ' staff-discount' : ''}">
+          ${data.staff_discount ? '<span class="vip-staff-badge">50% OFF Equipe</span>' : ''}
+          <span class="vip-plan-name">${esc(plan.name)}</span>
+          <span class="vip-plan-price">R$ ${esc(plan.price)} <small>/${esc(plan.period || "mês")}</small></span>
+          <span class="vip-plan-desc">${esc(plan.description || "")}</span>
+          <button class="btn btn-red btn-sm vip-checkout-btn" data-vip-price-id="${esc(plan.id)}">Assinar</button>
+        </div>
+      `).join("");
+    } catch (error) {
+      grid.innerHTML = `<span style="color:var(--muted);font-style:italic;">Erro ao carregar planos: ${esc(error.message)}</span>`;
+    }
+  }
+
+  async function loadVipHistory() {
+    const list = document.getElementById("vip-payment-history");
+    if (!list) return;
+
+    try {
+      const data = await apiFetch("/api/vip/history");
+      if (!data.ok) throw new Error(data.error || "Falha");
+
+      const payments = data.payments || [];
+      if (!payments.length) {
+        list.innerHTML = '<span style="color:var(--muted);font-style:italic;">Nenhum pagamento encontrado.</span>';
+        return;
+      }
+
+      list.innerHTML = payments.map((p) => `
+        <div class="vip-history-item">
+          <span class="vip-history-date">${esc(p.date || "")}</span>
+          <span class="vip-history-plan">${esc(p.plan || "")}</span>
+          <span class="vip-history-amount">R$ ${esc(p.amount || "0")}</span>
+          <span class="vip-history-status ${p.status || "pending"}">${esc(p.status_label || p.status || "")}</span>
+        </div>
+      `).join("");
+    } catch (error) {
+      list.innerHTML = `<span style="color:var(--muted);font-style:italic;">Erro ao carregar histórico: ${esc(error.message)}</span>`;
+    }
+  }
+
+  async function vipCheckoutVIP(priceId, button) {
+    const restore = setBusy(button, "Redirecionando...");
+    try {
+      const data = await apiPost("/api/vip/checkout", { price_id: priceId });
+      if (data.ok === false) {
+        alert(data.error || "Erro ao processar checkout");
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Erro ao criar checkout: " + (data.error || "URL não recebida"));
+      }
+    } catch (error) {
+      alert("Erro de rede: " + error.message);
+    } finally {
+      restore();
+    }
+  }
+
+  /* ── Auth / Discord Login ──────────────────────────── */
+  async function checkAuth() {
+    const overlay = document.getElementById('login-overlay');
+    const prompt = document.getElementById('login-prompt');
+    const loading = document.getElementById('login-loading');
+
+    try {
+      const data = await apiFetch('/api/auth/status');
+      if (data.authenticated) {
+        window._userRole = data.role;
+        window._userData = data.user;
+        overlay.style.display = 'none';
+        applyRoleFilter(data.role);
+        updateRoleBadge(data.role, data.user);
+        updateSettingsUserInfo(data.user, data.role);
+        return true;
+      }
+    } catch (_) {}
+
+    if (loading) loading.style.display = 'none';
+    overlay.style.display = 'flex';
+    if (prompt) prompt.style.display = '';
+    handleLoginRedirect();
+    return false;
+  }
+
+  function updateSettingsUserInfo(user, role) {
+    const box = document.getElementById('settings-user-info');
+    if (!box) return;
+    box.style.display = '';
+
+    const nameEl = document.getElementById('sui-name');
+    const roleEl = document.getElementById('sui-role');
+    const avatarEl = document.getElementById('sui-avatar');
+
+    if (nameEl) nameEl.textContent = user?.username || '---';
+    if (roleEl) {
+      const labels = { admin: 'Admin', staff: 'Staff', player: 'Membro Ruby', member: 'Membro' };
+      roleEl.textContent = labels[role] || role;
+    }
+    if (avatarEl && user?.avatar) {
+      avatarEl.style.backgroundImage = "url(https://cdn.discordapp.com/avatars/" + user.id + "/" + user.avatar + ".png)";
+    } else if (avatarEl) {
+      avatarEl.style.backgroundImage = '';
+      avatarEl.textContent = (user?.username || '?')[0].toUpperCase();
+    }
+  }
+
+  function applyRoleFilter(role) {
+    const allowedTabs = ROLE_TABS[role] || ROLE_TABS.player;
+    document.querySelectorAll('.tab-link').forEach((btn) => {
+      const tab = btn.dataset.tab;
+      btn.style.display = (allowedTabs.includes(tab) || !tab) ? '' : 'none';
+    });
+    const currentTab = document.body.dataset.currentTab || 'home';
+    if (!allowedTabs.includes(currentTab)) {
+      activateTab('home');
+    }
+
+    const aiContext = document.querySelector('.ai-context-panel');
+    if (aiContext) {
+      aiContext.style.display = (role !== 'member') ? '' : 'none';
+    }
+
+    const adminDiscordActions = document.getElementById('admin-discord-actions');
+    if (adminDiscordActions) {
+      adminDiscordActions.style.display = (role === 'admin' || role === 'staff') ? '' : 'none';
+    }
+
+    const serverAdminPanel = document.getElementById('server-admin-panel');
+    if (serverAdminPanel) {
+      serverAdminPanel.style.display = (role === 'admin' || role === 'staff') ? '' : 'none';
+    }
+
+    const aiBtn = document.querySelector('.tab-link[data-tab="ai"]');
+    if (aiBtn && role === 'member') {
+      if (!aiBtn.querySelector('.limited-badge')) {
+        const badge = document.createElement('span');
+        badge.className = 'limited-badge';
+        badge.textContent = 'Limitada';
+        aiBtn.appendChild(badge);
+      }
+    }
+  }
+
+  function updateRoleBadge(role, user) {
+    const badge = document.getElementById('role-badge');
+    if (!badge) return;
+    const labels = { admin: 'Admin', staff: 'Staff', player: 'Membro Ruby', member: 'Membro' };
+    badge.textContent = labels[role] || 'Jogador';
+    badge.className = 'role-badge ' + (role === 'admin' ? 'role-badge-admin' : 'role-badge-player');
+    badge.style.display = '';
+  }
+
+  function handleLoginRedirect() {
+    const params = new URLSearchParams(window.location.search);
+    const errorMsg = document.getElementById('login-error-msg');
+    if (!params.get('login')) return;
+
+    if (params.get('login') === 'error') {
+      const reason = params.get('reason') || 'unknown';
+      const messages = {
+        no_code: 'Código de autorização não recebido.',
+        missing_config: 'Configuração do Discord incompleta.',
+        token_exchange_failed: 'Falha ao autenticar com Discord.',
+        userinfo_failed: 'Falha ao obter informações do usuário.'
+      };
+      if (errorMsg) {
+        errorMsg.textContent = messages[reason] || 'Erro ao autenticar. Tente novamente.';
+        errorMsg.style.display = '';
+      }
+    }
+    window.history.replaceState({}, '', '/');
+  }
+
+  /* ── Discord Info Loader ──────────────────────────── */
+  async function loadDiscordInfo() {
+    try {
+      const data = await apiFetch('/api/discord/members');
+      if (data.ok && data.members) {
+        setText('discord-guild-name', data.members.guild_name || '---');
+        setText('discord-member-count', data.members.members_count);
+        setText('discord-online-count', data.members.presence_count);
+        setText('home-discord-members', data.members.members_count);
+      }
+    } catch (_) {}
+  }
+
+  /* ── Verification (Membro → Membro Ruby) ──────────── */
+  function initVerification() {
+    const verBox = document.getElementById('verification-box');
+    const memberStatusCard = document.getElementById('member-status-card');
+    if (!verBox) return;
+    if (window._userRole !== 'member') {
+      verBox.style.display = 'none';
+      if (memberStatusCard) memberStatusCard.style.display = '';
+      return;
+    }
+    verBox.style.display = '';
+
+    const termsCheckbox = document.getElementById('terms-checkbox');
+    const termsAcceptBtn = document.getElementById('terms-accept-btn');
+    const discordStep = document.getElementById('vstep-discord');
+    const discordJoinBtn = document.getElementById('discord-join-btn');
+    const discordCheckGuildBtn = document.getElementById('discord-check-guild-btn');
+    const discordJoinDiv = document.getElementById('vstep-discord-join');
+    const discordCodeDiv = document.getElementById('vstep-discord-code');
+    const discordSendBtn = document.getElementById('discord-send-code-btn');
+    const discordCodeInput = document.getElementById('discord-code-input');
+    const discordConfirmBtn = document.getElementById('discord-confirm-code-btn');
+    const discordMsg = document.getElementById('discord-code-msg');
+    const discordGuildMsg = document.getElementById('discord-guild-msg');
+    const completeBtn = document.getElementById('complete-verification-btn');
+    const termsOverlay = document.getElementById('terms-overlay');
+    const termsShowBtn = document.getElementById('terms-show-btn');
+    const termsModalClose = document.getElementById('terms-modal-close');
+    const termsModalBack = document.getElementById('terms-modal-back');
+
+    function showTermsOverlay(show) {
+      if (!termsOverlay) return;
+      termsOverlay.style.display = show ? 'flex' : 'none';
+    }
+
+    // Open terms overlay
+    if (termsShowBtn) {
+      termsShowBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showTermsOverlay(true);
+      });
+    }
+
+    // Close terms overlay
+    function closeTermsOverlay() { showTermsOverlay(false); }
+    if (termsModalClose) termsModalClose.addEventListener('click', closeTermsOverlay);
+    if (termsModalBack) termsModalBack.addEventListener('click', closeTermsOverlay);
+    if (termsOverlay) termsOverlay.addEventListener('click', (e) => {
+      if (e.target === termsOverlay) closeTermsOverlay();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && termsOverlay && termsOverlay.style.display === 'flex') closeTermsOverlay();
+    });
+
+    function setDiscordMsg(el, text, color) {
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = color || 'var(--muted)';
+    }
+
+    // Enable "Confirmar Termos" when checkbox is checked
+    if (termsCheckbox && termsAcceptBtn) {
+      termsCheckbox.addEventListener('change', () => {
+        termsAcceptBtn.disabled = !termsCheckbox.checked;
+      });
+    }
+
+    // Accept terms
+    if (termsAcceptBtn) {
+      termsAcceptBtn.addEventListener('click', async () => {
+        try {
+          const res = await apiPost('/api/auth/verify/accept-terms', {});
+          if (res.ok) {
+            document.getElementById('vstep-terms-status').textContent = '✓ aceito';
+            document.getElementById('vstep-terms-status').style.color = '#00c853';
+            if (discordStep) {
+              discordStep.style.opacity = '1';
+              discordStep.style.pointerEvents = 'auto';
+              document.getElementById('vstep-discord-status').textContent = 'pendente';
+              document.getElementById('vstep-discord-status').style.color = '#ffc107';
+            }
+          } else {
+            setDiscordMsg(discordGuildMsg, res.error || 'Erro ao aceitar termos.', '#e74c3c');
+          }
+        } catch (e) {
+          setDiscordMsg(discordGuildMsg, 'Erro de rede: ' + e.message, '#e74c3c');
+        }
+      });
+    }
+
+    // Join Discord server (opens invite link in new tab)
+    if (discordJoinBtn) {
+      discordJoinBtn.addEventListener('click', () => {
+        window.open('https://discord.gg/MnrSXTF4qx', '_blank');
+        setDiscordMsg(discordGuildMsg, '🔗 Link do Discord aberto! Entre no servidor e depois clique em "Verificar presença".', '#ffc107');
+      });
+    }
+
+    // Check guild membership
+    if (discordCheckGuildBtn) {
+      discordCheckGuildBtn.addEventListener('click', async () => {
+        discordCheckGuildBtn.disabled = true;
+        discordCheckGuildBtn.textContent = 'Verificando...';
+        try {
+          const res = await apiPost('/api/auth/verify/check-guild-membership', {});
+          if (res.ok && res.in_guild) {
+            setDiscordMsg(discordGuildMsg, '✅ Você está no servidor! Agora envie o código.', '#00c853');
+            if (discordJoinDiv) discordJoinDiv.style.display = 'none';
+            if (discordCodeDiv) discordCodeDiv.style.display = '';
+            document.getElementById('vstep-discord-status').textContent = 'pendente';
+            document.getElementById('vstep-discord-status').style.color = '#ffc107';
+          } else {
+            setDiscordMsg(discordGuildMsg, '❌ Você não está no servidor. Entre e tente novamente.', '#e74c3c');
+          }
+        } catch (e) {
+          setDiscordMsg(discordGuildMsg, 'Erro de rede: ' + e.message, '#e74c3c');
+        } finally {
+          discordCheckGuildBtn.disabled = false;
+          discordCheckGuildBtn.textContent = 'Verificar presença';
+        }
+      });
+    }
+
+    // Send Discord code
+    if (discordSendBtn) {
+      discordSendBtn.addEventListener('click', async () => {
+        discordSendBtn.disabled = true;
+        discordSendBtn.textContent = 'Enviando...';
+        try {
+          const res = await apiPost('/api/auth/verify/send-discord-code', {});
+          if (res.ok) {
+            setDiscordMsg(discordMsg, '✅ Código enviado! Verifique seu DM no Discord.', '#00c853');
+            if (discordCodeInput) discordCodeInput.disabled = false;
+            if (discordConfirmBtn) discordConfirmBtn.disabled = false;
+          } else {
+            setDiscordMsg(discordMsg, res.error || 'Erro ao enviar código.', '#e74c3c');
+          }
+        } catch (e) {
+          setDiscordMsg(discordMsg, 'Erro de rede: ' + e.message, '#e74c3c');
+        } finally {
+          discordSendBtn.disabled = false;
+          discordSendBtn.textContent = 'Enviar código';
+        }
+      });
+    }
+
+    // Confirm Discord code
+    if (discordConfirmBtn) {
+      discordConfirmBtn.addEventListener('click', async () => {
+        const code = discordCodeInput ? discordCodeInput.value.trim() : '';
+        if (!code || code.length < 6) {
+          setDiscordMsg(discordMsg, 'Insira o código de 6 dígitos recebido no Discord.', '#e74c3c');
+          return;
+        }
+        discordConfirmBtn.disabled = true;
+        discordConfirmBtn.textContent = 'Confirmando...';
+        try {
+          const res = await apiPost('/api/auth/verify/confirm-discord-code', { code: code });
+          if (res.ok) {
+            document.getElementById('vstep-discord-status').textContent = '✓ verificado';
+            document.getElementById('vstep-discord-status').style.color = '#00c853';
+            setDiscordMsg(discordMsg, '✅ Código confirmado!', '#00c853');
+            checkVerificationComplete();
+          } else {
+            setDiscordMsg(discordMsg, res.error || 'Código inválido.', '#e74c3c');
+          }
+        } catch (e) {
+          setDiscordMsg(discordMsg, 'Erro de rede: ' + e.message, '#e74c3c');
+        } finally {
+          discordConfirmBtn.disabled = false;
+          discordConfirmBtn.textContent = 'Confirmar';
+        }
+      });
+    }
+
+    // Complete verification
+    if (completeBtn) {
+      completeBtn.addEventListener('click', async () => {
+        completeBtn.disabled = true;
+        completeBtn.textContent = 'Processando...';
+        try {
+          const res = await apiPost('/api/auth/verify/complete', {});
+          if (res.ok) {
+            window._userRole = res.role || 'player';
+            applyRoleFilter(window._userRole);
+            if (verBox) verBox.style.display = 'none';
+            if (memberStatusCard) memberStatusCard.style.display = '';
+            loadDiscordInfo();
+            log('OK', '🎉 Parabéns! Você agora é Membro Ruby!');
+            alert('Parabéns! Agora você é Membro Ruby. As funcionalidades completas foram liberadas.');
+          } else {
+            alert(res.error || 'Erro ao completar verificação.');
+          }
+        } catch (e) {
+          alert('Erro de rede: ' + e.message);
+        } finally {
+          completeBtn.disabled = false;
+          completeBtn.textContent = 'Tornar-se Membro Ruby';
+        }
+      });
+    }
+
+    loadVerificationStatus();
+  }
+
+  async function checkVerificationComplete() {
+    try {
+      const res = await apiFetch('/api/auth/verify/status');
+      if (res.ok && res.overall_complete) {
+        const btn = document.getElementById('complete-verification-btn');
+        if (btn) btn.disabled = false;
+      }
+    } catch (_) {}
+  }
+
+  async function loadVerificationStatus() {
+    try {
+      const res = await apiFetch('/api/auth/verify/status');
+      if (!res.ok) return;
+
+      if (res.terms_accepted) {
+        document.getElementById('vstep-terms-status').textContent = '✓ aceito';
+        document.getElementById('vstep-terms-status').style.color = '#00c853';
+        const ds = document.getElementById('vstep-discord');
+        if (ds) { ds.style.opacity = '1'; ds.style.pointerEvents = 'auto'; }
+      }
+
+      if (res.discord_verified) {
+        document.getElementById('vstep-discord-status').textContent = '✓ verificado';
+        document.getElementById('vstep-discord-status').style.color = '#00c853';
+      }
+
+      if (res.overall_complete) {
+        const btn = document.getElementById('complete-verification-btn');
+        if (btn) btn.disabled = false;
+      }
+    } catch (_) {}
+  }
+
   function init() {
-    document.body.dataset.currentTab = document.body.dataset.currentTab || "home";
+    const loginBtn = document.getElementById('login-discord-btn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', () => { window.location.href = '/api/auth/discord/login'; });
+    }
 
-    bindEvents();
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+      logoutBtn.addEventListener('click', async () => {
+        try {
+          await apiFetch('/api/auth/logout', { method: 'POST' });
+        } catch (_) {}
+        window.location.reload();
+      });
+    }
 
-    log("SYSTEM", "Interface RubyMC pronta. Safe JSON parser ativo.");
+    checkAuth().then((authenticated) => {
+      if (!authenticated) return;
 
-    refreshStatus();
-    updateModpacks(false).catch(() => {});
-    setTimeout(loadVersions, 350);
-    setTimeout(loadAccounts, 500);
-    startServerPolling();
+      document.body.dataset.currentTab = document.body.dataset.currentTab || 'home';
 
-    setInterval(pollLogs, 4000);
+      bindEvents();
+
+      log('SYSTEM', 'Interface RubyMC pronta. Safe JSON parser ativo.');
+
+      refreshStatus();
+      updateModpacks(false).catch(() => {});
+      setTimeout(loadVersions, 350);
+      setTimeout(loadAccounts, 500);
+      startServerPolling();
+
+      setInterval(pollLogs, 4000);
+
+      initVerification();
+      setTimeout(loadDiscordInfo, 600);
+    });
   }
 
   document.addEventListener("DOMContentLoaded", init);

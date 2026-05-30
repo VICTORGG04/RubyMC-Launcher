@@ -337,7 +337,11 @@ CHANNEL_TOPICS = {
   servidor_oficial: "**#servidor-oficial** — Jogadores online e link do servidor Minecraft. 🎮\nAcompanhe quantos jogadores estão online e obtenha o link para entrar no servidor oficial RubyMC."
 }.freeze
 
+$topics_posted = false
+
 def post_channel_topics
+  return if $topics_posted
+
   CHANNEL_TOPICS.each do |key, description|
     channel_id = CHANNELS[key]
     next if channel_id.to_s.empty? || channel_id.start_with?("ID_")
@@ -356,6 +360,7 @@ def post_channel_topics
     puts "  #{status} Assunto postado em ##{key}"
     sleep(0.5)
   end
+  $topics_posted = true
 end
 
 def query_java_server
@@ -863,35 +868,35 @@ def embed_bem_vindos(member)
   invite_url  = create_invite(INVITE_CHANNEL_ID, max_uses: 0)
 
   {
-    content: "👋 Ei, <@#{user_id}>! Que bom ter você aqui!",
+    content: "🎮 **#{global_name}** entrou no servidor! <@#{user_id}>",
     embeds: [{
-               title:       "Bem-vindo ao LanServer RubyMC, #{global_name}! 💎",
-               description: <<~DESC,
-         Este é o servidor oficial do **RubyMC Launcher** — o launcher de Minecraft feito em Ruby puro, com autenticação real Microsoft e integração Discord nativa.
-
-         Explore os canais, tire dúvidas no <##{CHANNELS[:chat_rubymc]}> e aproveite! **Bom jogo! 🎮**
-       DESC
-               color:     0x2ECC71,
-               thumbnail: { url: avatar_url },
-                fields: [
-                  {
-                    name:   "📌 Por onde começar?",
-                    value:  "• <##{CHANNELS[:comunicados]}> — veja o que já está pronto no projeto\n" \
-                      "• <##{CHANNELS[:noticias]}> — fique por dentro de eventos e servidores\n" \
-                      "• <##{CHANNELS[:chat_rubymc]}> — tire dúvidas e converse com o bot",
-                    inline: false
-                  },
-                  {
-                    name:   "🔗 Convidar amigos",
-                    value:  invite_url \
-                      ? "Compartilhe este link com quem quiser entrar no servidor!\n#{invite_url}"
-                      : "Use `!convidar` no <##{CHANNELS[:chat_rubymc]}> para gerar um link.",
-                    inline: false
-                  }
-                ],
-               footer:    { text: "RubyMC Launcher • Bem-vindo à comunidade!" },
-               timestamp: Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-              }]
+      title: "Bem-vindo ao RubyMC, #{global_name}!",
+      description: "Olá **#{username}**! Seja bem-vindo ao servidor oficial da comunidade RubyMC. 🚀\n\n" \
+        "Somos um launcher de Minecraft feito em **Ruby puro**, com autenticação Microsoft, " \
+        "suporte a modpacks e integração nativa com o Discord.\n\n" \
+        "Tire suas dúvidas no <##{CHANNELS[:chat_rubymc]}>, veja as novidades no <##{CHANNELS[:noticias]}> " \
+        "e divirta-se! **Bom jogo!** ⛏️",
+      color: 0x2ECC71,
+      thumbnail: { url: avatar_url },
+      fields: [
+        {
+          name: "📌 Primeiros passos",
+          value: "• 🖥️ **Launcher**: Baixe em rubymc.xyz/download\n" \
+            "• 💬 **Dúvidas**: <##{CHANNELS[:chat_rubymc]}>\n" \
+            "• 🎮 **Servidor**: Conecte-se em mc.rubymc.xyz",
+          inline: false
+        },
+        {
+          name: "🔗 Convidar amigos",
+          value: invite_url \
+            ? "Compartilhe este link com quem quiser entrar no servidor!\n#{invite_url}"
+            : "Use `!convidar` no <##{CHANNELS[:chat_rubymc]}> para gerar um link.",
+          inline: false
+        }
+      ],
+      footer: { text: "RubyMC • Bem-vindo à comunidade!" },
+      timestamp: Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+    }]
   }
 end
 
@@ -926,27 +931,26 @@ def embed_novos_membros(member, invitation = nil)
                   ? "https://cdn.discordapp.com/avatars/#{user_id}/#{avatar_id}.png?size=64"
                   : "https://cdn.discordapp.com/embed/avatars/#{user_id.to_i % 5}.png"
 
-  description = "**<@#{user_id}>** (`#{username}`) acabou de entrar no servidor! 🎉\n" \
-    "Somos agora mais um na comunidade RubyMC. Bem-vindo!"
+  description = "🎉 **#{username}** acabou de entrar no servidor!"
 
   if invitation
     mc_user = invitation["minecraft_username"].to_s
     version = invitation["version"].to_s
     delivered_at = invitation["delivered_at"] ? Time.at(invitation["delivered_at"].to_i).strftime("%d/%m/%Y às %H:%M") : "agora"
-    description << "\n\n✅ Convite aceito pelo launcher"
-    description << "\nJogador Minecraft: **#{mc_user}**" unless mc_user.empty?
-    description << "\nVersão: **#{version}**" unless version.empty?
-    description << "\nConvite enviado em: #{delivered_at}"
+    description << "\n\n✅ **Convite do launcher aceito**"
+    description << "\n└ Nick Minecraft: **#{mc_user}**" unless mc_user.empty?
+    description << "\n└ Versão: **#{version}**" unless version.empty?
+    description << "\n└ Convite enviado em: #{delivered_at}"
   end
 
   {
     embeds: [{
-               description: description,
-               color:       0xF39C12,
-               thumbnail:   { url: avatar_url },
-               footer:      { text: "Entrou em #{Time.now.strftime("%d/%m/%Y às %H:%M")}" },
-               timestamp:   Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-             }]
+      description: description,
+      color:       0xF39C12,
+      thumbnail:   { url: avatar_url },
+      footer:      { text: "Entrou em #{Time.now.strftime("%d/%m/%Y às %H:%M")}" },
+      timestamp:   Time.now.utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+    }]
   }
 end
 
@@ -1095,11 +1099,7 @@ def on_member_join(member)
 
   {
     bem_vindos:    :embed_bem_vindos,
-    novos_membros: :embed_novos_membros,
-    noticias:      :embed_noticias,
-    comunicados:   :embed_comunicados,
-    chat_rubymc:   :embed_chat_rubymc,
-    regras:        :embed_regras
+    novos_membros: :embed_novos_membros
   }.each do |canal, metodo|
     channel_id = CHANNELS[canal]
     next if channel_id.to_s.empty? || channel_id.start_with?("ID_")
@@ -1167,9 +1167,7 @@ def connect_to_gateway
       when "READY"
         $bot_user_id = payload.dig("user", "id")
         puts "\e[32m✅ Conectado como: #{payload.dig("user", "username")}\e[0m"
-        post_invite_to_invite_channel
         post_channel_topics
-        post_server_status
         Thread.new do
           loop do
             sleep(300)

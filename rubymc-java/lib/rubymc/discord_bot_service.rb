@@ -177,6 +177,20 @@ module RubyMC
       { ok: true, code: response['code'], url: "https://discord.gg/#{response['code']}", channel_id: channel_id }
     end
 
+    def send_dm(user_id, message)
+      return { ok: true, simulated: true, dm_channel_id: '900000000000000001' } if simulate?
+
+      ensure_bot_ready!
+      dm = request(:post, '/users/@me/channels', { recipient_id: user_id.to_s })
+      dm_channel_id = dm['id']
+      raise 'Falha ao criar DM: ID do canal não retornado' unless dm_channel_id
+      request(:post, "/channels/#{dm_channel_id}/messages", {
+        content: message.to_s[0, 1900],
+        allowed_mentions: { parse: [] }
+      })
+      { ok: true, dm_channel_id: dm_channel_id }
+    end
+
     def text_channel?(channel_id)
       return true if simulate?
 
