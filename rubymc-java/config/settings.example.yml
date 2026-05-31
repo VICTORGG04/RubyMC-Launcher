@@ -42,12 +42,14 @@ discord:
     bot_role_id: 'ID_DO_CARGO_BOT'
 servers:
   java:
-    path: /caminho/para/ServidorMinecraftJava
+    path: ~/Servidores/ServidorMinecraftJava
     port: 25565
     active_version: '26.1.1'
     active_loader: vanilla
-    active_java: /usr/lib/jvm/jdk-26-oracle-x64/bin/java
+    active_java: java
     memory: -Xmx2G -Xms1G
+    online_mode: false
+    max_players: 20
   bedrock:
     path: /caminho/para/ServidorMinecraftBedrock
     port: 19132

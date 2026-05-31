@@ -1,202 +1,321 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>RubyMC Bedrock BDS</title>
-
-  <link rel="stylesheet" href="/assets/css/launcher.css?v=bds-server-only-1">
-  <link rel="stylesheet" href="/assets/css/bds-server-only.css?v=bds-server-only-1">
-
-  <link rel="stylesheet" href="/assets/css/bds-widths-fix.css?v=4">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>RubyMC Launcher</title>
+  <link rel="stylesheet" href="/assets/css/launcher.css?v=rubymc-ui-logic-fix-1">
 </head>
-<body data-rubymc-edition="bedrock-bds">
+<body data-current-tab="home">
+  <div class="rubymc-page">
+    <header class="top-showcase">
+      <section class="brand-showcase">
+        <img class="brand-logo-img" src="/assets/img/rubymc-logo-banner.png" alt="RubyMC Launcher">
+        <div class="brand-title">
+          <span>MINECRAFT</span>
+          <strong>RUBY</strong>
+          <em>LAUNCHER</em>
+          <p>Sua experiência Minecraft, elevada.</p>
+        </div>
 
-<div class="rubymc-shell bds-shell">
-  <section class="launcher-window app-window bds-window">
+        <div class="feature-row" aria-label="Recursos do RubyMC">
+          <div><b>🛡️</b><span>Autenticação<br>Microsoft</span></div>
+          <div><b>📦</b><span>Gerenciamento<br>de Modpacks</span></div>
+          <div><b>🎮</b><span>Discord<br>Integrado</span></div>
+          <div><b>🔄</b><span>Atualizações<br>Automáticas</span></div>
+          <div><b>⛶</b><span>Modo<br>Offline</span></div>
+        </div>
+      </section>
 
-    <aside class="app-sidebar">
-      <div class="app-title">
-        <span>💎</span><strong>RUBYMC BDS</strong>
-      </div>
+      <section class="hero-window">
+        <aside class="mini-sidebar">
+          <div class="mini-title">💎 RUBYMC LAUNCHER</div>
+          <button class="side-link active" data-tab="home">🏠 Início</button>
+          <button class="side-link" data-tab="modpacks">📦 Modpacks</button>
+          <button class="side-link" data-tab="server">🌐 Servidor</button>
+          <button class="side-link" data-tab="discord">🎮 Discord</button>
+          <button class="side-link" data-tab="display">▣ Display</button>
+          <button class="side-link" data-tab="project">🧪 Projeto</button>
+          <button class="side-link settings-link" data-tab="settings">⚙️ Configurações</button>
+        </aside>
 
-      <nav class="tab-nav" aria-label="Abas do RubyMC BDS">
-        <button class="tab-link active" data-tab="home">🏠 <span>Início</span></button>
-        <button class="tab-link" data-tab="server">🌐 <span>Servidor BDS</span></button>
-        <button class="tab-link" data-tab="versions">📦 <span>Versões BDS</span></button>
-        <button class="tab-link" data-tab="display">▣ <span>Display</span></button>
-        <button class="tab-link" data-tab="project">🧪 <span>Projeto</span></button>
-      </nav>
+        <main class="hero-content">
+          <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+          <span class="cyan-label">BEM-VINDO(A)!</span>
+          <h1>Pronto para jogar?</h1>
+          <p>Gerencie suas contas, modpacks, servidores e muito mais com o RubyMC Launcher.</p>
 
-      <button class="tab-link settings-link" data-tab="settings" style="margin-top: auto;">⚙️ <span>Configurações</span></button>
-    </aside>
+          <div class="actions">
+            <button class="btn btn-primary" data-action="play">Jogar Minecraft</button>
+            <button class="btn btn-secondary" data-action="join_server">Entrar no servidor</button>
+          </div>
 
-    <main class="app-content">
+          <div class="quick-stats">
+            <div><span>VERSÃO</span><strong id="minecraft-version">1.21.4</strong><em>Instalada</em></div>
+            <div><span>PERFIL ATIVO</span><strong id="active-profile">Vanilla</strong><em>Online</em></div>
+            <div><span>SERVIDOR</span><strong id="server-state">Online</strong><em id="server-players">0 jogadores</em></div>
+            <div><span>STATUS</span><strong id="launcher-state">Tudo certo!</strong><em>Pronto para jogar</em></div>
+          </div>
 
+          <footer class="connection-line"><span></span> Você está conectado</footer>
+        </main>
+      </section>
+    </header>
+
+    <main class="content-area">
       <section id="tab-home" class="tab-panel active">
-        <div class="bds-hero-grid" style="grid-template-columns: 1fr;">
-          <article class="bds-main-card">
-            <span class="cyan-label">BEDROCK DEDICATED SERVER</span>
-            <h1 style="margin: 8px 0 12px; font-size: 28px;">RubyMC BDS Manager</h1>
-            <p style="margin-bottom: 20px; line-height: 1.5;">Painel operacional exclusivo para gerenciamento do Bedrock Dedicated Server em ambiente Linux.</p>
-
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0;">
-              <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                <span style="font-size: 10px; color: var(--muted); display: block; text-transform: uppercase; letter-spacing: 0.5px;">Status do Processo</span>
-                <strong id="home-bds-state" style="color: var(--green); font-size: 16px; display: block; margin-top: 2px;">--</strong>
-              </div>
-              <div style="background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
-                <span style="font-size: 10px; color: var(--muted); display: block; text-transform: uppercase; letter-spacing: 0.5px;">Versão Ativa</span>
-                <strong id="home-bds-version" style="font-size: 16px; display: block; margin-top: 2px;">--</strong>
-              </div>
+        <div class="home-grid">
+          <article class="ruby-panel main-home-panel">
+            <div class="panel-header">
+              <h2>🏠 Início</h2>
+              <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
             </div>
+            <div class="panel-body two-col">
+              <div class="panel-copy">
+                <span class="cyan-label">PAINEL LOCAL</span>
+                <h3>Minecraft Ruby Launcher</h3>
+                <p>Interface Web com visual gamer, display integrado, servidor da comunidade, Discord Bot e suporte a modpacks.</p>
 
-            <div class="actions" style="display: flex; gap: 8px; margin-top: 16px;">
-              <button class="btn" id="home-refresh-status">Atualizar status</button>
-              <button class="btn btn-red" onclick="document.querySelector('[data-tab=\'server\']').click();">Gerenciar servidor</button>
+                <label for="profile-select">Perfil</label>
+                <select id="profile-select">
+                  <option value="vanilla">Vanilla / sem modpack</option>
+                </select>
+
+                <div class="actions">
+                  <button class="btn btn-primary" data-action="play">Jogar</button>
+                  <button class="btn btn-secondary" data-action="join_server">Entrar no servidor</button>
+                </div>
+              </div>
+
+              <figure class="preview-card">
+                <img src="/assets/img/rubymc-tela-inicio.png" alt="Preview da tela inicial do RubyMC">
+              </figure>
+            </div>
+          </article>
+
+          <article class="ruby-panel display-shortcut-panel">
+            <div class="panel-header compact">
+              <h2>🖥️ Display Interno</h2>
+            </div>
+            <div class="panel-body">
+              <p>Tudo que for executado aparece no display: testes, erros, imports, servidor e comandos.</p>
+              <div class="actions">
+                <button class="btn btn-secondary" data-tab-jump="display">Abrir display</button>
+                <button class="btn btn-secondary" data-action="clear_display">Limpar</button>
+              </div>
             </div>
           </article>
         </div>
+      </section>
+
+      <section id="tab-modpacks" class="tab-panel">
+        <article class="ruby-panel">
+          <div class="panel-header">
+            <h2>📦 Modpacks</h2>
+            <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+          </div>
+          <div class="panel-body two-col">
+            <div>
+              <h3>Importar Modpack</h3>
+              <p>Selecione um arquivo <strong>.mrpack</strong> ou <strong>.zip</strong> para criar um perfil no RubyMC.</p>
+
+              <label for="modpack-name">Nome do perfil</label>
+              <input id="modpack-name" type="text" placeholder="Ex.: RubyMC Survival">
+
+              <label for="modpack-file">Arquivo do modpack</label>
+              <label class="dropzone" for="modpack-file">
+                <span id="modpack-file-label">Clique para escolher ou arraste o arquivo aqui</span>
+                <small>Formatos suportados: .mrpack, .zip</small>
+                <input id="modpack-file" type="file" accept=".mrpack,.zip" hidden>
+              </label>
+
+              <div class="actions">
+                <button class="btn btn-primary" data-action="import_modpack">Importar modpack</button>
+                <button class="btn btn-secondary" data-action="update_modpacks">Atualizar lista</button>
+              </div>
+            </div>
+
+            <div>
+              <figure class="preview-card">
+                <img src="/assets/img/rubymc-modpacks.png" alt="Preview da aba Modpacks">
+              </figure>
+              <h3>Modpacks disponíveis</h3>
+              <div id="modpack-list" class="list-box">Nenhum modpack importado ainda.</div>
+            </div>
+          </div>
+        </article>
       </section>
 
       <section id="tab-server" class="tab-panel">
-        <div class="bds-two-column" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+        <article class="ruby-panel">
+          <div class="panel-header">
+            <h2>🌐 Servidor da Comunidade</h2>
+            <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+          </div>
+          <div class="panel-body two-col">
+            <div>
+              <h3>Servidor da comunidade</h3>
+              <p>Endereço configurado:</p>
+              <input id="server-address" type="text" value="não configurado" readonly>
 
-          <article class="bds-card">
-            <h3>Conexão UDP</h3>
-            <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Dados de endereço para conexões externas.</p>
+              <div class="actions">
+                <button class="btn btn-primary" data-action="test_server">Testar servidor</button>
+                <button class="btn btn-secondary" data-action="join_server">Entrar no servidor</button>
+              </div>
 
-            <label>Endereço de Acesso IP / Porta</label>
-            <input id="server-address" type="text" value="127.0.0.1:19132" readonly style="margin-bottom: 14px;">
-
-            <div class="actions" style="display: flex; gap: 8px;">
-              <button class="btn btn-cyan" id="bds-test-server">Testar BDS</button>
-              <button class="btn" id="bds-refresh-status">Atualizar</button>
-            </div>
-
-            <div style="margin-top: 20px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,0.06);">
-              <span class="cyan-label">Validação Real</span>
-              <strong id="server-test-state" style="display: block; font-size: 16px; margin: 4px 0 2px;">Aguardando teste</strong>
-              <small id="server-test-detail" style="color: var(--text-muted); display: block; font-size: 12px; margin-bottom: 12px;">Valide a resposta de pacotes UDP.</small>
-
-              <div class="server-live-grid">
-                <div><span>Online</span><strong id="server-live-online">--</strong></div>
-                <div><span>Capac.</span><strong id="server-live-max">--</strong></div>
-                <div><span>Ping</span><strong id="server-live-latency">--</strong></div>
-                <div><span>Versão</span><strong id="server-live-version">--</strong></div>
-                <div><span>Check</span><strong id="server-live-checked">--</strong></div>
+              <div class="status-box">
+                <span>Status do servidor</span>
+                <strong id="server-test-state">Aguardando teste</strong>
+                <em id="server-test-detail">Use o botão para validar a conexão.</em>
               </div>
             </div>
-          </article>
 
-          <article class="bds-card">
-            <h3>Monitor Ativo</h3>
-            <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Status da instância em execução no sistema.</p>
-
-            <div style="background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; margin-bottom: 14px; border: 1px solid rgba(255,255,255,0.04);">
-              <strong id="bds-active-version" style="display: block; font-size: 16px;">Versão: Carregando...</strong>
-              <small id="bds-active-pid" style="color: var(--muted); font-family: monospace;">PID: --</small>
-            </div>
-
-            <div class="actions" style="display: flex; gap: 8px;">
-              <button class="btn btn-red" id="bds-stop-active">Parar servidor</button>
-            </div>
-          </article>
-        </div>
-
-        <div style="width: 100%;">
-          <article class="bds-card">
-            <h3>Instâncias Disponíveis</h3>
-            <p style="font-size: 13px; color: var(--muted); margin-bottom: 14px;">Controle, inicialização rápida e remoção de instâncias locais.</p>
-            <div id="bds-server-list" style="display: grid; gap: 8px;">
-              <span style="color: var(--muted); font-style: italic;">A carregar lista de servidores...</span>
-            </div>
-          </article>
-        </div>
+            <figure class="preview-card tall-preview">
+              <img src="/assets/img/rubymc-servidor-comunidade.png" alt="Preview da aba Servidor">
+            </figure>
+          </div>
+        </article>
       </section>
 
-      <section id="tab-versions" class="tab-panel">
-        <div class="server-grid">
+      <section id="tab-discord" class="tab-panel">
+        <article class="ruby-panel">
+          <div class="panel-header">
+            <h2>🎮 Discord Bot</h2>
+            <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+          </div>
+          <div class="panel-body two-col">
+            <div>
+              <h3>Canais e cargos</h3>
+              <p>Valide os IDs configurados em <strong>config/settings.yml</strong> sem expor o token do bot.</p>
 
-          <article class="bds-card">
-            <h3>Instalar BDS Oficial</h3>
-            <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Realize o download automatizado direto da Mojang.</p>
+              <div class="discord-stats">
+                <div><span>BOT</span><strong id="discord-bot-state">Inativo</strong></div>
+                <div><span>CANAIS</span><strong id="discord-channel-count">--/--</strong></div>
+                <div><span>CARGOS</span><strong id="discord-role-count">--/--</strong></div>
+              </div>
 
-            <label for="bds-available-select">Selecione a Versão</label>
-            <select id="bds-available-select" style="margin-bottom: 14px; width: 100%;">
-              <option value="">A carregar manifestos oficiais...</option>
-            </select>
-
-            <div class="actions" style="display: flex; gap: 6px; margin-bottom: 14px;">
-              <button class="btn" id="bds-refresh-available">Atualizar lista</button>
-              <button class="btn" id="bds-install-latest">Mais recente</button>
+              <div class="actions">
+                <button class="btn btn-primary" data-action="validate_discord">Validar Discord</button>
+                <button class="btn btn-secondary" data-action="test_discord_logs">Testar canal de logs</button>
+              </div>
             </div>
 
-            <button class="btn btn-red" id="bds-install-selected" style="width: 100%;">Instalar Versão Selecionada</button>
-            <p id="bds-install-status" style="margin-top: 8px; font-size: 12px; color: var(--green);"></p>
-          </article>
-
-          <article class="bds-card">
-            <h3>Diretórios Físicos</h3>
-            <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Mapeamento de armazenamento das compilações salvas.</p>
-            <div id="bds-installed-list" style="display: grid; gap: 8px;">
-              <span style="color: var(--muted); font-style: italic;">A mapear armazenamento...</span>
+            <div class="permission-card">
+              <h3>Permissões</h3>
+              <p><strong>Membro</strong> acessa canais públicos. <strong>Jogador</strong> libera áreas do Minecraft. <strong>Staff/Admin</strong> liberam suporte e moderação.</p>
+              <p><strong>RubyMC Bot</strong> precisa ficar acima dos cargos que ele entrega.</p>
+              <ul>
+                <li>Canal de logs: <strong id="logs-channel-state">pendente</strong></li>
+                <li>Status: <strong id="discord-config-state">configurado</strong></li>
+              </ul>
+              <figure class="preview-card small-preview">
+                <img src="/assets/img/rubymc-discord-bot.png" alt="Preview da aba Discord">
+              </figure>
             </div>
-          </article>
-
-        </div>
+          </div>
+        </article>
       </section>
 
       <section id="tab-display" class="tab-panel">
-        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding: 0 4px;">
-          <div style="display: block;">
-            <h3 style="margin: 0;">Console de Eventos</h3>
-            <p style="margin: 4px 0 0; font-size: 13px; color: var(--muted);">Saída física de console em tempo real.</p>
+        <article class="ruby-panel">
+          <div class="panel-header">
+            <h2>▣ Display Interno de Logs</h2>
+            <div class="actions header-actions">
+              <button class="btn btn-secondary" data-action="run_tests">Rodar testes</button>
+              <button class="btn btn-secondary" data-action="clear_display">Limpar</button>
+            </div>
           </div>
-          <div class="actions" style="margin: 0; display: flex; gap: 6px;">
-            <button class="btn" id="clear-display">Limpar</button>
-            <button class="btn" id="refresh-display">Atualizar</button>
+          <div class="panel-body display-grid">
+            <div>
+              <h3>Logs, testes e erros</h3>
+              <p>Acompanhe tudo que acontece no launcher em tempo real.</p>
+              <pre id="display-log" class="terminal-display">[SYSTEM] RubyMC Web Launcher inicializando...
+[SYSTEM] Aguardando eventos do backend...</pre>
+            </div>
+            <figure class="preview-card display-preview">
+              <img src="/assets/img/rubymc-display-logs.png" alt="Preview do display interno">
+            </figure>
           </div>
-        </header>
-        <pre id="display-log" style="background: #02040a; border: 1px solid rgba(255,255,255,0.1); padding: 14px; border-radius: 8px; color: #62ff8f; font-family: monospace; overflow-y: auto; height: 380px; margin: 0;">[SYSTEM] Aguardando eventos do terminal...</pre>
+        </article>
       </section>
 
       <section id="tab-project" class="tab-panel">
-        <article class="bds-card" style="max-width: 540px;">
-          <h3>Raiz Operacional</h3>
-          <p style="margin-bottom: 16px; color: var(--muted); font-size: 13.5px;">Acesse diretamente as subpastas e binários executáveis nativos do BDS Linux.</p>
-          <button class="btn btn-cyan" id="open-project-folder" style="width: 100%; justify-content: flex-start; padding-left: 16px;">📁 Abrir pasta do projeto</button>
+        <article class="ruby-panel">
+          <div class="panel-header">
+            <h2>📁 Projeto</h2>
+            <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+          </div>
+          <div class="panel-body two-col">
+            <div>
+              <h3>Organização do projeto</h3>
+              <p>Centralize scripts, testes, documentos e recursos do launcher.</p>
+
+              <button class="project-option" data-action="open_project_folder">
+                <span>📁</span>
+                <strong>Abrir pasta do projeto</strong>
+                <em>Acesse a raiz do projeto no seu sistema.</em>
+              </button>
+
+              <button class="project-option" data-action="organize_project">
+                <span>💻</span>
+                <strong>Abrir scripts</strong>
+                <em>Gerencie os scripts do launcher.</em>
+              </button>
+
+              <button class="project-option" data-action="open_docs">
+                <span>📖</span>
+                <strong>Abrir documentação</strong>
+                <em>Acesse os documentos do projeto.</em>
+              </button>
+            </div>
+
+            <figure class="preview-card tall-preview">
+              <img src="/assets/img/rubymc-projeto.png" alt="Preview da aba Projeto">
+            </figure>
+          </div>
         </article>
       </section>
 
       <section id="tab-settings" class="tab-panel">
-        <div class="bds-two-column" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <article class="ruby-panel">
+          <div class="panel-header">
+            <h2>⚙️ Configurações</h2>
+            <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+          </div>
+          <div class="panel-body two-col">
+            <div>
+              <h3>Configurações gerais</h3>
+              <p>Personalize sua experiência.</p>
 
-          <article class="bds-card">
-            <h3>Sobre o Ambiente</h3>
-            <p style="margin: 6px 0;">Gerenciador Core: <strong style="color: var(--ruby);">RubyMC BDS Manager</strong></p>
-            <p style="margin: 6px 0;">Binários do Servidor: <strong>Ubuntu Dedicated Server x64</strong></p>
-            <p style="margin: 6px 0;">Conexão de Clientes: <strong>Externa Direta Nativa</strong></p>
-          </article>
+              <label>Minecraft</label>
+              <div class="settings-grid">
+                <select id="settings-version"><option>1.21.4</option><option>1.20.1</option><option>Vanilla</option></select>
+                <input id="settings-ram" type="number" value="2048" placeholder="RAM (MB)">
+              </div>
 
-          <article class="bds-card">
-            <h3>Link de Entrada da Comunidade</h3>
-            <p style="font-size: 13px; color: var(--muted); margin-bottom: 12px;">Compartilhe este endereço fixo para acesso alternativo e conexões da comunidade externa:</p>
+              <label>Discord</label>
+              <div class="toggle-row"><span>Rich Presence</span><button class="toggle active" data-toggle="rich_presence"></button></div>
+              <div class="toggle-row"><span>Ativar Bot Discord</span><button class="toggle active" data-toggle="discord_bot"></button></div>
 
-            <div style="display: flex; gap: 8px;">
-              <input id="settings-server-address" type="text" value="127.0.0.1:19132" readonly style="font-family: monospace; color: var(--green); flex: 1;">
-              <button class="btn btn-cyan" onclick="navigator.clipboard.writeText(document.getElementById('settings-server-address').value); alert('Endereço copiado com sucesso!');">Copiar</button>
+              <div class="actions">
+                <button class="btn btn-secondary" data-action="check_updates">Verificar atualizações</button>
+              </div>
             </div>
-          </article>
 
-        </div>
+            <div class="about-card">
+              <figure class="preview-card">
+                <img src="/assets/img/rubymc-configuracoes.png" alt="Preview da aba Configurações">
+              </figure>
+              <h3>Sobre o RubyMC Launcher</h3>
+              <p>Versão: <strong id="launcher-version">1.0.0</strong></p>
+              <p>Feito com ❤️ para a comunidade Minecraft.</p>
+            </div>
+          </div>
+        </article>
       </section>
-
     </main>
-  </section>
-</div>
+  </div>
 
-<script src="/assets/js/launcher.js?v=bds-server-only-1"></script>
-<script src="/assets/js/bds-auto-versions-fix.js?v=1"></script>
+  <script src="/assets/js/launcher.js?v=rubymc-ui-logic-fix-1"></script>
 </body>
 </html>

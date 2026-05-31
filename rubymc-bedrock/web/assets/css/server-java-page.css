@@ -1,23 +1,23 @@
-/* =========================================================
-   RubyMC Java Server Page Patch
-   Estilos para seletor de versão do servidor na aba Servidor.
-   ========================================================= */
+/* RubyMC Server Runtime/Version Selector */
 
 .server-version-control {
   margin: 16px 0 4px;
 }
 
-.server-version-box {
+.server-version-box,
+.server-runtime-selector {
   border: 1px solid rgba(53, 234, 255, .20);
   border-radius: 12px;
-  background: linear-gradient(145deg, rgba(5,7,16,.82), rgba(7,10,22,.58));
-  box-shadow:
-    inset 0 0 36px rgba(0,0,0,.22),
-    0 0 20px rgba(53,234,255,.08);
+  background:
+    radial-gradient(circle at 12% 20%, rgba(53,234,255,.10), transparent 28%),
+    linear-gradient(145deg, rgba(5,7,16,.82), rgba(7,10,22,.58));
+  box-shadow: inset 0 0 36px rgba(0,0,0,.22), 0 0 20px rgba(53,234,255,.08);
   padding: 12px;
 }
 
-.server-version-box small {
+.server-version-box small,
+.server-runtime-header small,
+.server-runtime-field small {
   display: block;
   color: #8ea0b8;
   font-size: 12px;
@@ -27,24 +27,44 @@
   margin-bottom: 8px;
 }
 
-.server-version-box em {
-  display: block;
-  color: #a8b8cc;
-  font-size: 13px;
-  font-style: normal;
-  margin-top: 8px;
-  line-height: 1.35;
-}
-
-.server-version-row {
+.server-version-row,
+.server-runtime-grid {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) auto;
   gap: 10px;
-  align-items: center;
+  align-items: end;
 }
 
-#server-version-select {
-  min-height: 40px;
+.server-runtime-grid {
+  grid-template-columns: minmax(130px, .8fr) minmax(160px, 1.2fr) auto;
+}
+
+.server-runtime-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.server-runtime-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(98,255,143,.30);
+  border-radius: 999px;
+  color: #dfffe7;
+  background: rgba(98,255,143,.10);
+  font-weight: 900;
+}
+
+.server-runtime-badge.is-bedrock {
+  border-color: rgba(53,234,255,.34);
+  color: #e2fbff;
+  background: rgba(53,234,255,.10);
 }
 
 button.is-loading,
@@ -54,8 +74,9 @@ button.is-loading,
   filter: saturate(.75);
 }
 
-@media (max-width: 680px) {
-  .server-version-row {
+@media (max-width: 760px) {
+  .server-version-row,
+  .server-runtime-grid {
     grid-template-columns: 1fr;
   }
 }

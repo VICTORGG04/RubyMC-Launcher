@@ -1,23 +1,309 @@
-/* =========================================================
-   RubyMC BDS Server-Only Frontend
-   Controla somente Bedrock Dedicated Server. Não usa cliente
-   Bedrock, mcpelauncher, Google Play ou importação APK.
-   ========================================================= */
 (() => {
-  "use strict";
-
   const $ = (selector, root = document) => root.querySelector(selector);
-  const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+  const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
 
-  const state = {
-    available: [],
-    installed: [],
-    status: null,
-    busy: false
+  let busy = false;
+
+  const ROUTES = {
+    status: ["/api/status", "/status"],
+    logs: ["/api/logs", "/logs"],
+    action: ["/api/action"],
+    modpackImport: ["/api/modpacks/import", "/api/import_modpack", "/api/modpack/import"],
+    modpacks: ["/api/modpacks", "/api/modpacks/list"]
   };
 
-  function esc(value) {
-    return String(value ?? "")
+  const ACTION_ALIASES = {
+    update_modpacks: ["update_modpacks", "refresh_modpacks", "list_modpacks"],
+    validate_discord: ["validate_discord", "discord_validate", "validate_discord_settings"],
+    test_discord_logs: ["test_discord_logs", "discord_test_logs", "test_logs_channel"],
+    test_server: ["test_server", "server_test", "check_server"],
+    join_server: ["join_server", "server_join"],
+    clear_display: ["clear_display", "display_clear"],
+    run_tests: ["run_tests", "test"],
+    organize_project: ["organize_project", "organize"],
+    open_project_folder: ["open_project_folder", "project_folder"],
+    open_docs: ["open_docs", "docs"],
+    check_updates: ["check_updates", "update_check"]
+  };
+
+  function time() {
+    return new Date().toLocaleTimeString("pt-BR", { hour12: false });
+  }
+
+  function writeLog(type, message) {
+    const display = $("#display-log");
+    if (!display) return;
+    display.textContent += `\n[${time()}] ${String(type).padEnd(7)} ${message}`;
+    display.scrollTop = display.scrollHeight;
+  }
+
+  function activateTab(tab) {
+    $$(".side-link").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
+    $$(".tab-panel").forEach(panel => panel.classList.toggle("active", panel.id === `tab-${tab}`));
+  }
+
+  async function fetchJson(url, options = {}) {
+    const response = await fetch(url, {
+      headers: {
+        "Accept": "application/json",
+        ...(options.headers || {})
+      },
+      ...options
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`${response.status} ${response.statusText}${body ? ` — ${body.slice(0, 140)}` : ""}`);
+    }
+
+    return response.json();
+  }
+
+  async function postJson(url, payload = {}) {
+    return fetchJson(url, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload)
+    });
+  }
+
+  async function firstWorkingGet(urls) {
+    let lastError;
+    for (const url of urls) {
+      try {
+        return await fetchJson(url);
+      } catch (error) {
+        lastError = error;
+      }
+    }
+    throw lastError;
+  }
+
+  function collectPayload(action) {
+    return {
+      action,
+      profile: $("#profile-select")?.value || "vanilla",
+      modpack_name: $("#modpack-name")?.value || "",
+      server_address: $("#server-address")?.value || "",
+      settings: {
+        version: $("#settings-version")?.value || "",
+        ram: $("#settings-ram")?.value || ""
+      }
+    };
+  }
+
+  async function sendBackendAction(action) {
+    const aliases = ACTION_ALIASES[action] || [action];
+    let lastError;
+
+    for (const actionName of aliases) {
+      try {
+        return await postJson("/api/action", collectPayload(actionName));
+      } catch (error) {
+        lastError = error;
+      }
+
+      try {
+        return await postJson(`/api/${actionName}`, collectPayload(actionName));
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    throw lastError;
+  }
+
+  async function runAction(action) {
+    if (!action || busy) return;
+    busy = true;
+    writeLog("ACTION", `Executando: ${action}`);
+
+    try {
+      if (action === "import_modpack") {
+        await importModpack();
+      } else if (action === "update_modpacks") {
+        await updateModpacks();
+      } else if (action === "clear_display") {
+        clearDisplay();
+        try {
+          const result = await sendBackendAction(action);
+          applyResult(result, action);
+        } catch (_) {}
+      } else {
+        const result = await sendBackendAction(action);
+        applyResult(result, action);
+      }
+    } catch (error) {
+      writeLog("ERROR", `${action}: ${error.message}`);
+    } finally {
+      busy = false;
+    }
+  }
+
+  async function importModpack() {
+    const input = $("#modpack-file");
+    const nameInput = $("#modpack-name");
+
+    if (!input || !input.files || input.files.length === 0) {
+      writeLog("WARN", "Selecione um arquivo .mrpack ou .zip.");
+      return;
+    }
+
+    const file = input.files[0];
+    const profileName = nameInput?.value?.trim() || file.name.replace(/\.(mrpack|zip)$/i, "");
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("modpack", file);
+    form.append("profile_name", profileName);
+    form.append("name", profileName);
+
+    let lastError;
+
+    for (const url of ROUTES.modpackImport) {
+      try {
+        const result = await fetchJson(url, { method: "POST", body: form });
+        applyResult(result, "import_modpack");
+        await updateModpacks(false);
+        return;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    try {
+      const result = await sendBackendAction("import_modpack");
+      applyResult(result, "import_modpack");
+      await updateModpacks(false);
+    } catch (_) {
+      throw lastError;
+    }
+  }
+
+  async function updateModpacks(showLog = true) {
+    if (showLog) writeLog("ACTION", "Atualizando lista de modpacks...");
+
+    for (const url of ROUTES.modpacks) {
+      try {
+        const result = await fetchJson(url);
+        const modpacks = result.modpacks || result.data || result;
+        renderModpacks(Array.isArray(modpacks) ? modpacks : []);
+        if (showLog) writeLog("OK", "Lista de modpacks atualizada.");
+        return;
+      } catch (_) {}
+    }
+
+    const result = await sendBackendAction("update_modpacks");
+    applyResult(result, "update_modpacks");
+  }
+
+  function clearDisplay() {
+    const display = $("#display-log");
+    if (display) display.textContent = `[${time()}] SYSTEM  Display limpo. Aguardando novos eventos...`;
+  }
+
+  function applyResult(result, action) {
+    if (!result) {
+      writeLog("OK", `${action} concluído.`);
+      return;
+    }
+
+    if (typeof result === "string") {
+      writeLog("OK", result);
+      return;
+    }
+
+    if (result.message) writeLog(result.ok === false ? "ERROR" : "OK", result.message);
+
+    if (Array.isArray(result.logs)) {
+      result.logs.forEach(item => {
+        if (typeof item === "string") writeLog("LOG", item);
+        else writeLog(item.type || "LOG", item.message || JSON.stringify(item));
+      });
+    }
+
+    if (result.display) updateDisplay(result.display);
+    if (result.status) applyStatus(result.status);
+    else applyStatus(result);
+    if (result.modpacks) renderModpacks(result.modpacks);
+    if (result.discord) applyStatus({ discord: result.discord });
+
+    if (action === "test_server" && result.ok !== undefined) {
+      setText("server-test-state", result.ok ? "Online" : "Offline");
+      setText("server-test-detail", result.message || "");
+    }
+  }
+
+  function setText(id, value) {
+    const el = document.getElementById(id);
+    if (el && value !== undefined && value !== null && value !== "") el.textContent = value;
+  }
+
+  function setValue(id, value) {
+    const el = document.getElementById(id);
+    if (el && value !== undefined && value !== null && value !== "") el.value = value;
+  }
+
+  function applyStatus(status = {}) {
+    setText("minecraft-version", status.minecraft_version || status.default_version || status.version);
+    setText("active-profile", status.active_profile || status.profile);
+    setText("server-state", status.server_status || status.server_state || status.server);
+    setText("server-players", status.server_players || status.players);
+    setText("launcher-state", status.launcher_status || status.status);
+    setText("launcher-version", status.launcher_version || status.version);
+    setValue("server-address", status.server_address || status.community_server || status.address);
+
+    if (status.server_test) {
+      setText("server-test-state", status.server_test.ok ? "Online" : "Offline");
+      setText("server-test-detail", status.server_test.message || "");
+    }
+
+    const discord = status.discord || {};
+    if (Object.keys(discord).length > 0) {
+      const botActive = discord.bot_enabled === true || discord.bot === true || discord.status === "ativo" || discord.bot_state === "ativo";
+      setText("discord-bot-state", botActive ? "Ativo" : (discord.bot_state || "Inativo"));
+      setText("discord-channel-count", discord.channels || discord.channel_count || discord.channels_count);
+      setText("discord-role-count", discord.roles || discord.role_count || discord.roles_count);
+      setText("logs-channel-state", discord.logs_channel || discord.logs_channel_id ? "configurado" : "pendente");
+      setText("discord-config-state", discord.configured === false ? "pendente" : "configurado");
+    }
+  }
+
+  function renderModpacks(modpacks) {
+    const list = $("#modpack-list");
+    const select = $("#profile-select");
+    if (!list) return;
+
+    if (!Array.isArray(modpacks) || modpacks.length === 0) {
+      list.textContent = "Nenhum modpack importado ainda.";
+      return;
+    }
+
+    list.innerHTML = modpacks.map(item => {
+      const name = typeof item === "string" ? item : (item.name || item.profile || item.title || "Modpack");
+      const version = typeof item === "object" && item.version ? item.version : "";
+      return `<div class="modpack-row"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(version)}</span></div>`;
+    }).join("");
+
+    if (select) {
+      const current = select.value;
+      select.innerHTML = `<option value="vanilla">Vanilla / sem modpack</option>` + modpacks.map(item => {
+        const name = typeof item === "string" ? item : (item.name || item.profile || item.title || "Modpack");
+        return `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
+      }).join("");
+      if ([...select.options].some(option => option.value === current)) select.value = current;
+    }
+  }
+
+  function updateDisplay(content) {
+    const display = $("#display-log");
+    if (!display) return;
+    display.textContent = Array.isArray(content) ? content.join("\n") : String(content);
+    display.scrollTop = display.scrollHeight;
+  }
+
+  function escapeHtml(value) {
+    return String(value)
       .replaceAll("&", "&amp;")
       .replaceAll("<", "&lt;")
       .replaceAll(">", "&gt;")
@@ -25,553 +311,62 @@
       .replaceAll("'", "&#039;");
   }
 
-  function setText(selector, value) {
-    const el = $(selector);
-    if (el) el.textContent = value ?? "";
-  }
-
-  function setHTML(selector, html) {
-    const el = $(selector);
-    if (el) el.innerHTML = html;
-  }
-
-  function setBusy(button, busyText = "Processando...") {
-    if (!button) return () => {};
-    const oldText = button.textContent;
-    button.disabled = true;
-    button.textContent = busyText;
-    return () => {
-      button.disabled = false;
-      button.textContent = oldText;
-    };
-  }
-
-  async function readJson(response, endpoint) {
-    const text = await response.text();
-
-    let data = {};
-    if (text.trim()) {
-      try {
-        data = JSON.parse(text);
-      } catch (error) {
-        throw new Error(`JSON inválido em ${endpoint}: ${error.message}`);
-      }
-    }
-
-    if (!response.ok || data.ok === false) {
-      throw new Error(data.error || data.message || `HTTP ${response.status}`);
-    }
-
-    return data;
-  }
-
-  async function getJson(endpoint) {
-    const response = await fetch(endpoint, {
-      headers: { Accept: "application/json" }
-    });
-    return readJson(response, endpoint);
-  }
-
-  async function postJson(endpoint, payload = {}) {
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify(payload)
-    });
-    return readJson(response, endpoint);
-  }
-
-  function logLine(type, message) {
-    const display = $("#display-log");
-    if (!display) return;
-
-    const time = new Date().toLocaleTimeString("pt-BR", { hour12: false });
-    display.textContent += `\n[${time}] ${String(type).toUpperCase().padEnd(7)} ${message}`;
-    display.scrollTop = display.scrollHeight;
-  }
-
-  function activateTab(tabName) {
-    if (!tabName) return;
-
-    $$(".tab-link").forEach((button) => {
-      button.classList.toggle("active", button.dataset.tab === tabName);
-    });
-
-    $$(".tab-panel").forEach((panel) => {
-      panel.classList.toggle("active", panel.id === `tab-${tabName}`);
-    });
-
-    document.body.dataset.currentTab = tabName;
-
-    if (tabName === "versions") {
-      refreshVersions();
-    } else if (tabName === "server" || tabName === "home") {
-      refreshStatus();
-      refreshInstalled();
-    } else if (tabName === "display") {
-      refreshLogs();
-    }
-  }
-
-  function normalizeVersion(item) {
-    if (!item) return null;
-
-    if (typeof item === "string") {
-      return {
-        version: item,
-        label: item,
-        url: "",
-        channel: "stable"
-      };
-    }
-
-    const version = item.version || item.id || item.name || "";
-    if (!version) return null;
-
-    const channel = item.channel || "stable";
-
-    return {
-      version,
-      label: `${version}${channel === "preview" ? " (Preview)" : ""}`,
-      url: item.url || item.download_url || "",
-      channel
-    };
-  }
-
-  async function refreshAvailable() {
-    const select = $("#bds-available-select");
-    if (select) {
-      select.innerHTML = '<option value="">Carregando...</option>';
-    }
-
-    try {
-      const data = await getJson("/api/bedrock/servers/available");
-      const versions = [
-        ...(data.versions || []),
-        ...(data.preview_versions || [])
-      ].map(normalizeVersion).filter(Boolean);
-
-      state.available = versions;
-
-      if (!select) return;
-
-      if (!versions.length) {
-        select.innerHTML = '<option value="">Nenhuma versão oficial encontrada</option>';
-        setText("#bds-install-status", "Não consegui carregar a lista oficial. Use instalação manual apenas com uma versão BDS válida.");
-        return;
-      }
-
-      select.innerHTML = versions.map((item) => `
-        <option value="${esc(item.version)}" data-url="${esc(item.url)}" data-channel="${esc(item.channel)}">
-          ${esc(item.label)}
-        </option>
-      `).join("");
-
-      setText("#bds-install-status", `Lista carregada: ${versions.length} versão(ões) encontradas.`);
-    } catch (error) {
-      state.available = [];
-      if (select) {
-        select.innerHTML = '<option value="">Erro ao carregar versões</option>';
-      }
-      setText("#bds-install-status", `Erro ao carregar versões oficiais: ${error.message}`);
-      logLine("ERROR", `Versões BDS disponíveis: ${error.message}`);
-    }
-  }
-
-  async function refreshInstalled() {
-    try {
-      const data = await getJson("/api/bedrock/servers/installed");
-      state.installed = data.servers || data.installed || [];
-      renderInstalled();
-    } catch (error) {
-      state.installed = [];
-      renderInstalled(error);
-      logLine("ERROR", `Versões BDS instaladas: ${error.message}`);
-    }
-  }
-
-  function renderInstalled(error = null) {
-    const html = error
-      ? `<div class="bds-error">Erro: ${esc(error.message)}</div>`
-      : state.installed.length
-        ? state.installed.map(renderServerItem).join("")
-        : '<div class="bds-empty">Nenhuma versão BDS instalada.</div>';
-
-    setHTML("#bds-server-list", html);
-    setHTML("#bds-installed-list", html);
-  }
-
-  function renderServerItem(server) {
-    const version = server.version || server.id || "";
-    const path = server.path || "";
-    const pid = server.pid || "";
-    const running = server.running === true || server.running === "true";
-
-    const badge = running
-      ? '<span class="bds-badge bds-badge-online">● Online</span>'
-      : '<span class="bds-badge bds-badge-offline">○ Parado</span>';
-
-    const mainAction = running
-      ? `<button class="btn btn-red btn-sm" data-bds-stop="${esc(version)}">Parar</button>
-         <button class="btn btn-dark btn-sm" data-bds-restart="${esc(version)}">Reiniciar</button>`
-      : `<button class="btn btn-cyan btn-sm" data-bds-start="${esc(version)}">Iniciar</button>`;
-
-    return `
-      <div class="bds-server-item">
-        <div class="bds-server-title">
-          ${badge}
-          <strong>Minecraft Bedrock ${esc(version)}</strong>
-          <small>BDS instalado${pid ? ` · PID ${esc(pid)}` : ""}</small>
-          ${path ? `<small>${esc(path)}</small>` : ""}
-        </div>
-        <div class="bds-server-actions">
-          ${mainAction}
-          <button class="btn btn-dark btn-sm" data-bds-logs="${esc(version)}">Logs</button>
-          <button class="btn btn-dark btn-sm" data-bds-remove="${esc(version)}">Remover</button>
-        </div>
-      </div>
-    `;
-  }
-
   async function refreshStatus() {
     try {
-      const data = await getJson("/api/bedrock/servers/status");
-      state.status = data;
-      renderStatus(data);
-    } catch (error) {
-      state.status = null;
-      renderStatusError(error);
-      logLine("ERROR", `Status BDS: ${error.message}`);
-    }
-  }
-
-  function renderStatus(data) {
-    const online = data.online === true || data.port_open === true;
-    const running = data.running === true || data.process_running === true;
-    const version = data.version || "--";
-    const pid = data.pid || "--";
-    const port = data.port || 19132;
-
-    setText("#home-bds-state", online ? "Online" : running ? "Processo ativo" : "Offline");
-    setText("#home-bds-detail", data.message || "--");
-    setText("#home-bds-version", version || "--");
-    setText("#home-bds-port", String(port));
-    setText("#home-bds-players", playersText(data.players));
-
-    setText("#server-test-state", online ? "Online" : "Offline");
-    setText("#server-test-detail", data.message || data.error || "--");
-    setText("#server-live-online", online ? "Sim" : "Não");
-    setText("#server-live-max", playersText(data.players));
-    setText("#server-live-latency", data.latency_ms ? `${data.latency_ms} ms` : "--");
-    setText("#server-live-version", version || "--");
-    setText("#server-live-checked", data.checked_at || "--");
-
-    setText("#bedrock-server-latency", data.latency_ms ? `${data.latency_ms} ms` : "--");
-    setText("#bedrock-server-players", playersText(data.players));
-    setText("#bedrock-server-motd", data.description || "--");
-
-    setText("#bds-active-version", running ? `Minecraft Bedrock ${version || "--"}` : "Nenhum BDS rodando");
-    setText("#bds-active-pid", running ? `PID ${pid}` : "PID --");
-
-    const activeBox = $("#bds-active-box");
-    if (activeBox) {
-      const badge = activeBox.querySelector(".bds-badge");
-      if (badge) {
-        badge.className = running ? "bds-badge bds-badge-online" : "bds-badge bds-badge-muted";
-        badge.textContent = running ? "● Rodando" : "○ Parado";
+      const data = await firstWorkingGet(ROUTES.status);
+      applyStatus(data.status || data);
+    } catch (_) {
+      try {
+        const data = await sendBackendAction("refresh_status");
+        applyResult(data, "refresh_status");
+      } catch (_) {
+        writeLog("WARN", "Status será atualizado quando o backend responder.");
       }
     }
-
-    const address = data.address || `127.0.0.1:${port}`;
-    const serverAddress = $("#server-address");
-    if (serverAddress) serverAddress.value = address;
-
-    setText("#settings-server-address", address);
   }
 
-  function renderStatusError(error) {
-    setText("#home-bds-state", "Erro");
-    setText("#home-bds-detail", error.message);
-    setText("#server-test-state", "Erro");
-    setText("#server-test-detail", error.message);
-  }
-
-  function playersText(players) {
-    if (!players) return "0/0";
-    const online = players.online ?? 0;
-    const max = players.max ?? 0;
-    return `${online}/${max}`;
-  }
-
-  async function installSelected(button) {
-    const select = $("#bds-available-select");
-    const option = select?.selectedOptions?.[0];
-
-    if (!option || !option.value) {
-      alert("Nenhuma versão BDS oficial selecionada.");
-      return;
-    }
-
-    const restore = setBusy(button);
+  async function pollLogs() {
     try {
-      const payload = {
-        version: option.value,
-        url: option.dataset.url || "",
-        channel: option.dataset.channel || "stable"
-      };
-
-      setText("#bds-install-status", `Instalando BDS ${payload.version}...`);
-      logLine("ACTION", `Instalando BDS ${payload.version}...`);
-
-      const data = await postJson("/api/bedrock/servers/download", payload);
-      setText("#bds-install-status", data.message || "BDS instalado.");
-      logLine("OK", data.message || `BDS ${payload.version} instalado.`);
-
-      await refreshInstalled();
-      await refreshStatus();
-    } catch (error) {
-      setText("#bds-install-status", `Erro: ${error.message}`);
-      logLine("ERROR", `Instalar BDS: ${error.message}`);
-      alert(`Erro ao instalar BDS: ${error.message}`);
-    } finally {
-      restore();
-    }
-  }
-
-  async function installLatest(button) {
-    const restore = setBusy(button);
-    try {
-      setText("#bds-install-status", "Instalando a versão mais recente...");
-      const data = await postJson("/api/bedrock/servers/download", {});
-      setText("#bds-install-status", data.message || "BDS instalado.");
-      logLine("OK", data.message || "BDS mais recente instalado.");
-      await refreshInstalled();
-      await refreshStatus();
-    } catch (error) {
-      setText("#bds-install-status", `Erro: ${error.message}`);
-      alert(`Erro ao instalar BDS: ${error.message}`);
-    } finally {
-      restore();
-    }
-  }
-
-  async function installManual(button) {
-    const input = $("#bds-manual-version");
-    const version = input?.value?.trim();
-
-    if (!version) {
-      alert("Informe uma versão BDS válida.");
-      return;
-    }
-
-    const restore = setBusy(button);
-    try {
-      setText("#bds-install-status", `Instalando BDS ${version}...`);
-      const data = await postJson("/api/bedrock/servers/download", { version });
-      setText("#bds-install-status", data.message || "BDS instalado.");
-      logLine("OK", data.message || `BDS ${version} instalado.`);
-      await refreshInstalled();
-      await refreshStatus();
-    } catch (error) {
-      setText("#bds-install-status", `Erro: ${error.message}`);
-      alert(`Erro ao instalar BDS ${version}: ${error.message}`);
-    } finally {
-      restore();
-    }
-  }
-
-  async function startServer(version, button) {
-    const restore = setBusy(button);
-    try {
-      logLine("ACTION", `Iniciando BDS ${version}...`);
-      const data = await postJson("/api/bedrock/servers/start", { version });
-      logLine(data.ok ? "OK" : "ERROR", data.message || data.error || "Start concluído.");
-      await refreshInstalled();
-      await refreshStatus();
-    } catch (error) {
-      logLine("ERROR", `Iniciar BDS: ${error.message}`);
-      alert(`Erro ao iniciar BDS: ${error.message}`);
-    } finally {
-      restore();
-    }
-  }
-
-  async function stopServer(version, button) {
-    const restore = setBusy(button);
-    try {
-      const payload = version ? { version } : {};
-      logLine("ACTION", version ? `Parando BDS ${version}...` : "Parando BDS ativo...");
-      const data = await postJson("/api/bedrock/servers/stop", payload);
-      logLine(data.ok ? "OK" : "ERROR", data.message || data.error || "Stop concluído.");
-      await refreshInstalled();
-      await refreshStatus();
-    } catch (error) {
-      logLine("ERROR", `Parar BDS: ${error.message}`);
-      alert(`Erro ao parar BDS: ${error.message}`);
-    } finally {
-      restore();
-    }
-  }
-
-  async function restartServer(version, button) {
-    const restore = setBusy(button);
-    try {
-      logLine("ACTION", `Reiniciando BDS ${version}...`);
-      const data = await postJson("/api/bedrock/servers/restart", { version });
-      logLine(data.ok ? "OK" : "ERROR", data.message || data.error || "Restart concluído.");
-      await refreshInstalled();
-      await refreshStatus();
-    } catch (error) {
-      logLine("ERROR", `Reiniciar BDS: ${error.message}`);
-      alert(`Erro ao reiniciar BDS: ${error.message}`);
-    } finally {
-      restore();
-    }
-  }
-
-  async function removeServer(version, button) {
-    if (!confirm(`Remover BDS ${version}? Essa ação apagará a pasta da versão instalada.`)) return;
-
-    const restore = setBusy(button, "Removendo...");
-    try {
-      logLine("ACTION", `Removendo BDS ${version}...`);
-      const data = await postJson("/api/bedrock/servers/remove", { version });
-      logLine(data.ok ? "OK" : "ERROR", data.message || data.error || "Remove concluído.");
-      await refreshInstalled();
-      await refreshStatus();
-    } catch (error) {
-      logLine("ERROR", `Remover BDS: ${error.message}`);
-      alert(`Erro ao remover BDS: ${error.message}`);
-    } finally {
-      restore();
-    }
-  }
-
-  async function showLogs(version) {
-    try {
-      const endpoint = version
-        ? `/api/bedrock/servers/logs?version=${encodeURIComponent(version)}`
-        : "/api/bedrock/servers/logs";
-
-      const data = await getJson(endpoint);
-      const logs = data.logs || [];
-      if (!logs.length) {
-        logLine("LOG", "Nenhum log BDS disponível.");
-      } else {
-        const display = $("#display-log");
-        if (display) {
-          display.textContent += `\n\n===== LOGS BDS ${version || ""} =====\n${logs.join("\n")}`;
-          display.scrollTop = display.scrollHeight;
-        }
-      }
-      activateTab("display");
-    } catch (error) {
-      logLine("ERROR", `Logs BDS: ${error.message}`);
-      alert(`Erro ao ler logs BDS: ${error.message}`);
-    }
-  }
-
-  async function refreshLogs() {
-    try {
-      const data = await getJson("/api/logs");
-      const logs = data.logs || [];
-      const display = $("#display-log");
-      if (display && logs.length) {
-        display.textContent = logs.join("\n");
-        display.scrollTop = display.scrollHeight;
-      }
-    } catch (error) {
-      logLine("ERROR", `Atualizar display: ${error.message}`);
-    }
-  }
-
-  async function openProjectFolder(button) {
-    const restore = setBusy(button);
-    try {
-      await postJson("/api/action", { action: "open_project_folder" });
-      logLine("OK", "Solicitação para abrir pasta enviada.");
-    } catch (error) {
-      alert(`Erro ao abrir pasta: ${error.message}`);
-    } finally {
-      restore();
-    }
+      const data = await firstWorkingGet(ROUTES.logs);
+      if (data.display) updateDisplay(data.display);
+      else if (data.logs) updateDisplay(data.logs);
+    } catch (_) {}
   }
 
   function bindEvents() {
-    $$(".tab-link").forEach((button) => {
-      button.addEventListener("click", () => activateTab(button.dataset.tab));
+    $$(".side-link").forEach(btn => {
+      btn.addEventListener("click", () => activateTab(btn.dataset.tab));
     });
 
-    $$("[data-tab-jump]").forEach((button) => {
-      button.addEventListener("click", () => activateTab(button.dataset.tabJump));
+    $$("[data-tab-jump]").forEach(btn => {
+      btn.addEventListener("click", () => activateTab(btn.dataset.tabJump));
     });
 
-    $("#home-refresh-status")?.addEventListener("click", (event) => {
-      const restore = setBusy(event.currentTarget, "Atualizando...");
-      Promise.all([refreshStatus(), refreshInstalled()]).finally(restore);
+    $$("[data-action]").forEach(btn => {
+      btn.addEventListener("click", () => runAction(btn.dataset.action));
     });
 
-    $("#bds-refresh-status")?.addEventListener("click", (event) => {
-      const restore = setBusy(event.currentTarget, "Atualizando...");
-      Promise.all([refreshStatus(), refreshInstalled()]).finally(restore);
+    $$(".toggle").forEach(toggle => {
+      toggle.addEventListener("click", () => {
+        toggle.classList.toggle("active");
+        writeLog("ACTION", `Configuração alterada: ${toggle.dataset.toggle}`);
+      });
     });
 
-    $("#bds-test-server")?.addEventListener("click", (event) => {
-      const restore = setBusy(event.currentTarget, "Testando...");
-      refreshStatus().finally(restore);
-    });
-
-    $("#bds-refresh-available")?.addEventListener("click", (event) => {
-      const restore = setBusy(event.currentTarget, "Atualizando...");
-      refreshAvailable().finally(restore);
-    });
-
-    $("#bds-install-selected")?.addEventListener("click", (event) => installSelected(event.currentTarget));
-    $("#bds-install-latest")?.addEventListener("click", (event) => installLatest(event.currentTarget));
-    $("#bds-install-manual")?.addEventListener("click", (event) => installManual(event.currentTarget));
-
-    $("#bds-stop-active")?.addEventListener("click", (event) => stopServer("", event.currentTarget));
-    $("#bds-show-logs")?.addEventListener("click", () => showLogs(""));
-    $("#clear-display")?.addEventListener("click", () => {
-      const display = $("#display-log");
-      if (display) display.textContent = "[SYSTEM] Display limpo.";
-      postJson("/api/action", { action: "clear_logs" }).catch(() => {});
-    });
-    $("#refresh-display")?.addEventListener("click", refreshLogs);
-    $("#open-project-folder")?.addEventListener("click", (event) => openProjectFolder(event.currentTarget));
-
-    document.addEventListener("click", (event) => {
-      const start = event.target.closest("[data-bds-start]");
-      if (start) return startServer(start.dataset.bdsStart, start);
-
-      const stop = event.target.closest("[data-bds-stop]");
-      if (stop) return stopServer(stop.dataset.bdsStop, stop);
-
-      const restart = event.target.closest("[data-bds-restart]");
-      if (restart) return restartServer(restart.dataset.bdsRestart, restart);
-
-      const remove = event.target.closest("[data-bds-remove]");
-      if (remove) return removeServer(remove.dataset.bdsRemove, remove);
-
-      const logs = event.target.closest("[data-bds-logs]");
-      if (logs) return showLogs(logs.dataset.bdsLogs);
-    });
+    const file = $("#modpack-file");
+    const label = $("#modpack-file-label");
+    if (file && label) {
+      file.addEventListener("change", () => {
+        label.textContent = file.files && file.files[0] ? file.files[0].name : "Clique para escolher ou arraste o arquivo aqui";
+      });
+    }
   }
 
-  async function boot() {
+  document.addEventListener("DOMContentLoaded", () => {
     bindEvents();
-    await Promise.allSettled([
-      refreshAvailable(),
-      refreshInstalled(),
-      refreshStatus(),
-      refreshLogs()
-    ]);
-
-    window.setInterval(refreshStatus, 15_000);
-  }
-
-  document.addEventListener("DOMContentLoaded", boot);
+    writeLog("SYSTEM", "Correção de lógica e imagens carregada. Interface pronta.");
+    refreshStatus();
+    updateModpacks(false).catch(() => {});
+    setInterval(pollLogs, 4000);
+  });
 })();

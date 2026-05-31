@@ -874,8 +874,7 @@ body::after {
 }
 
 /* Ícone do menu lateral: mesmo tamanho visual do emoji antigo */
-.tab-link .nav-discord-icon,
-.side-link .nav-discord-icon {
+.tab-link .nav-discord-icon {
   width: 18px;
   height: 18px;
   margin-right: 0;
@@ -899,8 +898,7 @@ body::after {
 }
 
 /* Ajuste para botões com ícone e texto */
-.tab-link,
-.side-link {
+.tab-link {
   gap: 10px;
 }
 
@@ -4041,134 +4039,6 @@ button.is-loading,
 }
 
 /* ── Discord Tab — Verification Box ──────────────── */
-#tab-home .verification-box {
-  border-color: rgba(255, 23, 79, .25) !important;
-  background: linear-gradient(145deg, rgba(255, 23, 79, .06), rgba(0, 0, 0, .1)) !important;
-}
-#tab-home .verification-box h3 {
-  font-size: 22px;
-  margin-bottom: 6px;
-  letter-spacing: .5px;
-}
-#tab-home .vstep-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  margin: 16px 0;
-}
-#tab-home .vstep {
-  background: rgba(255, 255, 255, .03);
-  border: 1px solid rgba(255, 255, 255, .06);
-  border-radius: 12px;
-  overflow: hidden;
-  transition: opacity .3s, border-color .3s;
-}
-#tab-home .vstep:not([style*="pointer-events: none"]) {
-  border-color: rgba(53, 234, 255, .15);
-}
-#tab-home .vstep-head {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 16px;
-  background: rgba(53, 234, 255, .03);
-  border-bottom: 1px solid rgba(255, 255, 255, .04);
-}
-#tab-home .vstep-num {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #ff1744, #d50000);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 0 10px rgba(255, 23, 68, .3);
-}
-#tab-home .vstep-title {
-  flex: 1;
-  font-weight: 600;
-  font-size: 13px;
-}
-#tab-home .vstep-status {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--muted, #888);
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-#tab-home .vstep-status::before {
-  content: '';
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--muted, #888);
-  flex-shrink: 0;
-}
-#tab-home .vstep-status[style*="#00c853"]::before {
-  background: #00c853;
-  box-shadow: 0 0 6px #00c853;
-}
-#tab-home .vstep-status[style*="#ffc107"]::before {
-  background: #ffc107;
-  box-shadow: 0 0 6px #ffc107;
-}
-#tab-home .vstep-body {
-  padding: 14px 16px;
-}
-#tab-home .vstep-body p {
-  font-size: 13px;
-  color: var(--muted, #888);
-  margin-bottom: 10px;
-}
-#tab-home .vstep-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  color: #ccc;
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-#tab-home .vstep-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  accent-color: #ff1744;
-  cursor: pointer;
-  border-radius: 4px;
-}
-#tab-home .vstep-code-row {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
-}
-#tab-home .vstep-code-input {
-  width: 100px;
-  padding: 6px 10px;
-  border: 1px solid rgba(255, 255, 255, .12);
-  border-radius: 8px;
-  background: rgba(0, 0, 0, .3);
-  color: #e0e0e0;
-  font-size: 18px;
-  font-weight: 700;
-  font-family: monospace;
-  text-align: center;
-  letter-spacing: 4px;
-}
-#tab-home .vstep-code-input:disabled {
-  opacity: .4;
-}
-#tab-home .vstep-code-input:focus {
-  border-color: #ff1744;
-  outline: none;
-}
 #tab-home #discord-code-msg {
   display: block;
   margin-top: 8px;
@@ -5016,112 +4886,714 @@ button.is-loading,
   }
 }
 
-/* ==========================================================================
-   📦 PATCH CORREÇÃO: DISCORD NA HOME PAGE (SEM QUEBRAS DE LAYOUT)
-   ========================================================================== */
-
-/* Container Principal do Discord inserido na Home */
-#tab-home .home-discord-section {
-  width: 100% !important;
-  margin-top: 30px !important;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  box-sizing: border-box;
-}
-
-/* Forçar os cards internos a ocuparem 100% da largura útil sem bugar */
-#tab-home #admin-discord-actions,
-#tab-home #verification-box,
-#tab-home #member-status-card {
-  width: 100% !important;
-  max-width: 100% !important;
-  box-sizing: border-box;
-  margin-bottom: 0 !important;
-}
-
-/* ─── CORREÇÃO: Caixa de Verificação (Token) ─── */
-#tab-home #verification-box .vstep-list {
-  display: flex;
-  flex-direction: column;
-  gap: 20px !important; /* Devolve o espaçamento vertical entre as etapas */
-  margin-top: 15px;
-}
-
-#tab-home #verification-box .vstep {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  padding: 15px;
-}
-
-/* Consertando a linha do código de verificação (os inputs que colaram) */
-#tab-home .vstep-code-row {
-  display: flex !important;
-  gap: 12px !important; /* Espaço exato e crucial entre os campos e botões */
-  align-items: center !important;
-  justify-content: flex-start !important;
-  flex-wrap: wrap !important;
-  margin-top: 12px !important;
-}
-
-/* Input do Token individual */
-#tab-home .vstep-code-input {
-  width: 110px !important;
-  height: 38px !important;
-  text-align: center !important;
-  font-size: 16px !important;
-  letter-spacing: 2px !important;
-  font-weight: bold !important;
-  background: rgba(0, 0, 0, 0.4) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 4px !important;
-  color: #fff !important;
-}
-
-/* ─── CORREÇÃO: Comportamento dos Botões ─── */
-/* Impede que o botão de vinculação ou confirmação estique 100% da tela */
-#tab-home .btn-discord,
-#tab-home #verification-box .btn,
-#tab-home #member-status-card .btn {
-  width: auto !important; /* Quebra a herança flexiva que esticava o botão */
-  min-width: 180px !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 10px 20px !important;
-  height: 38px !important;
-  font-weight: 600 !important;
-  border-radius: 4px !important;
-  box-sizing: border-box !important;
-}
-
-/* Botão grande final de "Tornar-se Membro Ruby" (Esse sim deve ser cheio e espaçado) */
+/* Botão "Tornar-se Membro Ruby" full-width */
 #tab-home #complete-verification-btn {
   width: 100% !important;
   height: 48px !important;
-  margin-top: 25px !important;
+  margin-top: 20px !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  font-size: 16px !important;
+  font-size: 15px !important;
 }
 
-/* ─── CORREÇÃO: Card de Status do Membro (Premium) ─── */
-#tab-home #member-status-card {
+#server-state {
+  word-break: break-word;
+}
+
+/* =========================================================
+   Dashboard — RubyMC Home Page Consolidado
+   ========================================================= */
+
+.dash {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Hero ── */
+
+.dash-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 22px 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: linear-gradient(145deg, rgba(5,7,16,.88), rgba(7,8,19,.78));
+  box-shadow: inset 0 0 60px rgba(0,0,0,.2), 0 0 30px rgba(255,23,79,.05);
+}
+
+.dash-hero-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dash-hero-emoji {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.dash-hero-text {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dash-hero-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #fff 30%, var(--red));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dash-hero-sub {
+  margin: 0;
+  font-size: 16px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.dash-hero-desc {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.dash-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.btn-glass {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  color: #fff;
+  transition: .2s ease;
+}
+.btn-glass:hover {
+  background: rgba(255,255,255,.12);
+  border-color: rgba(255,255,255,.25);
+  box-shadow: 0 0 20px rgba(255,255,255,.06);
+}
+
+.dash-hero-right {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.dash-profile-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #8792a7;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.dash-hero-right select {
+  min-width: 180px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(2,4,12,.7);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Stats Row ── */
+
+.dash-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.dash-stat {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(5,7,16,.85);
+  transition: .25s ease;
   position: relative;
   overflow: hidden;
 }
+.dash-stat::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  opacity: 0;
+  transition: .25s ease;
+}
+.dash-stat:hover {
+  border-color: rgba(255,255,255,.18);
+  transform: translateY(-1px);
+}
+.dash-stat:hover::before {
+  opacity: 1;
+}
 
-#tab-home #member-status-card .msc-body {
+.dash-stat[data-stat="version"]::before {
+  background: linear-gradient(135deg, rgba(255,23,79,.08), transparent);
+}
+.dash-stat[data-stat="server"]::before {
+  background: linear-gradient(135deg, rgba(53,234,255,.08), transparent);
+}
+.dash-stat[data-stat="status"]::before {
+  background: linear-gradient(135deg, rgba(98,255,143,.08), transparent);
+}
+.dash-stat[data-stat="discord"]::before {
+  background: linear-gradient(135deg, rgba(88,101,242,.08), transparent);
+}
+.dash-stat[data-stat="modpacks"]::before {
+  background: linear-gradient(135deg, rgba(255,193,7,.08), transparent);
+}
+
+.dash-stat-icon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.dash-stat-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 1px;
+  position: relative;
+  z-index: 1;
+  min-width: 0;
 }
 
-#tab-home #member-status-card .msc-stats {
-  display: flex;
-  gap: 15px;
-  flex-wrap: wrap;
-  margin: 10px 0;
+.dash-stat-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #8792a7;
+  text-transform: uppercase;
+  letter-spacing: .5px;
 }
+
+.dash-stat-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.2;
+}
+
+.dash-stat-body small {
+  font-size: 10px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ── Main Grid ── */
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+/* ── Dashboard Card ── */
+
+.dash-card {
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: linear-gradient(145deg, rgba(5,7,16,.92), rgba(7,8,19,.82));
+  box-shadow: inset 0 0 48px rgba(0,0,0,.15), 0 0 20px rgba(255,23,79,.04);
+  overflow: hidden;
+  transition: .25s ease;
+}
+.dash-card:hover {
+  border-color: rgba(255,255,255,.14);
+}
+
+.dash-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: rgba(255,255,255,.02);
+}
+
+.dash-card-header-icon {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.dash-card-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: .5px;
+  text-transform: uppercase;
+  flex: 1;
+}
+
+.dash-card-body {
+  padding: 16px 18px 18px;
+}
+
+/* ── Community Guild ── */
+
+.dash-guild-banner {
+  height: 40px;
+  margin: -16px -18px 0;
+  background: linear-gradient(135deg, rgba(88,101,242,.3), rgba(53,234,255,.06));
+  border-bottom: 1px solid rgba(88,101,242,.15);
+}
+
+.dash-guild-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.dash-guild-avatar {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(145deg, rgba(88,101,242,.25), rgba(53,234,255,.08));
+  border: 2px solid rgba(88,101,242,.35);
+  flex-shrink: 0;
+}
+
+.dash-guild-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #43b581;
+  border: 2px solid rgba(5,7,16,.95);
+  animation: dash-pulse 2s ease-in-out infinite;
+}
+
+@keyframes dash-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(67,181,129,.6); }
+  50% { box-shadow: 0 0 0 4px rgba(67,181,129,0); }
+}
+
+.dash-guild-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dash-guild-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: .3px;
+}
+
+.dash-guild-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 1px 8px;
+  border-radius: 3px;
+  background: rgba(88,101,242,.15);
+  color: #8b9aff;
+  border: 1px solid rgba(88,101,242,.2);
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.dash-guild-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.dash-guild-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+}
+.dash-guild-stat strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1.2;
+}
+.dash-guild-stat small {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.dash-invite-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 0;
+  background: linear-gradient(135deg, #5865f2, #4752c4);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(88,101,242,.2);
+  transition: .2s ease;
+}
+.dash-invite-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 24px rgba(88,101,242,.35);
+}
+
+/* ── Verification Steps ── */
+
+.dash-vstep {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.dash-vstep:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.dash-vstep:first-child {
+  padding-top: 2px;
+}
+
+.dash-vstep-marker {
+  flex-shrink: 0;
+  width: 28px;
+  padding-top: 2px;
+}
+
+.dash-vstep-status {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.06);
+  color: var(--muted);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.dash-vstep-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.dash-vstep-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f0f4ff;
+}
+
+.dash-vstep-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.dash-vstep-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dash-terms-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.dash-terms-check input[type="checkbox"] {
+  accent-color: var(--red);
+}
+
+.dash-link-btn {
+  background: none;
+  border: none;
+  color: var(--cyan);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dash-link-btn:hover {
+  color: #fff;
+}
+
+.dash-vstep-box {
+  margin-top: 8px;
+}
+
+.dash-vstep-box-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dash-code-input {
+  width: 90px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(2,4,12,.7);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 2px;
+}
+
+.dash-msg {
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-top: 6px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+/* ── Member Status Card ── */
+
+.dash-card-member .dash-card-body {
+  padding: 14px 18px 16px;
+}
+
+.dash-verified-badge {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--green);
+  background: rgba(98,255,143,.12);
+  border: 1px solid rgba(98,255,143,.2);
+  border-radius: 20px;
+  padding: 2px 10px;
+  margin-left: auto;
+}
+
+.dash-member-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.dash-member-stat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.06);
+}
+
+.dash-member-stat-icon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.dash-member-stat-label {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+
+.dash-member-stat-value {
+  display: block;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  margin-top: 1px;
+}
+
+.dash-card-member .dash-invite-btn {
+  margin-top: 12px;
+}
+
+/* ── Admin ── */
+
+.dash-admin {
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.06);
+  background: rgba(5,7,16,.8);
+  padding: 14px 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 20px;
+}
+
+.dash-admin-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0f4ff;
+  flex-shrink: 0;
+}
+
+.dash-admin-icon {
+  font-size: 16px;
+}
+
+.dash-admin-desc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+  flex: 1;
+  min-width: 160px;
+}
+
+.dash-admin-status {
+  display: flex;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.dash-admin-status strong {
+  color: #fff;
+}
+
+.dash-admin-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.dash-admin-btn {
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(255,255,255,.03);
+  color: #d0dcf0;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: .2s ease;
+  white-space: nowrap;
+}
+.dash-admin-btn:hover {
+  background: rgba(88,101,242,.1);
+  border-color: rgba(88,101,242,.25);
+  color: #fff;
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 1200px) {
+  .dash-stats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .dash-hero-title {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .dash-grid {
+    grid-template-columns: 1fr;
+  }
+  .dash-admin {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dash-admin-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 700px) {
+  .dash-hero {
+    flex-direction: column;
+  }
+  .dash-hero-right {
+    width: 100%;
+  }
+  .dash-hero-right select {
+    width: 100%;
+  }
+  .dash-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .dash-guild-stats {
+    grid-template-columns: 1fr;
+  }
+  .dash-member-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .dash-stats {
+    grid-template-columns: 1fr;
+  }
+  .dash-actions {
+    flex-direction: column;
+  }
+  .dash-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* ── Animations ── */
+
+@keyframes dash-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dash-hero { animation: dash-fade-in .35s ease both; }
+.dash-stats { animation: dash-fade-in .35s ease .08s both; }
+.dash-grid { animation: dash-fade-in .35s ease .15s both; }
+.dash-admin { animation: dash-fade-in .35s ease .22s both; }

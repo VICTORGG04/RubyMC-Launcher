@@ -1,366 +1,204 @@
 # 💎 RubyMC Bedrock BDS
 
-
 <div align="center">
 
-![Ruby](https://img.shields.io/badge/Ruby-3.2+-CC342D?style=for-the-badge&logo=ruby&logoColor=white)
-![Minecraft](https://img.shields.io/badge/Minecraft-Bedrock-00AEEF?style=for-the-badge&logo=minecraft&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)
-![BDS](https://img.shields.io/badge/BDS-Manager-00E5FF?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Development-00E0FF?style=for-the-badge)
+![Ruby](https://img.shields.io/badge/Ruby_3.2+-CC342D?style=for-the-badge&logo=ruby&logoColor=white)
+![Minecraft](https://img.shields.io/badge/Minecraft_Bedrock-00AEEF?style=for-the-badge&logo=minecraft&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux_Ubuntu-E95420?style=for-the-badge&logo=ubuntu&logoColor=white)
+![BDS](https://img.shields.io/badge/BDS_Manager-00E5FF?style=for-the-badge)
+![Sinatra](https://img.shields.io/badge/Sinatra_4.2-000000?style=for-the-badge&logo=ruby&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
+
+**Gerenciador visual para Minecraft Bedrock Dedicated Server com painel web, monitoramento UDP e controle de instâncias**
 
 </div>
 
 ---
 
-# 🖼️ Screenshots
+## 📸 Screenshots
 
 <div align="center">
 
-| 🏠 Início                                                           | 🌐 Servidor BDS                                                       |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 🏠 Início | 🌐 Servidor BDS |
+|---|---|
 | <img src="docs/assets/bedrock/bedrock-home-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-server-panel.png" width="100%"> |
 
-| 📦 Versões BDS                                                          | 📜 Display                                                             |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| 📦 Versões BDS | 📜 Display |
+|---|---|
 | <img src="docs/assets/bedrock/bedrock-versions-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-display-panel.png" width="100%"> |
 
-| 📁 Projeto                                                             | ⚙️ Configurações                                                        |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| 📁 Projeto | ⚙️ Configurações |
+|---|---|
 | <img src="docs/assets/bedrock/bedrock-project-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-settings-panel.png" width="100%"> |
 
 </div>
 
 ---
 
-# 🚀 Visão geral
+## 🚀 Funcionalidades
 
-O **RubyMC Bedrock BDS** é um ambiente administrativo completo criado para gerenciamento visual de servidores Bedrock Dedicated Server.
+### Painel Web
 
-O sistema foi desenvolvido para:
+| Aba | Função |
+|---|---|
+| 🏠 **Início** | Dashboard com status geral e ações rápidas |
+| 🌐 **Servidor BDS** | Monitoramento em tempo real (PID, ping, capacidade, versão) |
+| 📦 **Versões BDS** | Download automático de versões oficiais Mojang |
+| 📜 **Display** | Logs em tempo real do servidor |
+| 📁 **Projeto** | Acesso ao diretório raiz e arquivos do ambiente |
+| ⚙️ **Configurações** | IP, portas e informações do ambiente |
 
-* instalar versões oficiais do BDS;
-* iniciar/parar/reiniciar instâncias;
-* monitorar servidores Bedrock;
-* visualizar logs;
-* controlar diretórios;
-* administrar múltiplas versões;
-* oferecer gerenciamento visual moderno.
+### Monitoramento
 
----
+- **Status** online/offline com validação UDP
+- **PID** ativo do processo BDS
+- **Ping** do servidor
+- **Capacidade** de jogadores
+- **Versão ativa** do BDS
+- **Horário** do último check
 
-# ⚡ Recursos
+### Gerenciamento de Versões
 
-## 🌐 Painel Web Administrativo
+- Download automático de versões oficiais Mojang
+- Múltiplas versões instaladas simultaneamente
+- Inicialização independente por versão
+- Remoção de instâncias
 
-O launcher fornece:
+### Controle de Instâncias
 
-* interface web dark neon;
-* gerenciamento visual;
-* monitoramento em tempo real;
-* controle operacional;
-* múltiplas instâncias BDS;
-* gerenciamento Linux integrado.
-
----
-
-## 📦 Gerenciamento de versões BDS
-
-O sistema suporta:
-
-* download automático;
-* instalação oficial Mojang;
-* múltiplas versões;
-* inicialização independente;
-* reinicialização rápida;
-* remoção de instâncias.
+| Ação | Descrição |
+|---|---|
+| Iniciar | Sobe servidor BDS |
+| Parar | Desliga servidor BDS |
+| Reiniciar | Reinicia servidor BDS |
+| Logs | Abre console de logs |
+| Remover | Remove instância |
 
 ---
 
-## 🖥️ Monitor Operacional
+## 📋 Pré-requisitos
 
-O painel mostra:
-
-* PID ativo;
-* status online/offline;
-* validação UDP;
-* ping;
-* capacidade de jogadores;
-* versão ativa;
-* horário do último check.
+| Requisito | Verificação |
+|---|---|
+| **Ruby** 3.0+ | `ruby --version` |
+| **Bundler** | `gem install bundler` |
+| **Linux** (Ubuntu/Debian x64) | — |
+| **BDS** | Download automático pelo painel |
 
 ---
 
-## 📜 Display Interno
+## ⚙️ Instalação
 
-A aba Display permite:
+```bash
+# 1. Clone o repositório
+git clone https://github.com/VICTORGG04/RubyMC-Launcher.git
+cd RubyMC-Launcher/rubymc-bedrock
 
-* logs em tempo real;
-* limpeza rápida;
-* atualização dinâmica;
-* monitoramento interno;
-* depuração operacional.
+# 2. Instale as dependências Ruby
+bundle install
 
----
+# 3. Inicie o painel
+./rubymc start
+```
 
-## 📁 Projeto
-
-A página Projeto fornece:
-
-* acesso ao diretório raiz;
-* controle operacional Linux;
-* acesso rápido aos arquivos;
-* gerenciamento físico do ambiente BDS.
+Acesse o painel em **http://127.0.0.1:4567**
 
 ---
 
-## ⚙️ Configurações
+## 💻 CLI Admin (`./rubymc`)
 
-A aba Configurações centraliza:
+| Comando | Descrição |
+|---|---|
+| `./rubymc start` | Inicia painel web + monitor BDS |
+| `./rubymc stop` | Para painel + servidores |
+| `./rubymc restart` | Reinicia tudo |
+| `./rubymc status` | Status do projeto |
+| `./rubymc logs` | Logs do painel |
+| `./rubymc server start` | Inicia servidor BDS |
+| `./rubymc server stop` | Para servidor BDS |
+| `./rubymc server restart` | Reinicia servidor BDS |
+| `./rubymc server logs` | Logs do servidor BDS |
 
-* IP do servidor;
-* portas;
-* acesso da comunidade;
-* informações do ambiente;
-* gerenciamento operacional.
+### Variáveis de Ambiente
+
+| Variável | Padrão | Descrição |
+|---|---|---|
+| `RUBYMC_HOST` | `127.0.0.1` | Host do servidor web |
+| `RUBYMC_PORT` | `4567` | Porta do servidor web |
 
 ---
 
-# 🏗️ Estrutura do projeto
+## 🏗️ Estrutura do Projeto
 
-```text id="b7sl2q"
+```
 rubymc-bedrock/
-├── README.md
-├── rubymc
-├── Gemfile
-├── config/
-├── lib/
-├── scripts/
-├── web/
+├── rubymc                   # CLI Admin (bash)
+├── Gemfile                  # Dependências Ruby
+├── Gemfile.lock
+│
+├── lib/                     # Módulos Ruby
+├── config/                  # Configurações
+├── web/                     # Frontend
 │   ├── assets/
 │   │   ├── css/
 │   │   ├── js/
 │   │   ├── backgrounds/
 │   │   └── img/
 │   └── views/
-├── bedrock_servers/
-├── logs/
-└── tmp/
+├── scripts/                 # Scripts auxiliares
+├── bedrock_servers/         # Instâncias BDS (runtime)
+├── logs/                    # Logs do servidor
+├── tmp/                     # Runtime (gitignorado)
+└── docs/
+    └── assets/bedrock/      # Screenshots
 ```
 
 ---
 
-# 🧠 Interface RubyMC
+## 🖥️ Interface
 
-O RubyMC Bedrock utiliza:
-
-* visual neon cyan/red;
-* backgrounds cinematográficos;
-* layout inspirado em RPG dark fantasy;
-* sidebar moderna;
-* painéis responsivos;
-* efeitos glow.
+- **Visual neon** cyan/red com backgrounds cinematográficos
+- **Layout** inspirado em RPG dark fantasy
+- **Sidebar** moderna com efeitos glow
+- **Painéis** responsivos e dark mode
 
 ---
 
-# 📋 Páginas principais
+## 🔒 Segurança
 
-```text id="evu7m9"
-Início
-Servidor BDS
-Versões BDS
-Display
-Projeto
-Configurações
-```
+- ✅ **SSRF Protection** — downloads de URL bloqueiam IPs privados
+- ✅ **Command Injection** — execução de comandos via array (`Open3.capture3`, `system` com args separados)
+- ✅ **Rate Limiting** — limite de threads simultâneas
+- ✅ **Scheme Validation** — downloads rejeitam protocolos não confiáveis
 
 ---
 
-# ⚙️ Execução
+## 🗺️ Roadmap
 
-## Instalar dependências
+### ✅ Atual
+- [x] Gerenciamento de versões BDS (download + instalação)
+- [x] Monitoramento UDP (PID, ping, capacidade)
+- [x] Controle de instâncias (start/stop/restart/remove)
+- [x] Display de logs em tempo real
+- [x] Painel web dark neon
+- [x] Proteções de segurança
 
-```bash id="n8prxh"
-bundle install
-```
-
----
-
-## Iniciar painel
-
-```bash id="qv42o6"
-./rubymc start
-```
-
----
-
-## Reiniciar painel
-
-```bash id="4g4g7k"
-./rubymc restart
-```
+### 🔜 Futuro
+- [ ] Auto-update BDS
+- [ ] Backup automático
+- [ ] Integração IA local
+- [ ] Painel multiusuário
+- [ ] Gerenciamento remoto
+- [ ] Suporte Docker
 
 ---
 
-## Parar painel
-
-```bash id="5sdfu0"
-./rubymc stop
-```
-
----
-
-## Ver logs
-
-```bash id="x3k09m"
-./rubymc logs
-```
-
----
-
-# 🌐 Endereço padrão
-
-```text id="ut6pj4"
-http://127.0.0.1:4567
-```
-
----
-
-# 📦 Gerenciamento de instâncias
-
-O sistema suporta:
-
-* múltiplas instalações;
-* múltiplas versões;
-* múltiplos ambientes;
-* gerenciamento independente;
-* monitoramento simultâneo.
-
----
-
-# 🔥 Recursos operacionais
-
-## Controle rápido
-
-* iniciar servidor;
-* parar servidor;
-* reiniciar servidor;
-* remover instância;
-* abrir logs;
-* atualizar monitor.
-
----
-
-## Monitoramento
-
-```text id="ly2u8u"
-ONLINE
-PING
-PID
-VERSÃO
-CHECK
-CAPACIDADE
-```
-
----
-
-# 🛠️ Instalação
-
-Clone o repositório:
-
-```bash id="h3vl4z"
-git clone https://github.com/VICTORGG04/RubyMC-Launcher.git
-```
-
-Entre na pasta Bedrock:
-
-```bash id="vwaw73"
-cd RubyMC-Launcher/rubymc-bedrock
-```
-
-Instale dependências:
-
-```bash id="o9ph1w"
-bundle install
-```
-
----
-
-# 🧩 Dependências
-
-## Ruby
-
-```text id="ohj4x6"
-Ruby 3.x
-```
-
-## Gems principais
-
-* sinatra
-* puma
-* json
-* yaml
-* fileutils
-
----
-
-# 🐧 Ambiente Linux
-
-O projeto foi desenvolvido para:
-
-```text id="t0mp9p"
-Ubuntu Dedicated Server x64
-Linux
-Bedrock Dedicated Server
-```
-
----
-
-# 🔒 Segurança
-
-Nunca publique:
-
-* IPs privados;
-* configurações reais;
-* diretórios internos;
-* portas administrativas.
-
-Use arquivos separados para produção.
-
----
-
-# 🗺️ Roadmap
-
-## ✅ Atual
-
-* gerenciamento BDS;
-* painel web;
-* múltiplas instâncias;
-* monitoramento;
-* display interno;
-* gerenciamento visual.
-
----
-
-## 🔜 Futuro
-
-* auto-update BDS;
-* suporte Docker;
-* backup automático;
-* gerenciamento remoto;
-* integração IA;
-* monitoramento avançado;
-* painel multiusuário.
-
----
-
-# 📄 Licença
+## 📄 Licença
 
 Este projeto está licenciado sob a **MIT License** — consulte o arquivo [LICENSE](../LICENSE) para detalhes.
 
 ---
 
-# 👨‍💻 Autor
+## 👨‍💻 Autor
 
 Desenvolvido por **Victor Marcial**.

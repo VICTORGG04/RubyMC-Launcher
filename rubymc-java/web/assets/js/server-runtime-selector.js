@@ -4,11 +4,6 @@
   const STORAGE_VERSION_KEY = "rubymc.server.java.version";
 
   const inFlight = new Set();
-  let cachedJavaVersions = [];
-
-  function currentType() {
-    return "java";
-  }
 
   function selectedVersion() {
     const select = $("#server-runtime-version");
@@ -111,7 +106,6 @@
 
     const installed = data.installed || [];
     const active = data.active || null;
-    cachedJavaVersions = installed;
 
     return { installed, active };
   }
@@ -317,5 +311,4 @@
     init();
   }
 
-  window.currentType = currentType;
 })();

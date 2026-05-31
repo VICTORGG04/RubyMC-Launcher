@@ -45,18 +45,6 @@
   }
   global.setText = setText;
 
-  function setTextAll(ids, value) {
-    ids.forEach((id) => setText(id, value));
-  }
-  global.setTextAll = setTextAll;
-
-  function setValue(id, value) {
-    if (value === undefined || value === null || value === "") return;
-    const el = document.getElementById(id);
-    if (el) el.value = String(value);
-  }
-  global.setValue = setValue;
-
   function setBusy(button, busy, label) {
     if (!button) return;
     button.disabled = busy;
@@ -64,11 +52,6 @@
     if (label) button.textContent = busy ? "Processando..." : label;
   }
   global.setBusy = setBusy;
-
-  function sleep(ms) {
-    return new Promise(function(resolve) { setTimeout(resolve, ms); });
-  }
-  global.sleep = sleep;
 
   // --- API helpers ---
 
@@ -108,33 +91,6 @@
   }
   global.apiGet = apiGet;
 
-  async function getJson(endpoint) {
-    return safeJson(await fetch(endpoint, { headers: { Accept: "application/json" } }), endpoint);
-  }
-  global.getJson = getJson;
-
-  async function postJson(endpoint, payload) {
-    return safeJson(await fetch(endpoint, {
-      method: "POST",
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
-      body: JSON.stringify(payload || {})
-    }), endpoint);
-  }
-  global.postJson = postJson;
-
-  async function firstGet(urls) {
-    let lastError;
-    for (const url of urls) {
-      try {
-        return await apiFetch(url);
-      } catch (error) {
-        lastError = error;
-      }
-    }
-    throw lastError;
-  }
-  global.firstGet = firstGet;
-
   async function firstSuccessful(calls) {
     let lastError;
     for (const call of calls) {
@@ -148,12 +104,4 @@
   }
   global.firstSuccessful = firstSuccessful;
 
-  // --- Namespace ---
-  global.RubyMC = global.RubyMC || {};
-  Object.assign(global.RubyMC, {
-    $: global.$, $$: global.$$, esc, time, log, logBlock,
-    setText, setValue, setBusy, sleep,
-    safeJson, apiFetch, apiPost, apiGet, getJson, postJson,
-    firstGet, firstSuccessful
-  });
 })(window);

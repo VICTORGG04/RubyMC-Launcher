@@ -5,6 +5,7 @@ require "json"
 require "fileutils"
 require "open3"
 require "digest"
+require "zip"
 
 # =============================================================================
 # MinecraftManager — Download, instalação e launch do Minecraft Java Edition
@@ -61,6 +62,7 @@ class MinecraftManager
     meta = JSON.parse(File.read(json_path))
     download_client(version_id, meta, version_dir, &cb)
     download_libraries(meta, &cb)
+    download_natives(meta, version_id, &cb)
     download_assets(meta, &cb)
     meta
   end
@@ -189,6 +191,44 @@ class MinecraftManager
     end
   end
 
+  def download_natives(meta, version_id, &cb)
+    natives_path = File.join(@natives_dir, version_id)
+    FileUtils.mkdir_p(natives_path)
+
+    (meta["libraries"] || []).each_with_index do |lib, i|
+      next unless should_install_library?(lib)
+
+      classifiers = lib.dig("downloads", "classifiers") || {}
+      native = classifiers["natives-linux"]
+      next unless native
+
+      path = File.join(@libraries_dir, native["path"])
+      unless File.exist?(path)
+        cb&.call("Native #{i + 1}: #{File.basename(native["path"])}")
+        FileUtils.mkdir_p(File.dirname(path))
+        download_file(native["url"], path)
+      end
+
+      extract_native_archive(path, natives_path)
+    end
+  end
+
+  def extract_native_archive(archive_path, natives_path)
+    Zip::File.open(archive_path) do |zip|
+      zip.each do |entry|
+        name = entry.name.to_s
+        next if name.end_with?("/")
+        next if name.start_with?("META-INF/")
+        next unless name.end_with?(".so")
+
+        target = File.join(natives_path, File.basename(name))
+        entry.extract(target) { true }
+      end
+    end
+  rescue => e
+    raise "Erro ao extrair natives de #{File.basename(archive_path)}: #{e.message}"
+  end
+
   def build_classpath(version_id, meta)
     paths = []
     (meta["libraries"] || []).each do |lib|
@@ -200,7 +240,7 @@ class MinecraftManager
     paths.join(":")
   end
 
-  def build_launch_args(version_meta:, version_id:, username:, uuid:, mc_access_token:, classpath:, ram_mb:, server_address: nil)
+  def build_launch_args(version_meta:, version_id:, username:, uuid:, mc_access_token:, classpath:, ram_mb:, server_address: nil, java_path_for_detection: "java")
     natives_path = File.join(@natives_dir, version_id)
     FileUtils.mkdir_p(natives_path)
 
@@ -223,7 +263,7 @@ class MinecraftManager
     jvm = ["-Xmx#{ram_mb}M", "-Xms512M", "-XX:+UseG1GC",
            "-Djava.library.path=#{natives_path}", "-Dfile.encoding=UTF-8"]
 
-    java_ver = java_major_version
+    java_ver = java_major_version(java_path: java_path_for_detection)
 
     if version_meta.dig("arguments", "jvm")
       version_meta["arguments"]["jvm"].each do |a|
@@ -260,8 +300,8 @@ class MinecraftManager
 
   # Detecta a versão major do Java em uso (ex: 17, 21, 23)
   # Retorna 0 se não conseguir detectar (comportamento seguro: filtra o arg)
-  def java_major_version
-    out, = Open3.capture2e("java", "-version")
+  def java_major_version(java_path: "java")
+    out, = Open3.capture2e(java_path.to_s, "-version")
     # "java version \"21.0.3\"" ou "openjdk version \"17.0.11\""
     match = out.match(/version "(?:1\.)?(\d+)/)
     match ? match[1].to_i : 0

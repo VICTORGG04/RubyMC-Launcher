@@ -9,7 +9,6 @@ require "yaml"
 
 require_relative "microsoft_auth"
 require_relative "minecraft_manager"
-require_relative "session_manager"
 require_relative "../account_bank"
 require_relative "auto_updater"
 require_relative "../discord_integration"

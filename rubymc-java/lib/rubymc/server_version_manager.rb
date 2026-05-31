@@ -6,6 +6,7 @@ require 'json'
 require 'time'
 require 'set'
 require 'shellwords'
+require 'open3'
 
 module RubyMC
   class ServerVersionManager
@@ -443,21 +444,11 @@ module RubyMC
 
       java = java_bin || recommended_java(version_id)[:java_path]
       out_jar = File.join(vdir, "fabric-server-#{version_id}.jar")
-      cmd = [
-        Shellwords.escape(java),
-        '-jar',
-        Shellwords.escape(installer_jar),
-        'server',
-        '-mcversion',
-        Shellwords.escape(version_id),
-        '-loader',
-        Shellwords.escape(loader_version),
-        '-downloadMinecraft'
-      ].join(' ')
+      args = [java, '-jar', installer_jar, 'server', '-mcversion', version_id, '-loader', loader_version, '-downloadMinecraft']
 
       Dir.chdir(vdir) do
-        output = `#{cmd} 2>&1`
-        unless $?.success?
+        output, _, status = Open3.capture3(*args)
+        unless status.success?
           FileUtils.rm_f(installer_jar)
           return { ok: false, error: "Fabric installer falhou: #{output.lines.last(5).join.strip}" }
         end

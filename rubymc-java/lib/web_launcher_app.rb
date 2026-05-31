@@ -9,13 +9,21 @@ require 'rbconfig'
 require 'socket'
 require 'timeout'
 require 'yaml'
-require 'open-uri'
 require 'zip'
-require 'digest'
+require 'openssl'
 require 'cgi'
 require 'net/http'
 require 'uri'
 require 'set'
+
+# Load .env file if present (must happen before any config loading)
+env_file = File.join(File.dirname(__dir__), '.env')
+if File.file?(env_file)
+  File.read(env_file).each_line do |line|
+    key, val = line.strip.split('=', 2)
+    ENV[key] = val if key && val && !key.empty? && !key.start_with?('#')
+  end
+end
 
 begin
   require_relative 'rubymc/minecraft_server_status'
@@ -83,6 +91,8 @@ module RubyMC
       '.svg' => 'image/svg+xml',
       '.ico' => 'image/x-icon'
     }.freeze
+
+    DISCORD_CALLBACK_URL = 'http://127.0.0.1:4567/api/auth/discord/callback'.freeze
 
     attr_reader :root, :host, :port, :log_file
 
@@ -218,14 +228,10 @@ module RubyMC
         if version_id.empty?
           return json(res, { ok: false, error: 'version_id é obrigatório.' })
         end
-        Thread.new do
-          begin
-            client_mgr = MinecraftManager.new
-            client_mgr.install_version(version_id) { |msg| log('DOWNLOAD', msg) }
-            log('OK', "Versão #{version_id} instalada com sucesso.")
-          rescue => e
-            log('ERROR', "Falha ao instalar #{version_id}: #{e.message}")
-          end
+        with_thread_slot("install #{version_id}") do
+          client_mgr = MinecraftManager.new
+          client_mgr.install_version(version_id) { |msg| log('DOWNLOAD', msg) }
+          log('OK', "Versão #{version_id} instalada com sucesso.")
         end
         json(res, { ok: true, message: "Instalação de #{version_id} iniciada." })
       when '/api/user/version-status'
@@ -482,7 +488,7 @@ module RubyMC
         json(res, rubymc_simular_discord)
 
         # ── Discord avançado (via módulos opcionais) ──────────────────────────
-      when 'validate_discord_config'
+      when 'validate_discord', 'discord_validate', 'validate_discord_settings', 'validate_discord_config'
         report = validate_discord_config(remote: true)
         json(res, {
           ok: report[:errors].empty?,
@@ -780,10 +786,6 @@ module RubyMC
       'não encontrado'
     end
 
-    def modpacks_count
-      list_modpack_payloads.size
-    end
-
     def list_modpack_payloads
       manager = modpack_manager
       if manager
@@ -884,20 +886,6 @@ module RubyMC
                 'não configurado'
 
       { address: address, status: address == 'não configurado' ? 'pendente' : 'configurado' }
-    end
-
-    def load_settings
-      if defined?(RubyMC::Settings)
-        return RubyMC::Settings.new(root).data
-      end
-
-      file = File.join(root, 'config', 'settings.yml')
-      return {} unless File.file?(file)
-
-      YAML.safe_load(File.read(file), permitted_classes: [Symbol], aliases: true) || {}
-    rescue StandardError => e
-      log('WARN', "Não foi possível ler config/settings.yml: #{e.message}")
-      {}
     end
 
     def discord_config
@@ -1332,15 +1320,41 @@ module RubyMC
       @server_action_mutex.synchronize { @server_action_busy.delete(key) }
     end
 
-    def run_async(label)
-      log('ACTION', "#{label} iniciado...")
+    MAX_BG_THREADS = 32
+
+    def with_thread_slot(label)
+      mtx = @bg_thread_mtx ||= Mutex.new
+      ctr = @bg_thread_ctr ||= 0
+
+      acquired = false
+      mtx.synchronize do
+        if ctr < MAX_BG_THREADS
+          ctr += 1
+          acquired = true
+        end
+      end
+
+      unless acquired
+        log('WARN', "Thread pool cheia (#{MAX_BG_THREADS}), ignorando: #{label}")
+        return
+      end
+
       Thread.new do
         begin
           yield
-          log('OK', "#{label} concluído.")
-        rescue StandardError => e
-          log('ERROR', "#{label} falhou: #{e.class}: #{e.message}")
+        rescue => e
+          log('ERROR', "#{label} lançou exceção: #{e.message}")
+        ensure
+          mtx.synchronize { @bg_thread_ctr -= 1 }
         end
+      end
+    end
+
+    def run_async(label)
+      log('ACTION', "#{label} iniciado...")
+      with_thread_slot(label) do
+        yield
+        log('OK', "#{label} concluído.")
       end
     end
 
@@ -1441,25 +1455,6 @@ module RubyMC
       log('ERROR', "Falha ao enviar log para o Discord: #{e.class}: #{e.message}")
       log('WARN', 'Confira: bot_enabled true, bot_token válido, guild_id correto, canal de logs configurado e permissão Enviar Mensagens.')
       raise
-    end
-
-    def open_classic_launcher(extra_env: {})
-      launcher = File.join(root, 'launcher.rb')
-      raise 'launcher.rb não encontrado na raiz do projeto.' unless File.file?(launcher)
-
-      bundle = `which bundle 2>/dev/null`.strip
-      bundle = nil if bundle.empty?
-      env_part = extra_env.map { |k, v| "#{k}=#{shell_escape(v)}" }.join(' ')
-      prefix = bundle ? "#{shell_escape(bundle)} exec " : ''
-      command = %(cd #{shell_escape(root)} && #{env_part}#{prefix}#{shell_escape(RbConfig.ruby)} #{shell_escape(launcher)}; echo; read -p "Pressione ENTER para fechar...")
-
-      terminal_cmd = terminal_command(command)
-      log('COMMAND', terminal_cmd.join(' '))
-
-      pid = Process.spawn(*terminal_cmd, out: File::NULL, err: File::NULL)
-      Process.detach(pid)
-      log('OK', "Launcher clássico iniciado em terminal externo. PID: #{pid}")
-      pid
     end
 
     def terminal_command(command)
@@ -1891,7 +1886,15 @@ module RubyMC
     end
 
     def set_session_cookie(res, session_id)
-      res['Set-Cookie'] = "rubymc_session=#{session_id}; Path=/; HttpOnly; SameSite=Lax; Max-Age=86400"
+      res['Set-Cookie'] = "rubymc_session=#{session_id}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400"
+    end
+
+    def session_hmac_key
+      @session_hmac_key ||= SecureRandom.random_bytes(32)
+    end
+
+    def compute_session_hmac(payload)
+      OpenSSL::HMAC.hexdigest('SHA256', session_hmac_key, payload)
     end
 
     def save_sessions
@@ -1899,7 +1902,9 @@ module RubyMC
         data = @sessions.transform_values do |s|
           s.merge(expires_at: s[:expires_at]&.iso8601)
         end
-        File.write(@session_file, JSON.generate(data))
+        json = JSON.generate(data)
+        hmac = compute_session_hmac(json)
+        File.write(@session_file, JSON.generate(data: json, hmac: hmac))
       end
     rescue StandardError => e
       log('WARN', "save_sessions: #{e.message}")
@@ -1909,7 +1914,21 @@ module RubyMC
       return unless File.exist?(@session_file)
 
       @sessions_mutex.synchronize do
-        raw = JSON.parse(File.read(@session_file))
+        envelope = JSON.parse(File.read(@session_file))
+        raw_json = envelope['data']
+        stored_hmac = envelope['hmac']
+
+        unless raw_json.is_a?(String) && stored_hmac.is_a?(String)
+          return @sessions = {}
+        end
+
+        expected_hmac = compute_session_hmac(raw_json)
+        unless OpenSSL.secure_compare(expected_hmac, stored_hmac)
+          log('WARN', 'load_sessions: HMAC mismatch — session file tampered, resetting')
+          return @sessions = {}
+        end
+
+        raw = JSON.parse(raw_json)
         @sessions = raw.transform_values do |s|
           s.transform_keys(&:to_sym).tap do |sym|
             sym[:expires_at] = Time.parse(sym[:expires_at]) if sym[:expires_at].is_a?(String)
@@ -1939,9 +1958,9 @@ module RubyMC
     end
 
     def refresh_user_role(user_id)
-      settings = load_settings
-      guild_id = settings.dig('discord', 'guild_id')
-      bot_token = settings.dig('discord', 'bot_token')
+      oauth = oauth_config
+      guild_id = oauth[:guild_id]
+      bot_token = oauth[:bot_token]
       return nil unless guild_id && bot_token
       uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{user_id}")
       req = Net::HTTP::Get.new(uri)
@@ -1957,22 +1976,12 @@ module RubyMC
 
     def dynamic_redirect_uri(req, oauth)
       configured = oauth['redirect_uri'].to_s.strip
-      return configured unless configured.empty?
-
-      "http://127.0.0.1:4567/api/auth/discord/callback"
+      configured.empty? ? DISCORD_CALLBACK_URL : configured
     end
 
     def request_host(req)
       h = req['Host']
       h && !h.empty? ? h : "#{host}:#{port}"
-    end
-
-    def host
-      @host
-    end
-
-    def port
-      @port
     end
 
     def handle_auth_status(req, res)
@@ -1988,12 +1997,26 @@ module RubyMC
       end
     end
 
+    def oauth_config
+      @oauth_config ||= begin
+        cfg = RubyMC::DiscordConfig.new(load_settings)
+        {
+          client_id: cfg.client_id,
+          client_secret: cfg.client_secret,
+          bot_token: cfg.bot_token,
+          guild_id: cfg.guild_id,
+          redirect_uri: cfg.discord.dig('oauth', 'redirect_uri').to_s.strip
+        }
+      end
+    end
+
     def handle_discord_login(req, res)
-      settings = load_settings
-      oauth = settings.dig('discord', 'oauth') || {}
-      client_id = oauth['client_id']
-      redirect_uri = CGI.escape(dynamic_redirect_uri(req, oauth))
-      url = "https://discord.com/api/oauth2/authorize?client_id=#{client_id}&redirect_uri=#{redirect_uri}&response_type=code&scope=identify"
+      oauth = oauth_config
+      state = SecureRandom.hex(16)
+      (@oauth_states ||= {})[state] = Time.now + 300
+      cb = oauth[:redirect_uri].to_s.strip
+      cb = DISCORD_CALLBACK_URL if cb.empty?
+      url = "https://discord.com/api/oauth2/authorize?client_id=#{oauth[:client_id]}&redirect_uri=#{CGI.escape(cb)}&response_type=code&scope=identify&state=#{state}"
       res.status = 302
       res['Location'] = url
     end
@@ -2001,32 +2024,38 @@ module RubyMC
     def handle_discord_callback(req, res)
       code = req.query['code']
       error = req.query['error']
+      state = req.query['state']
       if error || !code
         res.status = 302
         res['Location'] = "/?login=error&reason=#{CGI.escape(error || 'no_code')}"
         return
       end
 
-      settings = load_settings
-      oauth = settings.dig('discord', 'oauth') || {}
-      guild_id = settings.dig('discord', 'guild_id')
-      bot_token = settings.dig('discord', 'bot_token')
+      # Validate OAuth state parameter (CSRF protection)
+      if state.nil? || !(@oauth_states ||= {}).key?(state) || @oauth_states[state] < Time.now
+        res.status = 302
+        res['Location'] = '/?login=error&reason=invalid_state'
+        return
+      end
+      @oauth_states.delete(state)
 
-      unless oauth['client_id'] && oauth['client_secret'] && guild_id && bot_token
+      oauth = oauth_config
+      unless oauth[:client_id] && oauth[:client_secret] && oauth[:guild_id] && oauth[:bot_token]
         res.status = 302
         res['Location'] = '/?login=error&reason=missing_config'
         return
       end
 
       # 1. Exchange code for token
-      redirect_uri = dynamic_redirect_uri(req, oauth)
+      cb = oauth[:redirect_uri].to_s.strip
+      cb = DISCORD_CALLBACK_URL if cb.empty?
       token_uri = URI('https://discord.com/api/v10/oauth2/token')
       token_resp = Net::HTTP.post_form(token_uri, {
-        client_id: oauth['client_id'],
-        client_secret: oauth['client_secret'],
+        client_id: oauth[:client_id],
+        client_secret: oauth[:client_secret],
         grant_type: 'authorization_code',
         code: code,
-        redirect_uri: redirect_uri
+        redirect_uri: cb
       })
 
       unless token_resp.code.to_i == 200
@@ -2056,9 +2085,9 @@ module RubyMC
       # 3. Get guild member info (via bot token) — optional
       #     If user is not in the guild, they still get a :member session
       #     and must complete verification (enter server + DM code) to unlock features.
-      member_uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{user_id}")
+      member_uri = URI("https://discord.com/api/v10/guilds/#{oauth[:guild_id]}/members/#{user_id}")
       member_req = Net::HTTP::Get.new(member_uri)
-      member_req['Authorization'] = "Bot #{bot_token}"
+      member_req['Authorization'] = "Bot #{oauth[:bot_token]}"
 
       begin
         member_resp = Net::HTTP.start(member_uri.hostname, member_uri.port, use_ssl: true) { |http| http.request(member_req) }
@@ -2152,9 +2181,9 @@ module RubyMC
       end
 
       uid = user[:user_id].to_s
-      settings = load_settings
-      guild_id = settings.dig('discord', 'guild_id')
-      bot_token = settings.dig('discord', 'bot_token')
+      oauth = oauth_config
+      guild_id = oauth[:guild_id]
+      bot_token = oauth[:bot_token]
 
       unless guild_id && bot_token
         return json(res, { ok: false, error: 'Discord não configurado.' })
@@ -2186,9 +2215,9 @@ module RubyMC
       end
 
       # Verifica se o usuário está no servidor Discord
-      settings = load_settings
-      guild_id = settings.dig('discord', 'guild_id')
-      bot_token = settings.dig('discord', 'bot_token')
+      oauth = oauth_config
+      guild_id = oauth[:guild_id]
+      bot_token = oauth[:bot_token]
       if guild_id && bot_token
         member_uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{uid}")
         member_req = Net::HTTP::Get.new(member_uri)
@@ -2296,10 +2325,28 @@ module RubyMC
       json(res, { ok: false, error: e.message })
     end
 
+    def verification_hmac_key
+      @verification_hmac_key ||= SecureRandom.random_bytes(32)
+    end
+
+    def compute_vdata_hmac(payload)
+      OpenSSL::HMAC.hexdigest('SHA256', verification_hmac_key, payload)
+    end
+
     def load_verification_data
       file = File.join(root, 'tmp', 'verification_data.json')
       return {} unless File.exist?(file)
-      JSON.parse(File.read(file))
+
+      envelope = JSON.parse(File.read(file))
+      raw_json = envelope['data']
+      stored_hmac = envelope['hmac']
+
+      return {} unless raw_json.is_a?(String) && stored_hmac.is_a?(String)
+
+      expected = compute_vdata_hmac(raw_json)
+      return {} unless OpenSSL.secure_compare(expected, stored_hmac)
+
+      JSON.parse(raw_json)
     rescue
       {}
     end
@@ -2307,7 +2354,9 @@ module RubyMC
     def save_verification_data(data)
       file = File.join(root, 'tmp', 'verification_data.json')
       FileUtils.mkdir_p(File.dirname(file))
-      File.write(file, JSON.generate(data))
+      json = JSON.generate(data)
+      hmac = compute_vdata_hmac(json)
+      File.write(file, JSON.generate(data: json, hmac: hmac))
     end
 
   end

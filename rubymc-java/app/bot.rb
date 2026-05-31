@@ -23,6 +23,15 @@
 $stdout.sync = true
 $stderr.sync = true
 
+# Load .env file if present
+env_file = File.join(File.expand_path('..', __dir__), '.env')
+if File.file?(env_file)
+  File.read(env_file).each_line do |line|
+    key, val = line.strip.split('=', 2)
+    ENV[key] = val if key && val && !key.empty? && !key.start_with?('#')
+  end
+end
+
 require "websocket-client-simple"
 require "httparty"
 require "json"
@@ -1131,6 +1140,32 @@ end
 puts ""
 
 MAX_RECONNECT_DELAY = 60
+MAX_BG_THREADS = 16
+$bg_thread_counter = 0
+$bg_thread_counter_mutex = Mutex.new
+
+def track_thread(name: nil, limit: MAX_BG_THREADS, &block)
+  slot = false
+  $bg_thread_counter_mutex.synchronize do
+    if $bg_thread_counter < limit
+      $bg_thread_counter += 1
+      slot = true
+    end
+  end
+
+  unless slot
+    puts "[BOT] ⚠️  Thread limit (#{limit}) atingido, ignorando thread: #{name}"
+    return
+  end
+
+  Thread.new do
+    block.call
+  rescue => e
+    puts "[BOT] Thread #{name}: #{e.message}"
+  ensure
+    $bg_thread_counter_mutex.synchronize { $bg_thread_counter -= 1 }
+  end
+end
 
 def connect_to_gateway
   ws = WebSocket::Client::Simple.connect(GATEWAY_URL)
@@ -1147,7 +1182,7 @@ def connect_to_gateway
     case op
     when 10
       interval = payload["heartbeat_interval"] / 1000.0
-      Thread.new do
+      track_thread(name: 'heartbeat') do
         loop do
           sleep(interval)
           ws.send({ op: 1, d: sequence }.to_json)
@@ -1168,7 +1203,7 @@ def connect_to_gateway
         $bot_user_id = payload.dig("user", "id")
         puts "\e[32m✅ Conectado como: #{payload.dig("user", "username")}\e[0m"
         post_channel_topics
-        Thread.new do
+        track_thread(name: 'server_status_refresh') do
           loop do
             sleep(300)
             post_server_status
@@ -1177,7 +1212,7 @@ def connect_to_gateway
             sleep(60)
           end
         end
-        Thread.new do
+        track_thread(name: 'server_manager_refresh') do
           loop do
             RubyMC::ServerManager::SERVERS.each_key do |key|
               s = RubyMC::ServerManager.status(key)

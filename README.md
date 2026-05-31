@@ -2,419 +2,264 @@
 
 <div align="center">
 
-![Ruby](https://img.shields.io/badge/Ruby-3.2+-CC342D?style=for-the-badge\&logo=ruby\&logoColor=white)
-![Minecraft](https://img.shields.io/badge/Minecraft-Ecosystem-62B47A?style=for-the-badge\&logo=minecraft\&logoColor=white)
-![Java](https://img.shields.io/badge/Java-Launcher-FF9800?style=for-the-badge\&logo=openjdk\&logoColor=white)
-![Bedrock](https://img.shields.io/badge/Bedrock-BDS-00AEEF?style=for-the-badge\&logo=minecraft\&logoColor=white)
-![Discord](https://img.shields.io/badge/Discord-Integration-5865F2?style=for-the-badge\&logo=discord\&logoColor=white)
-![IA](https://img.shields.io/badge/IA-Ollama-009688?style=for-the-badge)
-![Status](https://img.shields.io/badge/Status-Development-00E0FF?style=for-the-badge)
+![Ruby](https://img.shields.io/badge/Ruby_3.2+-CC342D?style=for-the-badge&logo=ruby&logoColor=white)
+![Minecraft](https://img.shields.io/badge/Minecraft_Java_%2B_Bedrock-62B47A?style=for-the-badge&logo=minecraft&logoColor=white)
+![Discord](https://img.shields.io/badge/Discord_Bot-5865F2?style=for-the-badge&logo=discord&logoColor=white)
+![Ollama](https://img.shields.io/badge/IA_Local_Ollama-009688?style=for-the-badge&logo=ollama&logoColor=white)
+![Sinatra](https://img.shields.io/badge/Sinatra-Web-000000?style=for-the-badge&logo=ruby&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)
 
-Ecossistema Ruby para gerenciamento de servidores Minecraft Java e Minecraft Bedrock Dedicated Server.
+**Ecossistema Ruby para gerenciamento de servidores Minecraft Java Edition e Bedrock Dedicated Server**
 
 </div>
 
 ---
 
-# 🖼️ Showcase do Projeto
+## 📸 Showcase
 
 <div align="center">
 
-| 🏠 Bedrock Início                                                   | 🌐 Servidor BDS                                                       |
-| ------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 🏠 Java — Dashboard | 📦 Java — Modpacks |
+|---|---|
+| <img src="rubymc-java/docs/assets/screenshots/rubymc-tela-inicio.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-modpacks.png" width="100%"> |
+
+| 🌐 Java — Servidor | 💬 Java — Discord |
+|---|---|
+| <img src="rubymc-java/docs/assets/screenshots/rubymc-servidor-comunidade.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-discord-bot.png" width="100%"> |
+
+| 🧠 Java — IA | ⚙️ Java — Configurações |
+|---|---|
+| <img src="rubymc-java/docs/assets/screenshots/rubymc-ia.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-configuracoes.png" width="100%"> |
+
+| 🏠 Bedrock — Início | 🌐 Bedrock — Servidor |
+|---|---|
 | <img src="docs/assets/bedrock/bedrock-home-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-server-panel.png" width="100%"> |
-
-| 📦 Versões BDS                                                          | 📜 Display                                                             |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| <img src="docs/assets/bedrock/bedrock-versions-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-display-panel.png" width="100%"> |
-
-| 📁 Projeto                                                             | ⚙️ Configurações                                                        |
-| ---------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| <img src="docs/assets/bedrock/bedrock-project-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-settings-panel.png" width="100%"> |
 
 </div>
 
 ---
 
-# 🚀 Visão geral
+## 🚀 Visão Geral
 
-O **RubyMC Launcher** é um ecossistema dividido em dois ambientes principais:
+O **RubyMC Launcher** é um ecossistema completo dividido em dois projetos independentes:
 
-| Projeto               | Objetivo                                                             |
-| --------------------- | -------------------------------------------------------------------- |
-| 💎 RubyMC Java        | Launcher Minecraft Java com modpacks, Discord, IA local e painel web |
-| 💎 RubyMC Bedrock BDS | Gerenciador visual para Minecraft Bedrock Dedicated Server           |
+| Projeto | Descrição |
+|---|---|
+| **💎 RubyMC Java** | Launcher Minecraft Java com painel web, modpacks, autenticação Microsoft, bot Discord, IA local via Ollama e gerenciamento de servidor |
+| **💎 RubyMC Bedrock** | Gerenciador visual para Minecraft Bedrock Dedicated Server (BDS) com instalação de versões, monitoramento UDP e controle de instâncias |
 
-O objetivo é fornecer:
+### Destaques de Segurança
 
-* gerenciamento visual;
-* interface dark/neon;
-* integração Discord;
-* IA local;
-* gerenciamento de servidores;
-* monitoramento em tempo real;
-* suporte operacional;
-* organização modular em Ruby.
+- ✅ **Proteção SSRF** — bloqueio de IPs privados em downloads de URL
+- ✅ **Command Injection** — execução de comandos via array (`Open3.capture3`, `system` com args separados)
+- ✅ **Rate Limiting** — limite de 16 threads simultâneas (bot) e 32 (web)
+- ✅ **HMAC Sessions** — dados de sessão e verificação assinados com HMAC-SHA256 (chave derivada do `client_secret`)
+- ✅ **OAuth State Parameter** — prevenção de CSRF no callback Microsoft/Discord
+- ✅ **Validação de Scheme** — downloads rejeitam protocolos que não sejam `http://` ou `https://`
 
 ---
 
-# 🏗️ Estrutura do repositório
+## 🏗️ Estrutura do Repositório
 
-```text id="2qzj1x"
-RubyMC-Launcher/
+```
+MinecraftLauncher/
 ├── README.md
 ├── docs/
 │   └── assets/
-│       └── bedrock/
+│       └── bedrock/              # Screenshots do Bedrock
 │
 ├── rubymc-java/
 │   ├── README.md
-│   ├── bot_daemon.rb
-│   ├── launcher.rb
-│   ├── launcher_gui.rb
-│   ├── config/
-│   ├── lib/
-│   ├── scripts/
-│   └── web/
+│   ├── rubymc                    # CLI Admin (bash)
+│   ├── Gemfile                   # Dependências Ruby
+│   ├── app/                      # Entry points (server.rb, bot.rb, console.rb)
+│   ├── lib/                      # Módulos Ruby
+│   ├── bin/                      # Player CLI + ferramentas
+│   ├── config/                   # settings.yml + exemplo
+│   ├── web/                      # Frontend (HTML + CSS + JS)
+│   ├── archive/scripts/          # Scripts auxiliares
+│   └── docs/                     # Documentação + screenshots
 │
 ├── rubymc-bedrock/
 │   ├── README.md
-│   ├── config/
+│   ├── rubymc                    # CLI Admin (bash)
+│   ├── Gemfile
 │   ├── lib/
+│   ├── config/
+│   ├── web/                      # Frontend BDS
 │   ├── scripts/
-│   ├── web/
 │   └── docs/
 │
-└── scripts/
+└── archive/                      # Scripts legados
 ```
 
 ---
 
-# 💎 RubyMC Java
+## ⚡ Começo Rápido (Java)
 
-O **RubyMC Java** é o launcher voltado para Minecraft Java Edition.
-
-## Recursos
-
-* launcher web;
-* sistema de modpacks;
-* Discord Bot;
-* Rich Presence;
-* IA local;
-* display de logs;
-* gerenciamento de perfis;
-* ambiente RubyMC.
-
-## Módulos principais
-
-```text id="l1r7u9"
-Início
-Modpacks
-Servidor
-Discord
-IA
-Display
-Projeto
-Configurações
-```
-
-## Modpacks
-
-O sistema suporta:
-
-* `.mrpack`
-* `.zip`
-
-Fluxo operacional:
-
-```text id="7krg4n"
-Selecionar arquivo
-→ Validar formato
-→ Importar modpack
-→ Criar perfil
-→ Atualizar launcher
-→ Executar instância
-```
-
-## IA Local
-
-Modelo utilizado:
-
-```text id="jz4z5r"
-qwen3.5:9b
-```
-
-A IA pode:
-
-* interpretar logs;
-* explicar erros;
-* auxiliar configuração;
-* responder dúvidas;
-* apoiar suporte técnico.
-
----
-
-# 💎 RubyMC Bedrock BDS
-
-O **RubyMC Bedrock BDS** é o ambiente administrativo do Minecraft Bedrock Dedicated Server.
-
-## Recursos
-
-* instalação de versões BDS;
-* gerenciamento de instâncias;
-* monitoramento UDP;
-* controle de processos;
-* gerenciamento Linux;
-* monitor ativo;
-* logs em tempo real;
-* painel operacional.
-
-## Páginas principais
-
-```text id="1dbz0j"
-Início
-Servidor BDS
-Versões BDS
-Display
-Projeto
-Configurações
-```
-
----
-
-# 🌐 Servidor BDS
-
-A aba Servidor fornece:
-
-* IP/porta;
-* validação UDP;
-* status online;
-* PID ativo;
-* capacidade;
-* ping;
-* ações rápidas.
-
-## Ações disponíveis
-
-```text id="b7fx2s"
-Iniciar
-Parar
-Reiniciar
-Logs
-Remover
-```
-
----
-
-# 📦 Versões BDS
-
-O sistema permite:
-
-* instalar versões oficiais;
-* atualizar lista;
-* selecionar versões;
-* iniciar versões instaladas;
-* remover instâncias;
-* visualizar diretórios físicos.
-
----
-
-# 📜 Display
-
-O Display funciona como console operacional.
-
-## Recursos
-
-* logs em tempo real;
-* atualização dinâmica;
-* limpeza rápida;
-* monitoramento interno;
-* depuração do backend.
-
----
-
-# 💬 Discord
-
-O ecossistema RubyMC possui integração completa com Discord.
-
-## Recursos
-
-* Discord Bot;
-* Rich Presence;
-* validação de canais;
-* logs operacionais;
-* suporte automatizado;
-* geração de convites;
-* gerenciamento de cargos.
-
-## Configuração
-
-```yaml id="0m0smv"
-discord:
-  rich_presence: true
-  bot_enabled: true
-  bot_token: '${RUBYMC_DISCORD_BOT_TOKEN}'
-  guild_id: 'DISCORD_GUILD_ID'
-```
-
-## Segurança
-
-Nunca publique tokens reais.
-
-Use variável de ambiente:
-
-```bash id="m4d5sh"
-export RUBYMC_DISCORD_BOT_TOKEN='SEU_TOKEN'
-```
-
----
-
-# 🧠 IA Local
-
-O projeto suporta IA local usando Ollama.
-
-## Instalação
-
-```bash id="f6l1o6"
-ollama pull qwen3.5:9b
-ollama serve
-```
-
-## Configuração
-
-```yaml id="g8l7x4"
-ai_support:
-  enabled: true
-  provider: ollama
-  host: 'http://127.0.0.1:11434'
-  model: 'qwen3.5:9b'
-```
-
----
-
-# ⚙️ Instalação
-
-Clone o repositório:
-
-```bash id="3sh8ph"
+```bash
+# 1. Clone
 git clone https://github.com/VICTORGG04/RubyMC-Launcher.git
-```
+cd RubyMC-Launcher/rubymc-java
 
-Entre na pasta:
-
-```bash id="31o0d2"
-cd RubyMC-Launcher
-```
-
-Instale dependências:
-
-```bash id="l8tl8m"
+# 2. Instale dependências
+gem install bundler
 bundle install
+
+# 3. Configure
+cp config/settings.example.yml config/settings.yml
+# Edite config/settings.yml com seu token Discord e guild_id
+
+# 4. Inicie
+./rubymc start
 ```
+
+Acesse o painel em **http://127.0.0.1:4567**
 
 ---
 
-# 💎 Executar RubyMC Java
+## 💎 RubyMC Java
 
-```bash id="kwzpk6"
+### Comandos da CLI (`./rubymc`)
+
+| Comando | Descrição |
+|---|---|
+| `./rubymc start` | Inicia servidor web + bot Discord + servidor Minecraft |
+| `./rubymc start --simulate` | Modo simulação (20 jogadores + Discord mock) |
+| `./rubymc start --no-servers` | Inicia sem servidor Minecraft |
+| `./rubymc stop` | Para servidor Minecraft + web + bot |
+| `./rubymc stop --keep-servers` | Para apenas web + bot, mantém servidor Minecraft |
+| `./rubymc status` | Status do projeto, bot e servidor |
+| `./rubymc logs` | Logs da **web** (não do jogo) |
+| `./rubymc test` | Verifica sintaxe Ruby + bundle check |
+| `./rubymc server start\|stop\|restart` | Controla servidor Minecraft |
+| `./rubymc server status` | Status do servidor Minecraft |
+| `./rubymc server logs` | Logs do servidor Minecraft |
+| `./rubymc bot start\|stop\|restart\|logs\|status` | Gerencia bot Discord |
+| `./rubymc ai "pergunta"` | Pergunta à IA local (Ollama) |
+| `./rubymc ai-chat` | Chat interativo com IA |
+| `./rubymc install` | Instala dependências manualmente |
+| `./rubymc classic` | Abre console Ruby clássico |
+
+### CLI Player (`bin/rubymc-player`)
+
+| Comando | Descrição |
+|---|---|
+| `bin/rubymc-player` | Menu interativo |
+| `bin/rubymc-player play` | Abre o launcher para jogar |
+| `bin/rubymc-player modpacks` | Lista/instala modpacks |
+| `bin/rubymc-player server` | Status do servidor |
+| `bin/rubymc-player discord` | Link do servidor Discord |
+| `bin/rubymc-player help` | Ajuda |
+
+> Leia o README completo em [rubymc-java/README.md](rubymc-java/README.md)
+
+---
+
+## 💎 RubyMC Bedrock BDS
+
+### Comandos da CLI (`./rubymc`)
+
+| Comando | Descrição |
+|---|---|
+| `./rubymc start` | Inicia painel web + monitor BDS |
+| `./rubymc stop` | Para painel + servidores |
+| `./rubymc restart` | Reinicia tudo |
+| `./rubymc status` | Status do projeto |
+| `./rubymc logs` | Logs do painel |
+| `./rubymc server start\|stop\|restart\|logs` | Controla servidor BDS |
+
+> Leia o README completo em [rubymc-bedrock/README.md](rubymc-bedrock/README.md)
+
+---
+
+## 🧩 Pré-requisitos
+
+### RubyMC Java
+
+| Requisito | Versão | Verificação |
+|---|---|---|
+| **Ruby** | 3.0+ | `ruby --version` |
+| **Bundler** | — | `gem install bundler` |
+| **Java** | 21+ (Minecraft 1.21.x) | `java --version` |
+| **Ollama** (opcional) | — | `ollama pull qwen2.5:3b` |
+
+### RubyMC Bedrock
+
+| Requisito | Versão | Verificação |
+|---|---|---|
+| **Ruby** | 3.0+ | `ruby --version` |
+| **Bundler** | — | `gem install bundler` |
+| **Linux** | Ubuntu/Debian x64 | — |
+| **BDS** | — | Downloads automáticos pelo painel |
+
+---
+
+## 🛠️ Validação
+
+```bash
+# Verificar sintaxe de todos os arquivos Ruby
 cd rubymc-java
-./rubymc restart
-```
-
-Painel:
-
-```text id="w1c3h2"
-http://127.0.0.1:4567
-```
-
----
-
-# 💎 Executar RubyMC Bedrock
-
-```bash id="lq7xsy"
-cd rubymc-bedrock
-./rubymc restart
-```
-
-Painel:
-
-```text id="i7q4oe"
-http://127.0.0.1:4567
-```
-
----
-
-# 🧩 Dependências
-
-## Ruby
-
-```text id="8m2gpr"
-Ruby 3.x
-```
-
-## Gems principais
-
-* sinatra
-* puma
-* yaml
-* json
-* discordrb
-* websocket-client-simple
-* fileutils
-
----
-
-# 🛠️ Validação
-
-## Ruby
-
-```bash id="w5xmx4"
-ruby -c bot_daemon.rb
+ruby -c app/server.rb
+ruby -c app/bot.rb
 ruby -c lib/web_launcher_app.rb
-```
 
-## Bundler
-
-```bash id="q5f8l2"
+# Verificar dependências
 bundle check
-```
 
-## Porta do painel
+# Teste completo (sintaxe + bundle)
+./rubymc test
 
-```bash id="3k7d7u"
+# Verificar porta do painel
 ss -ltnp | grep 4567
 ```
 
 ---
 
-# 🗺️ Roadmap
+## 🗺️ Roadmap
 
-## RubyMC Java
+### RubyMC Java — v1.1 ✅
+- [x] Autenticação Microsoft OAuth + banco de contas
+- [x] Modo offline (LAN/servidores offline)
+- [x] Modpacks (`.mrpack` / `.zip`)
+- [x] Servidor da comunidade com status ao vivo
+- [x] Discord Bot (boas-vindas, comandos, cargos, convites)
+- [x] Rich Presence no Discord
+- [x] IA local via Ollama (Qwen 2.5 3B)
+- [x] Dashboard consolidado (glassmorphism + animações)
+- [x] CLI Admin + Player
+- [x] Modo simulação (20 jogadores + Discord mock)
+- [x] Proteções de segurança (SSRF, HMAC, rate limiting, OAuth state, command injection)
 
-* melhorias no launcher;
-* sistema avançado de modpacks;
-* integração IA completa;
-* sincronização multiplayer;
-* marketplace RubyMC.
+### RubyMC Java — v1.2 🔜
+- [ ] IA premium (OpenAI/Anthropic)
+- [ ] Integração Modrinth/CurseForge API
+- [ ] Autenticação de usuários no painel
+- [ ] Auto-detect de Java
+- [ ] Empacotamento `.deb` / `.AppImage`
 
-## RubyMC Bedrock
+### RubyMC Bedrock — Atual ✅
+- [x] Gerenciamento de versões BDS (download + instalação)
+- [x] Monitoramento UDP (PID, ping, capacidade)
+- [x] Controle de instâncias (start/stop/restart/remove)
+- [x] Display de logs em tempo real
+- [x] Painel web dark neon
 
-* auto-update BDS;
-* monitoramento avançado;
-* integração IA;
-* painel multiusuário;
-* gerenciamento remoto;
-* backup automático.
+### RubyMC Bedrock — Futuro 🔜
+- [ ] Auto-update BDS
+- [ ] Backup automático
+- [ ] Integração IA
+- [ ] Painel multiusuário
+- [ ] Gerenciamento remoto
 
 ---
 
-# 📄 Licença
+## 📄 Licença
 
 Este projeto está licenciado sob a **MIT License** — consulte o arquivo [LICENSE](LICENSE) para detalhes.
 
 ---
 
-# 👨‍💻 Autor
+## 👨‍💻 Autor
 
 Desenvolvido por **Victor Marcial**.

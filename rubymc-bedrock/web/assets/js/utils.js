@@ -45,6 +45,11 @@
   }
   global.setText = setText;
 
+  function setTextAll(ids, value) {
+    ids.forEach((id) => setText(id, value));
+  }
+  global.setTextAll = setTextAll;
+
   function setValue(id, value) {
     if (value === undefined || value === null || value === "") return;
     const el = document.getElementById(id);

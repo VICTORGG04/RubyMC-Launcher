@@ -10,6 +10,8 @@ URL="http://${HOST}:${PORT}"
 RUN_DIR="$ROOT/tmp/rubymc"
 PID_FILE="$RUN_DIR/web.pid"
 LOG_FILE="$RUN_DIR/web.log"
+GAME_LOG_DIR="${RUBYMC_SERVER_DIR:-$HOME/Servidores/ServidorMinecraftJava}"
+GAME_LOG_FILE="${RUBYMC_GAME_LOG:-$GAME_LOG_DIR/logs/latest.log}"
 
 # Controle automático do servidor Java quando o projeto sobe/desce.
 AUTO_JAVA_SERVER="${RUBYMC_AUTO_SERVERS:-true}"
@@ -21,8 +23,7 @@ ok()  { echo "[OK] $*"; }
 warn(){ echo "[AVISO] $*"; }
 err() { echo "[ERRO] $*" >&2; }
 
-ensure_gemfile() {
-  say "Verificando Gemfile..."
+ensure_missing_gems() {
   touch Gemfile
 
   if ! grep -q '^source ' Gemfile; then
@@ -35,17 +36,20 @@ ensure_gemfile() {
     mv "$tmpfile" Gemfile
   fi
 
-  sed -i "/^[[:space:]]*gem[[:space:]]['\"]webrick['\"]/d" Gemfile
-  sed -i "/^[[:space:]]*gem[[:space:]]['\"]rubyzip['\"]/d" Gemfile
-  sed -i "/^[[:space:]]*gem[[:space:]]['\"]json['\"]/d" Gemfile
-  sed -i "/glimmer-dsl-tk/d" Gemfile
-  sed -i "/glimmer-dsl-libui/d" Gemfile
-  sed -i "/^[[:space:]]*gem[[:space:]]['\"]tk['\"]/d" Gemfile
-  sed -i "/^[[:space:]]*gem[[:space:]]['\"]libui['\"]/d" Gemfile
+  for sed_pattern in 'glimmer-dsl-tk' 'glimmer-dsl-libui' 'tk' 'libui'; do
+    sed -i "/$sed_pattern/d" Gemfile
+  done
 
-  printf '\ngem "webrick", "~> 1.9"\n' >> Gemfile
-  printf 'gem "rubyzip", "~> 2.3"\n' >> Gemfile
-  printf 'gem "json"\n' >> Gemfile
+  local gem
+  for gem in 'webrick' 'rubyzip' 'json'; do
+    if ! grep -q "^[[:space:]]*gem[[:space:]][\"']$gem[\"']" Gemfile; then
+      case "$gem" in
+        webrick) printf '\ngem "webrick", "~> 1.9"\n' >> Gemfile ;;
+        rubyzip) printf 'gem "rubyzip", "~> 2.3"\n' >> Gemfile ;;
+        json)    printf 'gem "json"\n' >> Gemfile ;;
+      esac
+    fi
+  done
 }
 
 install_deps() {
@@ -54,7 +58,7 @@ install_deps() {
     gem install bundler
   fi
 
-  ensure_gemfile
+  ensure_missing_gems
 
   if bundle check >/dev/null 2>&1; then
     ok "Dependências já instaladas."
@@ -68,10 +72,9 @@ free_port() {
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${PORT}/tcp" >/dev/null 2>&1 || true
   elif command -v lsof >/dev/null 2>&1; then
-    pid="$(lsof -t -iTCP:${PORT} -sTCP:LISTEN 2>/dev/null || true)"
-    if [ -n "$pid" ]; then
-      kill -9 $pid >/dev/null 2>&1 || true
-    fi
+    while IFS= read -r pid; do
+      [ -n "$pid" ] && kill -9 "$pid" >/dev/null 2>&1 || true
+    done < <(lsof -t -i "tcp:${PORT}" 2>/dev/null || true)
   fi
 }
 
@@ -141,6 +144,7 @@ api_get() {
 java_server_action() {
   local action="$1"
   local api_action
+  local resp_file err_file
 
   case "$action" in
     start)   api_action="start_server" ;;
@@ -152,19 +156,20 @@ java_server_action() {
       ;;
   esac
 
+  resp_file="$(mktemp)"; err_file="$(mktemp)"
+  trap 'rm -f "$resp_file" "$err_file"' RETURN
+
   say "Executando servidor Java: ${action}"
-  if api_post_json "/api/action" "{\"action\":\"${api_action}\"}" >/tmp/rubymc_java_server_response.$$ 2>/tmp/rubymc_java_server_error.$$; then
-    cat /tmp/rubymc_java_server_response.$$
+  if api_post_json "/api/action" "{\"action\":\"${api_action}\"}" >"$resp_file" 2>"$err_file"; then
+    cat "$resp_file"
     echo
     ok "Servidor Java: ${action} solicitado."
-    rm -f /tmp/rubymc_java_server_response.$$ /tmp/rubymc_java_server_error.$$
     return 0
   fi
 
   warn "Falha ao solicitar ${action} do servidor Java:"
-  cat /tmp/rubymc_java_server_error.$$ 2>/dev/null || true
+  cat "$err_file" 2>/dev/null || true
   echo
-  rm -f /tmp/rubymc_java_server_response.$$ /tmp/rubymc_java_server_error.$$
   return 1
 }
 
@@ -311,9 +316,10 @@ start_server() {
 
   echo
   say "Acesse: ${URL}/?v=latest-update"
-  say "Use './rubymc logs' para ver logs."
+  say "Use './rubymc logs' para ver logs da web."
+  say "Use './rubymc server logs' para ver logs do servidor Minecraft."
   say "Use './rubymc stop' para parar projeto + servidores."
-  say "Use './rubymc server start' ou './rubymc server stop' para controlar o servidor."
+  say "Use './rubymc server start|stop|restart' para controlar o servidor Minecraft."
 }
 
 restart_server() {
@@ -356,6 +362,7 @@ run_tests() {
   install_deps
   echo "[RubyMC] Verificando sintaxe Ruby..."
   [ -f app/server.rb ] && ruby -c app/server.rb
+  [ -f app/bot.rb ] && ruby -c app/bot.rb
   [ -f app/console.rb ] && ruby -c app/console.rb
   [ -f lib/web_launcher_app.rb ] && ruby -c lib/web_launcher_app.rb
   [ -f bin/run_checks.rb ] && ruby bin/run_checks.rb || true
@@ -470,7 +477,8 @@ server_cli() {
       status_game_servers
       ;;
     logs)
-      show_logs
+      touch "$GAME_LOG_FILE"
+      tail -f "$GAME_LOG_FILE"
       ;;
     *)
       echo "Uso: ./rubymc server [start|stop|restart|status|logs]"
@@ -495,14 +503,18 @@ Projeto:
   stop                   Para servidor Java + web + bot
   restart [opções]       Reinicia servidor Java + web + bot
   status                 Mostra status do projeto, bot e servidor
-  logs                   Mostra logs da web
-  test                   Testes básicos
+  logs                   Mostra logs da WEB (não do jogo)
+  test                   Testes básicos (sintaxe Ruby + bundle)
   classic                Abre console clássico
   organize               Instruções de organização
   install                Instala dependências
 
-Servidor:
-  server [start|stop|restart|status|logs]
+Servidor de Jogo (Java):
+  server start           Inicia servidor Minecraft
+  server stop            Para servidor Minecraft
+  server restart         Reinicia servidor Minecraft
+  server status          Status do servidor Minecraft
+  server logs            Logs do servidor Minecraft (game)
   servers ...            Alias de server
 
 Bot:
@@ -520,6 +532,8 @@ Variáveis:
   RUBYMC_AUTO_SERVERS=true|false
   RUBYMC_HOST=127.0.0.1
   RUBYMC_PORT=4567
+  RUBYMC_SERVER_DIR=<dir>            Diretório do servidor Minecraft
+  RUBYMC_GAME_LOG=<path>            Caminho do log do servidor Minecraft
 USAGE
 }
 

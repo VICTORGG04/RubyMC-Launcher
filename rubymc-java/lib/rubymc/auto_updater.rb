@@ -94,9 +94,9 @@ class AutoUpdater
 
     # Extrai
     if tmp_file.end_with?(".zip")
-      system("unzip -o -q #{tmp_file} -d #{tmp_dir}")
+      system("unzip", "-o", "-q", tmp_file, "-d", tmp_dir)
     else
-      system("tar -xzf #{tmp_file} -C #{tmp_dir} --strip-components=1")
+      system("tar", "-xzf", tmp_file, "-C", tmp_dir, "--strip-components=1")
     end
 
     # Copia arquivos Ruby para o diretório do launcher

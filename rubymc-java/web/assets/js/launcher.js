@@ -27,6 +27,7 @@
     enter_server: ["enter_server"],
     update_modpacks: ["update_modpacks", "refresh_modpacks", "list_modpacks"],
     validate_discord: ["validate_discord", "discord_validate", "validate_discord_settings"],
+    discord_simulate: ["discord_simulate", "simular_discord"],
     test_discord_logs: ["test_discord_logs", "discord_test_logs", "test_logs_channel"],
     test_all_channels: ["test_all_channels", "discord_test_channels", "test_channels"],
     create_invite: ["create_invite", "discord_create_invite", "generate_invite"],
@@ -185,7 +186,7 @@
 
     document.body.dataset.currentTab = tab;
 
-    $$(".tab-link, .side-link").forEach((button) => {
+    document.querySelectorAll('.tab-link').forEach((button) => {
       button.classList.toggle("active", button.dataset.tab === tab);
     });
 
@@ -312,13 +313,39 @@
   }
 
   function applyStatus(status = {}) {
+    const serverObj = (status.server && typeof status.server === "object") ? status.server : {};
+
+    const serverLabelRaw =
+        status.server_status ||
+        status.server_state ||
+        status.process_status ||
+        serverObj.status ||
+        serverObj.address ||
+        status.server ||
+        "";
+
+    const serverLabel = (serverLabelRaw && typeof serverLabelRaw === "object")
+        ? (serverLabelRaw.status || serverLabelRaw.address || "Configurado")
+        : serverLabelRaw;
+
+    const serverAddressRaw =
+        status.server_address ||
+        status.community_server ||
+        status.address ||
+        serverObj.address ||
+        "";
+
+    const serverAddress = (serverAddressRaw && typeof serverAddressRaw === "object")
+        ? (serverAddressRaw.address || "")
+        : serverAddressRaw;
+
     setText("minecraft-version", status.minecraft_version || status.default_version || status.version);
     setText("active-profile", status.active_profile || status.profile);
-    setText("server-state", status.server_status || status.server_state || status.server);
+    setText("server-state", serverLabel || "--");
     setText("server-players", status.server_players || status.players);
     setText("launcher-state", status.launcher_status || status.status);
     setText("launcher-version", status.launcher_version || status.version);
-    setValue("server-address", status.server_address || status.community_server || status.address);
+    setValue("server-address", serverAddress);
 
     if (status.modpacks_count !== undefined) setText("home-modpacks-count", status.modpacks_count);
 
@@ -594,9 +621,6 @@
     setText("server-live-latency", status.latency ? `${status.latency} ms` : "--");
     setText("server-live-version", status.version || "--");
     setText("server-live-checked", status.checkedAt || "--");
-    setText("server-overlay-status", online ? "Online" : "Offline");
-    setText("server-overlay-players", playerRatio(status));
-    setText("server-overlay-ping", status.latency ? `${status.latency} ms` : "--");
     setText("server-state", online ? "Online" : "Offline");
     setText("server-players", playerRatio(status));
     setClass("server-test-state", "server-live-error", !online);
@@ -669,7 +693,7 @@
   }
 
   function isServerTabActive() {
-    const activeButton = $(".side-link.active, .tab-link.active");
+    const activeButton = document.querySelector('.tab-link.active');
     return activeButton?.dataset?.tab === "server" || $("#tab-server")?.classList.contains("active");
   }
 
@@ -1216,7 +1240,7 @@
   }
 
   function bindEvents() {
-    $$(".tab-link, .side-link").forEach((button) => {
+    document.querySelectorAll('.tab-link').forEach((button) => {
       button.addEventListener("click", () => activateTab(button.dataset.tab));
     });
 
@@ -1622,7 +1646,7 @@
       aiContext.style.display = (role !== 'member') ? '' : 'none';
     }
 
-    const adminDiscordActions = document.getElementById('admin-discord-actions');
+    const adminDiscordActions = document.getElementById('admin-actions-card');
     if (adminDiscordActions) {
       adminDiscordActions.style.display = (role === 'admin' || role === 'staff') ? '' : 'none';
     }
@@ -1679,6 +1703,7 @@
       const data = await apiFetch('/api/discord/members');
       if (data.ok && data.members) {
         setText('discord-guild-name', data.members.guild_name || '---');
+        setText('msc-guild-name', data.members.guild_name || 'RubyMC');
         setText('discord-member-count', data.members.members_count);
         setText('discord-online-count', data.members.presence_count);
         setText('home-discord-members', data.members.members_count);
@@ -1701,7 +1726,7 @@
     const termsCheckbox = document.getElementById('terms-checkbox');
     const termsAcceptBtn = document.getElementById('terms-accept-btn');
     const discordStep = document.getElementById('vstep-discord');
-    const discordJoinBtn = document.getElementById('discord-join-btn');
+    const discordJoinBtn = document.getElementById('discord-join-verify-btn') || document.getElementById('discord-join-btn');
     const discordCheckGuildBtn = document.getElementById('discord-check-guild-btn');
     const discordJoinDiv = document.getElementById('vstep-discord-join');
     const discordCodeDiv = document.getElementById('vstep-discord-code');
@@ -1709,7 +1734,7 @@
     const discordCodeInput = document.getElementById('discord-code-input');
     const discordConfirmBtn = document.getElementById('discord-confirm-code-btn');
     const discordMsg = document.getElementById('discord-code-msg');
-    const discordGuildMsg = document.getElementById('discord-guild-msg');
+    const discordGuildMsg = document.getElementById('discordGuildMsg');
     const completeBtn = document.getElementById('complete-verification-btn');
     const termsOverlay = document.getElementById('terms-overlay');
     const termsShowBtn = document.getElementById('terms-show-btn');
@@ -1872,7 +1897,13 @@
             window._userRole = res.role || 'player';
             applyRoleFilter(window._userRole);
             if (verBox) verBox.style.display = 'none';
-            if (memberStatusCard) memberStatusCard.style.display = '';
+            if (memberStatusCard) {
+              memberStatusCard.style.display = '';
+              memberStatusCard.querySelectorAll('button').forEach((btn) => {
+                btn.disabled = false;
+                btn.removeAttribute('disabled');
+              });
+            }
             loadDiscordInfo();
             log('OK', '🎉 Parabéns! Você agora é Membro Ruby!');
             alert('Parabéns! Agora você é Membro Ruby. As funcionalidades completas foram liberadas.');
@@ -1965,5 +1996,18 @@
 
   document.addEventListener("DOMContentLoaded", init);
 
+
+  window.backendAction = async function(action) {
+    try {
+      const result = await backendAction(action);
+      applyResult(result, action);
+      return result;
+    } catch (error) {
+      log("ERROR", `${action}: ${error.message}`);
+      throw error;
+    }
+  };
+
+  window.runRubyMCAction = runAction;
   window.refreshServerLiveStatus = refreshServerLiveStatus;
 })();

@@ -26,215 +26,244 @@
       <main class="app-content">
         <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
         <section id="tab-home" class="tab-panel active" data-panel-title="Início">
-          <div class="panel-grid hero-grid">
-            <article class="panel-copy">
-              <span class="cyan-label">BEM-VINDO(A)!</span>
-              <h1>Pronto para jogar?</h1>
-              <p>Gerencie suas contas, modpacks, servidores e muito mais com o RubyMC Launcher.</p>
-              <label for="profile-select">Perfil ativo</label>
-              <select id="profile-select"><option value="vanilla">Vanilla / sem modpack</option></select>
-              <div class="actions"><button class="btn btn-red" data-action="play">Jogar Minecraft</button><button class="btn btn-dark" data-action="enter_server">Entrar no servidor</button></div>
-              <div class="hero-stats">
-                <div><span>VERSÃO</span><strong id="minecraft-version">1.21.4</strong></div>
-                <div><span>PERFIL ATIVO</span><strong id="active-profile">Vanilla</strong></div>
-                <div><span>SERVIDOR</span><strong id="server-state">Online</strong><em id="server-players" class="home-stat-sub">0 jogadores</em></div>
-                <div><span>STATUS</span><strong id="launcher-state">Tudo certo!</strong></div>
-              </div>
-              <div class="home-quick-cards">
-                <div class="home-card">
-                  <span class="home-card-icon">💬</span>
-                  <div class="home-card-body">
-                    <span class="home-card-label">Discord</span>
-                    <strong><span id="home-discord-members">--</span> <small class="home-card-unit">membros</small></strong>
-                  </div>
+          <div class="dash">
+
+            <!-- ─── HERO ─── -->
+            <div class="dash-hero">
+              <div class="dash-hero-left">
+                <span class="dash-hero-emoji">🎮</span>
+                <div class="dash-hero-text">
+                  <h1 class="dash-hero-title">BEM-VINDO(A)!</h1>
+                  <p class="dash-hero-sub">Pronto para jogar?</p>
                 </div>
-                <div class="home-card">
-                  <span class="home-card-icon">📦</span>
-                  <div class="home-card-body">
-                    <span class="home-card-label">Modpacks</span>
-                    <strong><span id="home-modpacks-count">--</span> <small class="home-card-unit">instalados</small></strong>
-                  </div>
+                <p class="dash-hero-desc">Gerencie suas contas, modpacks, servidores e muito mais.</p>
+                <div class="dash-actions">
+                  <button class="btn btn-red" data-action="play">▶ Jogar Minecraft</button>
+                  <button class="btn btn-glass" data-action="enter_server">🚪 Entrar no servidor</button>
                 </div>
               </div>
-            </article>
-            <figure class="preview-frame">
-              <img src="/assets/img/rubymc-tela-inicio.png" alt="RubyMC Launcher">
-            </figure>
-          </div>
-          <div class="home-discord-section" id="home-discord-section">
-            <div class="ds-header">
-              <div class="ds-header-orb">💬</div>
-              <div class="ds-header-text">
-                <h2 class="ds-header-title">COMUNIDADE E VERIFICAÇÃO</h2>
-                <p class="ds-header-sub">Conecte-se ao servidor Discord, torne-se um Membro Ruby e desbloqueie todas as funcionalidades.</p>
+              <div class="dash-hero-right">
+                <label class="dash-profile-label" for="profile-select">Perfil ativo</label>
+                <select id="profile-select"><option value="vanilla">Vanilla / sem modpack</option></select>
               </div>
             </div>
 
-            <div class="ds-grid">
-              <!-- ── Left column ──────────────────────── -->
-              <div class="ds-main-col">
+            <!-- ─── STATS ─── -->
+            <div class="dash-stats">
+              <div class="dash-stat" data-stat="version">
+                <span class="dash-stat-icon">📦</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">VERSÃO</span>
+                  <strong class="dash-stat-value" id="minecraft-version">1.21.4</strong>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="profile">
+                <span class="dash-stat-icon">🎯</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">PERFIL ATIVO</span>
+                  <strong class="dash-stat-value" id="active-profile">Vanilla</strong>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="server">
+                <span class="dash-stat-icon">🌐</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">SERVIDOR</span>
+                  <strong class="dash-stat-value" id="server-state">Online</strong>
+                  <small id="server-players">0 jogadores</small>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="status">
+                <span class="dash-stat-icon">✅</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">STATUS</span>
+                  <strong class="dash-stat-value" id="launcher-state">Tudo certo!</strong>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="discord">
+                <span class="dash-stat-icon">💬</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">DISCORD</span>
+                  <strong class="dash-stat-value"><span id="home-discord-members">--</span></strong>
+                  <small>membros</small>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="modpacks">
+                <span class="dash-stat-icon">📥</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">MODPACKS</span>
+                  <strong class="dash-stat-value"><span id="home-modpacks-count">--</span></strong>
+                  <small>instalados</small>
+                </div>
+              </div>
+            </div>
 
-                <!-- Server info card (guild) -->
-                <div class="ds-server-card">
-                  <div class="ds-server-banner"></div>
-                  <div class="ds-server-body">
-                    <div class="ds-server-avatar">
+            <!-- ─── MAIN GRID ─── -->
+            <div class="dash-grid">
+
+              <!-- ── Community Card ── -->
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <span class="dash-card-header-icon">💬</span>
+                  <h3>Comunidade</h3>
+                </div>
+                <div class="dash-card-body">
+                  <div class="dash-guild-banner"></div>
+                  <div class="dash-guild-info">
+                    <div class="dash-guild-avatar">
                       <svg viewBox="0 0 28 28" width="28" height="28" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#5865f2"/><path d="M15.5 8.5h-7a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V9a.5.5 0 0 0-.5-.5z" fill="#fff"/><circle cx="12" cy="12" r="2.5" fill="#5865f2"/></svg>
-                      <div class="ds-server-status-dot"></div>
+                      <span class="dash-guild-dot"></span>
                     </div>
-                    <div class="ds-server-info">
-                      <h3 class="ds-server-name" id="discord-guild-name">RubyMC</h3>
-                      <span class="ds-server-badge">COMUNIDADE</span>
+                    <div class="dash-guild-meta">
+                      <strong class="dash-guild-name" id="discord-guild-name">RubyMC</strong>
+                      <span class="dash-guild-badge">COMUNIDADE</span>
                     </div>
-                    <div class="ds-server-stats">
-                      <div class="ds-server-stat">
-                        <span class="ds-stat-icon">👥</span>
+                  </div>
+                  <div class="dash-guild-stats">
+                    <div class="dash-guild-stat">
+                      <span>👥</span>
+                      <div>
                         <strong id="discord-member-count">--</strong>
-                        <span class="ds-stat-label">Membros</span>
+                        <small>Membros</small>
                       </div>
-                      <div class="ds-server-stat">
-                        <span class="ds-stat-icon ds-stat-online">🟢</span>
+                    </div>
+                    <div class="dash-guild-stat">
+                      <span>🟢</span>
+                      <div>
                         <strong id="discord-online-count">--</strong>
-                        <span class="ds-stat-label">Online</span>
+                        <small>Online</small>
                       </div>
                     </div>
-                    <button class="btn ds-btn-invite" onclick="handleDiscordServerJoin()" id="discord-join-btn">
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M15.25 8.5l-6-5.5v3.5H4.5v4h4.75v3.5l6-5.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      Entrar no Servidor
-                    </button>
                   </div>
+                  <button class="btn btn-discord dash-invite-btn" onclick="handleDiscordServerJoin()" id="discord-join-btn">
+                    🚪 Entrar no Servidor
+                  </button>
                 </div>
+              </div>
 
-                <!-- Verification flow card -->
-                <div class="ds-verify-card" id="verification-box">
-                  <div class="ds-verify-header">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z" stroke="#5865f2" stroke-width="1.5"/><path d="M7.5 10.5l1.5 1.5 3.5-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                    <span>Verificação de Membro</span>
-                  </div>
-
-                  <!-- Step list -->
-                  <div class="ds-verify-steps">
-                    <!-- Terms step -->
-                    <div class="ds-verify-step" id="vstep-terms">
-                      <div class="ds-step-marker">
-                        <span id="vstep-terms-status" class="ds-step-status">pendente</span>
-                      </div>
-                      <div class="ds-step-body">
-                        <div class="ds-step-title">1. Aceitar Termos</div>
-                        <div class="ds-step-desc">Leia e aceite os termos de uso do servidor.</div>
-                        <div class="ds-step-controls">
-                          <label class="ds-terms-check">
-                            <input type="checkbox" id="terms-checkbox">
-                            <span>Li e aceito os <button class="ds-link-btn" id="terms-show-btn">termos de uso</button></span>
-                          </label>
-                          <button class="btn btn-discord-sm" id="terms-accept-btn" disabled>Confirmar Termos</button>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Discord step -->
-                    <div class="ds-verify-step" id="vstep-discord" style="opacity:0.4;pointer-events:none;">
-                      <div class="ds-step-marker">
-                        <span id="vstep-discord-status" class="ds-step-status">bloqueado</span>
-                      </div>
-                      <div class="ds-step-body">
-                        <div class="ds-step-title">2. Verificação Discord</div>
-                        <div class="ds-step-desc">Entre no servidor e receba um código no DM.</div>
-
-                        <div id="vstep-discord-join" class="ds-step-box">
-                          <div class="ds-step-box-row">
-                            <button class="btn btn-discord-sm" onclick="handleDiscordServerJoin()" id="discord-join-btn">▶ Entrar no Servidor</button>
-                            <button class="btn btn-dark-sm" id="discord-check-guild-btn">Verificar presença</button>
-                          </div>
-                          <div id="discordGuildMsg" class="ds-msg" style="display:none;"></div>
-                        </div>
-
-                        <div id="vstep-discord-code" class="ds-step-box" style="display:none;">
-                          <div class="ds-step-box-row">
-                            <button class="btn btn-discord-sm" id="discord-send-code-btn">Enviar código</button>
-                            <input id="discord-code-input" class="ds-code-input" type="text" placeholder="000000" maxlength="6" disabled>
-                            <button class="btn btn-red-sm" id="discord-confirm-code-btn" disabled>Confirmar</button>
-                          </div>
-                          <div id="discord-code-msg" class="ds-msg" style="display:none;"></div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- Complete step -->
-                    <div class="ds-verify-step" id="vstep-complete">
-                      <div class="ds-step-marker">
-                        <span class="ds-step-status">—</span>
-                      </div>
-                      <div class="ds-step-body">
-                        <div class="ds-step-title">3. Finalizar</div>
-                        <div class="ds-step-desc">Complete o processo e torne-se Membro Ruby.</div>
-                        <button class="btn ds-btn-complete" id="complete-verification-btn" disabled>
-                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z" stroke="currentColor" stroke-width="1.5"/><path d="M7.5 10.5l1.5 1.5 3.5-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                          Tornar-se Membro Ruby
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+              <!-- ── Verification Card ── -->
+              <div class="dash-card dash-card-verify" id="verification-box">
+                <div class="dash-card-header">
+                  <span class="dash-card-header-icon">✦</span>
+                  <h3>Verificação</h3>
                 </div>
-
-                <!-- ── Member Status Card (shown when verified) ── -->
-                <div id="member-status-card" class="msc-card" style="display:none;">
-                  <div class="msc-accent-bar"></div>
-                  <div class="msc-body">
-                    <div class="msc-badge-wrap">
-                      <div class="msc-badge">✦</div>
-                      <div class="msc-badge-glow"></div>
+                <div class="dash-card-body">
+                  <!-- Step 1: Terms -->
+                  <div class="dash-vstep" id="vstep-terms">
+                    <div class="dash-vstep-marker">
+                      <span id="vstep-terms-status" class="dash-vstep-status">pendente</span>
                     </div>
-                    <h3 class="msc-title">Membro Verificado</h3>
-                    <span class="msc-verified-tag">✓ Verificado</span>
-                    <p class="msc-desc">Você completou a verificação e agora faz parte da comunidade RubyMC.</p>
-                    <div class="msc-stats">
-                      <div class="msc-stat">
-                        <span class="msc-stat-label">Status</span>
-                        <strong class="msc-stat-value">Ativo</strong>
-                      </div>
-                      <div class="msc-stat">
-                        <span class="msc-stat-label">Servidor</span>
-                        <strong class="msc-stat-value" id="msc-guild-name">RubyMC</strong>
-                      </div>
-                      <div class="msc-stat">
-                        <span class="msc-stat-label">Cargo</span>
-                        <strong class="msc-stat-value" id="msc-member-role">Membro</strong>
+                    <div class="dash-vstep-body">
+                      <div class="dash-vstep-title">1. Aceitar Termos</div>
+                      <div class="dash-vstep-desc">Leia e aceite os termos de uso do servidor.</div>
+                      <div class="dash-vstep-controls">
+                        <label class="dash-terms-check">
+                          <input type="checkbox" id="terms-checkbox">
+                          <span>Li e aceito os <button class="dash-link-btn" id="terms-show-btn">termos de uso</button></span>
+                        </label>
+                        <button class="btn btn-discord-sm" id="terms-accept-btn" disabled>Confirmar Termos</button>
                       </div>
                     </div>
-                    <button class="btn msc-btn" onclick="backendAction('join_server')">
-                      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M15.25 8.5l-6-5.5v3.5H4.5v4h4.75v3.5l6-5.5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                      Entrar no Servidor
-                    </button>
+                  </div>
+                  <!-- Step 2: Discord -->
+                  <div class="dash-vstep" id="vstep-discord" style="opacity:0.4;pointer-events:none;">
+                    <div class="dash-vstep-marker">
+                      <span id="vstep-discord-status" class="dash-vstep-status">bloqueado</span>
+                    </div>
+                    <div class="dash-vstep-body">
+                      <div class="dash-vstep-title">2. Verificação Discord</div>
+                      <div class="dash-vstep-desc">Entre no servidor e receba um código no DM.</div>
+                      <div id="vstep-discord-join" class="dash-vstep-box">
+                        <div class="dash-vstep-box-row">
+                          <button class="btn btn-discord-sm" onclick="handleDiscordServerJoin()" id="discord-join-verify-btn">▶ Entrar no Servidor</button>
+                          <button class="btn btn-dark-sm" id="discord-check-guild-btn">Verificar presença</button>
+                        </div>
+                        <div id="discordGuildMsg" class="dash-msg" style="display:none;"></div>
+                      </div>
+                      <div id="vstep-discord-code" class="dash-vstep-box" style="display:none;">
+                        <div class="dash-vstep-box-row">
+                          <button class="btn btn-discord-sm" id="discord-send-code-btn">Enviar código</button>
+                          <input id="discord-code-input" class="dash-code-input" type="text" placeholder="000000" maxlength="6" disabled>
+                          <button class="btn btn-red-sm" id="discord-confirm-code-btn" disabled>Confirmar</button>
+                        </div>
+                        <div id="discord-code-msg" class="dash-msg" style="display:none;"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Step 3: Complete -->
+                  <div class="dash-vstep" id="vstep-complete">
+                    <div class="dash-vstep-marker">
+                      <span class="dash-vstep-status">—</span>
+                    </div>
+                    <div class="dash-vstep-body">
+                      <div class="dash-vstep-title">3. Finalizar</div>
+                      <div class="dash-vstep-desc">Complete o processo e torne-se Membro Ruby.</div>
+                      <button class="btn ds-btn-complete" id="complete-verification-btn" disabled>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z" stroke="currentColor" stroke-width="1.5"/><path d="M7.5 10.5l1.5 1.5 3.5-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Tornar-se Membro Ruby
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <!-- ── Right column (admin) ──────────────── -->
-              <div class="ds-side-col">
-                <div class="ds-admin-card" id="admin-actions-card" style="display:none;">
-                  <div class="ds-admin-header">
-                    <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M9 2.25L3 6v6l6 3.75L15 12V6L9 2.25z" stroke="currentColor" stroke-width="1.5"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.5"/></svg>
-                    <span>Painel Administrativo</span>
-                  </div>
-                  <p class="ds-admin-desc">Gerencie integrações e ações do Discord diretamente do launcher.</p>
-                  <div class="ds-admin-grid">
-                    <button class="ds-admin-btn" onclick="backendAction('join_server')">
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2L2 6v4l6 4 6-4V6L8 2z" stroke="currentColor" stroke-width="1.3"/><circle cx="8" cy="8" r="1.5" stroke="currentColor" stroke-width="1.3"/></svg>
-                      <span>Entrar via Bot</span>
-                    </button>
-                    <button class="ds-admin-btn" onclick="backendAction('status_discord')">
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.3"/><path d="M8 4v4l2.5 1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                      <span>Status Discord</span>
-                    </button>
-                    <button class="ds-admin-btn" onclick="backendAction('send_test')">
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L6 8l6 4V4z" stroke="currentColor" stroke-width="1.3"/><path d="M3 3v10" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
-                      <span>Testar DM</span>
-                    </button>
-                  </div>
+              <!-- ── Member Status Card (shown when verified, replaces verification card) ── -->
+              <div class="dash-card dash-card-member" id="member-status-card" style="display:none;">
+                <div class="dash-card-header">
+                  <span class="dash-card-header-icon">✦</span>
+                  <h3>Membro Verificado</h3>
+                  <span class="dash-verified-badge">✓</span>
                 </div>
+                <div class="dash-card-body">
+                  <div class="dash-member-stats">
+                    <div class="dash-member-stat">
+                      <span class="dash-member-stat-icon">🟢</span>
+                      <div>
+                        <span class="dash-member-stat-label">Status</span>
+                        <strong class="dash-member-stat-value">Ativo</strong>
+                      </div>
+                    </div>
+                    <div class="dash-member-stat">
+                      <span class="dash-member-stat-icon">🌐</span>
+                      <div>
+                        <span class="dash-member-stat-label">Servidor</span>
+                        <strong class="dash-member-stat-value" id="msc-guild-name">RubyMC</strong>
+                      </div>
+                    </div>
+                    <div class="dash-member-stat">
+                      <span class="dash-member-stat-icon">🏷️</span>
+                      <div>
+                        <span class="dash-member-stat-label">Cargo</span>
+                        <strong class="dash-member-stat-value" id="msc-member-role">Membro</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <button class="btn btn-discord dash-invite-btn" data-action="join_server">
+                    🚪 Entrar no Servidor
+                  </button>
+                </div>
+              </div>
+
+            </div>
+
+            <!-- ─── ADMIN ─── -->
+            <div class="dash-admin" id="admin-actions-card" style="display:none;">
+              <div class="dash-admin-header">
+                <span class="dash-admin-icon">⚙️</span>
+                <span>Painel Administrativo</span>
+              </div>
+              <p class="dash-admin-desc">Gerencie integrações e ações do Discord diretamente do launcher.</p>
+              <div class="dash-admin-status">
+                <span>Bot: <strong id="discord-bot-state">--</strong></span>
+                <span>Log: <strong id="logs-channel-state">--</strong></span>
+                <span>Config: <strong id="discord-config-state">--</strong></span>
+              </div>
+              <div class="dash-admin-actions">
+                <button class="dash-admin-btn" data-action="join_server">🔗 Entrar via Bot</button>
+                <button class="dash-admin-btn" data-action="validate_discord">✅ Validar Discord</button>
+                <button class="dash-admin-btn" data-action="discord_simulate" id="discord-simulate-btn">▶ Simular Discord</button>
               </div>
             </div>
+
           </div>
         </section>
         <section id="tab-modpacks" class="tab-panel" data-panel-title="Modpacks">

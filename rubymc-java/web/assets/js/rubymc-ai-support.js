@@ -220,8 +220,6 @@
 
   setTimeout(function() { clearInterval(tabCheckInterval); }, 10000);
 
-  var originalActivateTab = window.activateTab || null;
-  var origBind = document.addEventListener;
   document.addEventListener('tab-changed', function(e) {
     if (e.detail === 'ai') {
       refreshContext();

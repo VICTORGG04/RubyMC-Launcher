@@ -6,6 +6,7 @@ $LOAD_PATH.unshift(File.join(root, "lib"))
 
 require "bundler/setup"
 require_relative "../lib/web_launcher_app"
+require_relative "../lib/rubymc/java_project_fixes"
 
 host = ENV.fetch("RUBYMC_HOST", "127.0.0.1")
 port = ENV.fetch("RUBYMC_PORT", "4567").to_i

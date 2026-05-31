@@ -4,6 +4,8 @@ require 'digest'
 require 'fileutils'
 require 'json'
 require 'open-uri'
+require 'resolv'
+require 'ipaddr'
 require 'securerandom'
 require 'time'
 require 'yaml'
@@ -293,10 +295,37 @@ module MinecraftRubyLauncher
       end
     end
 
+    def safe_validate_url!(url)
+      parsed = URI.parse(url)
+      raise "URL scheme must be http or https" unless %w[http https].include?(parsed.scheme)
+      raise "URL host cannot be empty" if parsed.host.nil? || parsed.host.empty?
+      return if parsed.host == 'localhost' || parsed.host == '127.0.0.1' || parsed.host == '::1'
+
+      ip = IPAddr.new(Resolv.getaddress(parsed.host))
+      private_ranges = [
+        IPAddr.new('10.0.0.0/8'),
+        IPAddr.new('172.16.0.0/12'),
+        IPAddr.new('192.168.0.0/16'),
+        IPAddr.new('127.0.0.0/8'),
+        IPAddr.new('::1/128'),
+        IPAddr.new('fc00::/7'),
+        IPAddr.new('169.254.0.0/16')
+      ]
+      private_ranges.each do |range|
+        if range.include?(ip)
+          raise "URL resolves to a private or internal IP: #{ip}"
+        end
+      end
+    rescue URI::InvalidURIError, IPAddr::InvalidAddressError => e
+      raise "Invalid URL: #{e.message}"
+    end
+
     def download_file(url, target, sha1: nil)
       if File.file?(target) && sha1 && Digest::SHA1.file(target).hexdigest.casecmp?(sha1)
         return target
       end
+
+      safe_validate_url!(url)
 
       FileUtils.mkdir_p(File.dirname(target))
       temp = "#{target}.download"

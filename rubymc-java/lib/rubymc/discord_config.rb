@@ -60,10 +60,7 @@ module RubyMC
     end
 
     def raw_token
-      env_token = ENV['RUBYMC_DISCORD_BOT_TOKEN'].to_s.strip
-      return env_token unless env_token.empty?
-
-      resolve_env_reference(discord['bot_token']).to_s.strip
+      discord['bot_token'].to_s.strip
     end
 
     def resolve_env_reference(value)
@@ -84,6 +81,10 @@ module RubyMC
 
     def client_id
       discord['client_id'].to_s.strip
+    end
+
+    def client_secret
+      discord.dig('oauth', 'client_secret').to_s.strip
     end
 
     def guild_id
