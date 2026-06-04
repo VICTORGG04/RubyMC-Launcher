@@ -551,11 +551,35 @@ module RubyMC
         account_id = params.dig('settings', 'account') || params['account_id']
         server_mode = (action == 'enter_server')
         ram = (params.dig('settings', 'ram') || 2048).to_i
+        
+        # Extrair version_id do profile, settings.version ou modpack_name
+        version_id = params['version_id'] || 
+                     params['profile'] || 
+                     params.dig('settings', 'version') || 
+                     params['modpack_name']
+        
+        # Se version_id foi fornecido e version_manager estiver disponivel, ativa-lo
+        if version_id && version_manager
+          begin
+            activate_result = version_manager.activate(version_id)
+            unless activate_result[:ok]
+              log('WARN', "Falha ao ativar versão #{version_id}: #{activate_result[:error]}")
+              # Continua com a versão ativa atual ou default
+              version_id = nil
+            end
+          rescue => e
+            log('WARN', "Erro ao ativar versão: #{e.message}")
+            version_id = nil
+          end
+        end
+        
+        # Usar version_id se foi ativado, senão usa a versão ativa do manager
+        target_version = version_id || (version_manager&.active_version&.dig(:id) || resolve_launch_version)
 
         if account_id && !account_id.to_s.empty?
           # Launch com conta Microsoft
           result = with_server_mutex('launch_minecraft') do
-            launch_with_account(account_id: account_id, ram_mb: ram, server_mode: server_mode)
+            launch_with_account(account_id: account_id, ram_mb: ram, server_mode: server_mode, version_id: target_version)
           end
         else
           # Launch offline — exige username
@@ -564,7 +588,7 @@ module RubyMC
             return json(res, { ok: false, error: 'Username offline não preenchido. Vá em Configurações.' })
           end
           result = with_server_mutex('launch_minecraft') do
-            launch_offline(username: username, ram_mb: ram, server_mode: server_mode)
+            launch_offline(username: username, ram_mb: ram, server_mode: server_mode, version_id: target_version)
           end
         end
 
@@ -894,12 +918,21 @@ module RubyMC
       return @version_manager if @version_manager
       return nil unless defined?(RubyMC::ServerVersionManager)
 
-      dir = '/home/victor/Servidores/ServidorMinecraftJava'
-      unless Dir.exist?(dir)
-        log('WARN', "Diretório do servidor não encontrado: #{dir}")
+      # Tentar múltiplos caminhos para o servidor
+      possible_dirs = [
+        File.join(root, 'server'),
+        File.join(root, 'servers', 'ServidorMinecraftJava'),
+        File.join(ENV['HOME'], 'Servidores', 'ServidorMinecraftJava'),
+        '/home/victor/Servidores/ServidorMinecraftJava'
+      ]
+      
+      dir = possible_dirs.find { |d| Dir.exist?(d) }
+      unless dir
+        log('WARN', "Nenhum diretório de servidor encontrado. Tentou: #{possible_dirs.join(', ')}")
         return nil
       end
-
+      
+      log('INFO', "Usando diretório de servidor: #{dir}")
       settings = defined?(RubyMC::Settings) ? RubyMC::Settings.new(root) : nil
       @version_manager = RubyMC::ServerVersionManager.new(dir, settings)
     rescue => e
@@ -1775,7 +1808,7 @@ module RubyMC
       json(res, { ok: false, error: e.message })
     end
 
-    def launch_with_account(account_id:, ram_mb: 2048, server_mode: false)
+    def launch_with_account(account_id:, ram_mb: 2048, server_mode: false, version_id: nil)
       bank = AccountBank.new
       account = bank.find(account_id)
       raise "Conta '#{account_id}' não encontrada." unless account
@@ -1802,7 +1835,7 @@ module RubyMC
       end
 
       bank.touch(account[:email])
-      version_id = resolve_launch_version
+      version_id ||= resolve_launch_version
 
       mc_mgr = MinecraftManager.new
       mc_mgr.ensure_version_dependencies(version_id)
@@ -1825,10 +1858,10 @@ module RubyMC
       { error: e.message }
     end
 
-    def launch_offline(username:, ram_mb: 2048, server_mode: false)
+    def launch_offline(username:, ram_mb: 2048, server_mode: false, version_id: nil)
       uuid = SecureRandom.uuid.gsub('-', '')
       token = '0'
-      version_id = resolve_launch_version
+      version_id ||= resolve_launch_version
 
       mc_mgr = MinecraftManager.new
       mc_mgr.ensure_version_dependencies(version_id)
