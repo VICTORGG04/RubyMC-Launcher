@@ -142,7 +142,7 @@ class MinecraftManager
     )
   end
 
-  def launch(version_id:, username:, uuid:, mc_access_token:, java_path: nil, ram_mb: 2048, server_address: nil)
+  def launch(version_id:, username:, uuid:, mc_access_token:, java_path: nil, ram_mb: 2048, server_address: nil, game_directory: nil, loader: nil, loader_version: nil)
     json_path = File.join(@versions_dir, version_id, "#{version_id}.json")
     raise "Versão #{version_id} não instalada." unless File.exist?(json_path)
 
@@ -151,14 +151,19 @@ class MinecraftManager
     raise "Java não encontrado. Instale Java 17+." unless java
 
     classpath = build_classpath(version_id, meta)
+    
+    # Usar game_directory customizado se fornecido (para modpacks)
+    effective_game_dir = game_directory || @mc_dir
+    
     args      = build_launch_args(
       version_meta: meta, version_id: version_id,
       username: username, uuid: uuid, mc_access_token: mc_access_token,
       classpath: classpath, ram_mb: ram_mb,
-      server_address: server_address
+      server_address: server_address,
+      game_directory: effective_game_dir
     )
 
-    pid = spawn(*([java] + args), chdir: @mc_dir, out: :out, err: :err)
+    pid = spawn(*([java] + args), chdir: effective_game_dir, out: :out, err: :err)
     Process.detach(pid)
     pid
   end
@@ -450,14 +455,16 @@ class MinecraftManager
     paths.join(":")
   end
 
-  def build_launch_args(version_meta:, version_id:, username:, uuid:, mc_access_token:, classpath:, ram_mb:, server_address: nil, java_path_for_detection: "java")
+  def build_launch_args(version_meta:, version_id:, username:, uuid:, mc_access_token:, classpath:, ram_mb:, server_address: nil, java_path_for_detection: "java", game_directory: nil)
     natives_path = File.join(@natives_dir, version_id)
     FileUtils.mkdir_p(natives_path)
+
+    effective_game_dir = game_directory || @mc_dir
 
     r = {
       "${auth_player_name}"  => username,
       "${version_name}"      => version_id,
-      "${game_directory}"    => @mc_dir,
+      "${game_directory}"    => effective_game_dir,
       "${assets_root}"       => @assets_dir,
       "${assets_index_name}" => version_meta.dig("assetIndex", "id") || version_id,
       "${auth_uuid}"         => uuid,

@@ -552,34 +552,76 @@ module RubyMC
         server_mode = (action == 'enter_server')
         ram = (params.dig('settings', 'ram') || 2048).to_i
         
-        # Extrair version_id do profile, settings.version ou modpack_name
-        version_id = params['version_id'] || 
+        # Extrair profile/version_id do payload
+        profile_id = params['version_id'] || 
                      params['profile'] || 
                      params.dig('settings', 'version') || 
                      params['modpack_name']
         
-        # Se version_id foi fornecido e version_manager estiver disponivel, ativa-lo
-        if version_id && version_manager
+        # Variáveis para launch
+        target_version = nil
+        game_directory = nil
+        loader = nil
+        loader_version = nil
+        
+        # Verificar se é um modpack/profile
+        modpack_profile = nil
+        if profile_id && defined?(MinecraftRubyLauncher::ModpackManager)
           begin
-            activate_result = version_manager.activate(version_id)
-            unless activate_result[:ok]
-              log('WARN', "Falha ao ativar versão #{version_id}: #{activate_result[:error]}")
-              # Continua com a versão ativa atual ou default
-              version_id = nil
-            end
+            modpack_mgr = MinecraftRubyLauncher::ModpackManager.new
+            modpack_profile = modpack_mgr.find(profile_id)
           rescue => e
-            log('WARN', "Erro ao ativar versão: #{e.message}")
-            version_id = nil
+            log('DEBUG', "ModpackManager não disponível ou erro: #{e.message}")
           end
         end
         
-        # Usar version_id se foi ativado, senão usa a versão ativa do manager
-        target_version = version_id || (version_manager&.active_version&.dig(:id) || resolve_launch_version)
+        if modpack_profile
+          # É um modpack - obter opções de launch
+          begin
+            launch_opts = modpack_mgr.launch_options(profile_id)
+            target_version = launch_opts[:minecraft_version]
+            game_directory = launch_opts[:game_directory]
+            loader = launch_opts[:loader]
+            loader_version = launch_opts[:loader_version]
+            log('INFO', "Launch com modpack: #{profile_id} (v#{target_version}, loader: #{loader})")
+          rescue => e
+            log('WARN', "Falha ao obter opções de launch para modpack #{profile_id}: #{e.message}")
+            # Tentar como versão normal
+            modpack_profile = nil
+          end
+        end
+        
+        # Se não é modpack ou falhou, tratar como versão normal
+        if !modpack_profile && profile_id && version_manager
+          begin
+            activate_result = version_manager.activate(profile_id)
+            unless activate_result[:ok]
+              log('WARN', "Falha ao ativar versão #{profile_id}: #{activate_result[:error]}")
+              profile_id = nil
+            end
+          rescue => e
+            log('WARN', "Erro ao ativar versão: #{e.message}")
+            profile_id = nil
+          end
+          
+          target_version ||= profile_id || (version_manager&.active_version&.dig(:id) || resolve_launch_version)
+        end
+        
+        # Se ainda não tem target_version, usar o default
+        target_version ||= (version_manager&.active_version&.dig(:id) || resolve_launch_version)
 
         if account_id && !account_id.to_s.empty?
           # Launch com conta Microsoft
           result = with_server_mutex('launch_minecraft') do
-            launch_with_account(account_id: account_id, ram_mb: ram, server_mode: server_mode, version_id: target_version)
+            launch_with_account(
+              account_id: account_id, 
+              ram_mb: ram, 
+              server_mode: server_mode, 
+              version_id: target_version,
+              game_directory: game_directory,
+              loader: loader,
+              loader_version: loader_version
+            )
           end
         else
           # Launch offline — exige username
@@ -588,7 +630,15 @@ module RubyMC
             return json(res, { ok: false, error: 'Username offline não preenchido. Vá em Configurações.' })
           end
           result = with_server_mutex('launch_minecraft') do
-            launch_offline(username: username, ram_mb: ram, server_mode: server_mode, version_id: target_version)
+            launch_offline(
+              username: username, 
+              ram_mb: ram, 
+              server_mode: server_mode,
+              version_id: target_version,
+              game_directory: game_directory,
+              loader: loader,
+              loader_version: loader_version
+            )
           end
         end
 
@@ -1790,13 +1840,79 @@ module RubyMC
       account_id = params['account_id'] || params.dig('settings', 'account')
       server_mode = params['server_mode'] == true
       ram = (params['ram_mb'] || params.dig('settings', 'ram') || 2048).to_i
+      
+      # Extrair profile/version_id do payload
+      profile_id = params['version_id'] || 
+                   params['profile'] || 
+                   params.dig('settings', 'version') || 
+                   params['modpack_name']
+        
+      # Variáveis para launch
+      target_version = nil
+      game_directory = nil
+      loader = nil
+      loader_version = nil
+        
+      # Verificar se é um modpack/profile
+      modpack_profile = nil
+      if profile_id && defined?(MinecraftRubyLauncher::ModpackManager)
+        begin
+          modpack_mgr = MinecraftRubyLauncher::ModpackManager.new
+          modpack_profile = modpack_mgr.find(profile_id)
+        rescue => e
+          log('DEBUG', "ModpackManager não disponível ou erro: #{e.message}")
+        end
+      end
+        
+      if modpack_profile
+        # É um modpack - obter opções de launch
+        begin
+          launch_opts = modpack_mgr.launch_options(profile_id)
+          target_version = launch_opts[:minecraft_version]
+          game_directory = launch_opts[:game_directory]
+          loader = launch_opts[:loader]
+          loader_version = launch_opts[:loader_version]
+          log('INFO', "Launch com modpack: #{profile_id} (v#{target_version}, loader: #{loader})")
+        rescue => e
+          log('WARN', "Falha ao obter opções de launch para modpack #{profile_id}: #{e.message}")
+          # Tentar como versão normal
+          modpack_profile = nil
+        end
+      end
+        
+      # Se não é modpack ou falhou, tratar como versão normal
+      if !modpack_profile && profile_id && version_manager
+        begin
+          activate_result = version_manager.activate(profile_id)
+          unless activate_result[:ok]
+            log('WARN', "Falha ao ativar versão #{profile_id}: #{activate_result[:error]}")
+            profile_id = nil
+          end
+        rescue => e
+          log('WARN', "Erro ao ativar versão: #{e.message}")
+          profile_id = nil
+        end
+          
+        target_version ||= profile_id || (version_manager&.active_version&.dig(:id) || resolve_launch_version)
+      end
+        
+      # Se ainda não tem target_version, usar o default
+      target_version ||= (version_manager&.active_version&.dig(:id) || resolve_launch_version)
 
       if account_id && !account_id.to_s.empty?
-        result = with_server_mutex('launch_minecraft') { launch_with_account(account_id: account_id, ram_mb: ram, server_mode: server_mode) }
+        result = with_server_mutex('launch_minecraft') { 
+          launch_with_account(account_id: account_id, ram_mb: ram, server_mode: server_mode, 
+                              version_id: target_version, game_directory: game_directory,
+                              loader: loader, loader_version: loader_version)
+        }
       else
         username = params['username'] || params.dig('settings', 'username').to_s.strip
         return json(res, { ok: false, error: 'Username não preenchido.' }) if username.empty?
-        result = with_server_mutex('launch_minecraft') { launch_offline(username: username, ram_mb: ram, server_mode: server_mode) }
+        result = with_server_mutex('launch_minecraft') { 
+          launch_offline(username: username, ram_mb: ram, server_mode: server_mode,
+                         version_id: target_version, game_directory: game_directory,
+                         loader: loader, loader_version: loader_version)
+        }
       end
 
       if result[:pid]
@@ -1808,7 +1924,7 @@ module RubyMC
       json(res, { ok: false, error: e.message })
     end
 
-    def launch_with_account(account_id:, ram_mb: 2048, server_mode: false, version_id: nil)
+    def launch_with_account(account_id:, ram_mb: 2048, server_mode: false, version_id: nil, game_directory: nil, loader: nil, loader_version: nil)
       bank = AccountBank.new
       account = bank.find(account_id)
       raise "Conta '#{account_id}' não encontrada." unless account
@@ -1847,7 +1963,10 @@ module RubyMC
       pid = mc_mgr.launch(
         version_id: version_id, username: username, uuid: uuid,
         mc_access_token: token, java_path: java, ram_mb: ram_mb,
-        server_address: server_address
+        server_address: server_address,
+        game_directory: game_directory,
+        loader: loader,
+        loader_version: loader_version
       )
       Process.detach(pid)
       msg = server_mode ? "conectado ao servidor" : "com conta Microsoft"
@@ -1858,7 +1977,7 @@ module RubyMC
       { error: e.message }
     end
 
-    def launch_offline(username:, ram_mb: 2048, server_mode: false, version_id: nil)
+    def launch_offline(username:, ram_mb: 2048, server_mode: false, version_id: nil, game_directory: nil, loader: nil, loader_version: nil)
       uuid = SecureRandom.uuid.gsub('-', '')
       token = '0'
       version_id ||= resolve_launch_version
@@ -1873,7 +1992,10 @@ module RubyMC
       pid = mc_mgr.launch(
         version_id: version_id, username: username, uuid: uuid,
         mc_access_token: token, java_path: java, ram_mb: ram_mb,
-        server_address: server_address
+        server_address: server_address,
+        game_directory: game_directory,
+        loader: loader,
+        loader_version: loader_version
       )
       Process.detach(pid)
       msg = server_mode ? "conectado ao servidor" : "offline"
