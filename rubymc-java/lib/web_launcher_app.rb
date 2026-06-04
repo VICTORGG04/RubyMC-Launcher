@@ -768,22 +768,52 @@ module RubyMC
         json(res, { ok: true, active: mgr.active_version })
 
       when 'profile_select', 'activate_profile'
-        mgr = version_manager
-        unless mgr
-          return json(res, { ok: false, error: 'Gerenciador de versões não disponível.' })
-        end
         params = parse_json(req.body) || {}
         vid = params['version_id'] || req.query['version_id']
         unless vid
           return json(res, { ok: false, error: 'Informe version_id.' })
         end
-        result = mgr.activate(vid)
-        if result[:ok]
-          log('OK', "Perfil alterado para versão '#{vid}'.")
-        else
-          log('ERROR', "Falha ao ativar perfil '#{vid}': #{result[:error]}")
+        
+        # Tentar primeiro como modpack
+        modpack_profile = nil
+        modpack_mgr = nil
+        if defined?(MinecraftRubyLauncher::ModpackManager)
+          begin
+            modpack_mgr = MinecraftRubyLauncher::ModpackManager.new
+            modpack_profile = modpack_mgr.find(vid)
+          rescue => e
+            log('DEBUG', "ModpackManager erro: #{e.message}")
+          end
         end
-        json(res, result.merge(active: mgr.active_version))
+        
+        if modpack_profile
+          # É um modpack - ativar a versão do Minecraft correspondente
+          minecraft_version = modpack_profile.minecraft_version
+          mgr = version_manager
+          unless mgr
+            return json(res, { ok: false, error: 'Gerenciador de versões não disponível.' })
+          end
+          result = mgr.activate(minecraft_version)
+          if result[:ok]
+            log('OK', "Perfil modpack '#{vid}' ativado (versão #{minecraft_version}).")
+          else
+            log('ERROR', "Falha ao ativar versão para modpack '#{vid}': #{result[:error]}")
+          end
+          json(res, result.merge(active: mgr.active_version, modpack: { id: vid, name: modpack_profile.name }))
+        else
+          # Não é modpack, tentar como versão normal do servidor
+          mgr = version_manager
+          unless mgr
+            return json(res, { ok: false, error: 'Gerenciador de versões não disponível.' })
+          end
+          result = mgr.activate(vid)
+          if result[:ok]
+            log('OK', "Perfil alterado para versão '#{vid}'.")
+          else
+            log('ERROR', "Falha ao ativar perfil '#{vid}': #{result[:error]}")
+          end
+          json(res, result.merge(active: mgr.active_version))
+        end
 
       when 'profile_current'
         mgr = version_manager
