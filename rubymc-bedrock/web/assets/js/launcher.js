@@ -38,8 +38,9 @@
   }
 
   function activateTab(tab) {
-    $$(".side-link").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
+    $$(".tab-link").forEach(btn => btn.classList.toggle("active", btn.dataset.tab === tab));
     $$(".tab-panel").forEach(panel => panel.classList.toggle("active", panel.id === `tab-${tab}`));
+    document.body.dataset.currentTab = tab;
   }
 
   async function fetchJson(url, options = {}) {
@@ -333,9 +334,31 @@
     } catch (_) {}
   }
 
+  const esc = escapeHtml;
+
+  function setBusy(button, busy, label) {
+    if (typeof busy === "string") {
+      const orig = button.textContent;
+      button.disabled = true;
+      button.textContent = busy;
+      return () => { button.disabled = false; button.textContent = orig; };
+    }
+    if (busy) {
+      button.dataset.orig = button.dataset.orig || button.textContent;
+      button.disabled = true;
+      if (label) button.textContent = label;
+    } else {
+      button.textContent = button.dataset.orig || button.textContent;
+      button.disabled = false;
+    }
+  }
+
   function bindEvents() {
-    $$(".side-link").forEach(btn => {
-      btn.addEventListener("click", () => activateTab(btn.dataset.tab));
+    $$(".tab-link").forEach(btn => {
+      btn.addEventListener("click", () => {
+        activateTab(btn.dataset.tab);
+        if (btn.dataset.tab === "vip") setTimeout(loadVipData, 100);
+      });
     });
 
     $$("[data-tab-jump]").forEach(btn => {
@@ -361,6 +384,328 @@
       });
     }
   }
+
+  /* ── VIP ──────────────────────────────────────────── */
+
+  async function loadVipData() {
+    await Promise.allSettled([
+      loadVipStatus(),
+      loadVipPlans(),
+      loadPendingPayments()
+    ]);
+  }
+
+  async function loadVipStatus() {
+    const detail = document.getElementById("vip-status-detail");
+    if (!detail) return;
+    try {
+      const data = await fetchJson("/api/vip/status");
+      if (!data.ok) throw new Error(data.error || "Falha");
+      if (data.active && data.plan != 'doacao') {
+        const badge = data.role_granted
+          ? '<span class="vip-role-badge team">Gratuito pela Equipe</span>'
+          : '';
+        detail.innerHTML = `
+          <span class="vip-status-badge active">👑 ${esc(data.plan)}</span>
+          <span class="vip-status-plan">${esc(data.plan_label || data.plan)}</span>
+          ${badge}
+          ${data.expires_at ? `<span class="vip-status-expires">Expira em ${esc(data.expires_at)}</span>` : ""}
+        `;
+      } else {
+        detail.innerHTML = `
+          <span class="vip-status-badge none">Nenhum plano ativo</span>
+          <span style="color:var(--muted);font-size:13px;">Adquira um plano abaixo para desbloquear benefícios VIP no servidor.</span>
+        `;
+      }
+    } catch (error) {
+      detail.innerHTML = `<span style="color:var(--muted);font-style:italic;">Erro ao carregar status: ${esc(error.message)}</span>`;
+    }
+  }
+
+  async function loadVipPlans() {
+    const grid = document.getElementById("vip-plans-grid");
+    if (!grid) return;
+    try {
+      const data = await fetchJson("/api/vip/plans");
+      if (!data.ok) throw new Error(data.error || "Falha");
+      const plans = data.plans || [];
+      if (!plans.length) {
+        grid.innerHTML = '<span style="color:var(--muted);font-style:italic;">Nenhum plano disponível no momento.</span>';
+        return;
+      }
+      grid.innerHTML = plans.map((plan) => {
+        if (plan.id === 'doacao') {
+          return `
+        <div class="vip-plan-card${data.staff_discount ? ' staff-discount' : ''}">
+          <span class="vip-plan-name">${esc(plan.name)}</span>
+          <span class="vip-plan-price">${esc(plan.price)}</span>
+          <span class="vip-plan-desc">${esc(plan.description || "")}</span>
+          <div class="doacao-row">
+            <input type="number" class="doacao-input" min="1" step="0.01" placeholder="Valor (R$)">
+            <button class="btn btn-green btn-sm doacao-btn" data-vip-price-id="doacao">Doar</button>
+          </div>
+        </div>`;
+        }
+        return `
+        <div class="vip-plan-card${data.staff_discount ? ' staff-discount' : ''}">
+          ${data.staff_discount ? '<span class="vip-staff-badge">50% OFF Equipe</span>' : ''}
+          <span class="vip-plan-name">${esc(plan.name)}</span>
+          <span class="vip-plan-price">R$ ${esc(plan.price)} <small>/${esc(plan.period || "mês")}</small></span>
+          <span class="vip-plan-desc">${esc(plan.description || "")}</span>
+          <button class="btn btn-red btn-sm vip-checkout-btn" data-vip-price-id="${esc(plan.id)}">Assinar</button>
+        </div>`;
+      }).join("");
+
+      grid.querySelectorAll(".vip-checkout-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const planId = btn.dataset.vipPriceId;
+          const parent = btn.closest(".vip-plan-card");
+          const amountInput = parent?.querySelector(".doacao-input");
+          vipCheckoutVIP(planId, btn, amountInput?.value || null);
+        });
+      });
+      grid.querySelectorAll(".doacao-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const planId = btn.dataset.vipPriceId;
+          const parent = btn.closest(".vip-plan-card");
+          const amountInput = parent?.querySelector(".doacao-input");
+          vipCheckoutVIP(planId, btn, amountInput?.value || null);
+        });
+      });
+    } catch (error) {
+      grid.innerHTML = `<span style="color:var(--muted);font-style:italic;">Erro ao carregar planos: ${esc(error.message)}</span>`;
+    }
+  }
+
+  async function loadPendingPayments() {
+    const section = document.getElementById("vip-pending-section");
+    const list = document.getElementById("vip-pending-list");
+    if (!section || !list) return;
+    try {
+      const data = await fetchJson("/api/vip/pix/status");
+      if (!data.ok) return;
+      const pending = data.pending || [];
+      if (!pending.length) { section.style.display = "none"; return; }
+      section.style.display = "";
+      list.innerHTML = pending.map((p) => `
+        <div class="vip-pending-item" data-payment-id="${esc(p.id)}">
+          <div class="pending-header">
+            <span class="pending-plan">${esc(p.plan_label || p.plan)}</span>
+            <span class="pending-amount">R$ ${esc(p.amount)}</span>
+          </div>
+          <div class="pending-user">Usuário: ${esc(p.user_id || "?")}</div>
+          ${p.ocr_amount ? `<div class="pending-ocr">OCR: R$ ${esc(p.ocr_amount)} — ${esc(p.ocr_sender || "?")}</div>` : ""}
+          ${p.receipt ? `<div class="pending-receipt"><a href="/api/vip/pix/receipt/${esc(p.id)}" target="_blank"><img src="/api/vip/pix/receipt/${esc(p.id)}" alt="Comprovante"></a></div>` : '<div class="pending-ocr" style="color:#fbbf24;">⏳ Aguardando upload do comprovante...</div>'}
+          ${p.receipt ? `
+          <div class="pending-actions">
+            <button class="btn-confirm" onclick="confirmPendingPayment('${esc(p.id)}', this)">✅ Confirmar</button>
+            <button class="btn-reject" onclick="rejectPendingPayment('${esc(p.id)}', this)">❌ Recusar</button>
+          </div>` : ""}
+        </div>
+      `).join("");
+    } catch (_) {
+      section.style.display = "none";
+    }
+  }
+
+  async function confirmPendingPayment(paymentId, btn) {
+    btn.disabled = true;
+    btn.textContent = "Confirmando...";
+    try {
+      const data = await postJson("/api/vip/pix/confirm", { payment_id: paymentId });
+      if (!data.ok) { alert(data.error || "Erro ao confirmar"); btn.disabled = false; btn.textContent = "✅ Confirmar"; return; }
+      alert(data.message);
+      loadPendingPayments();
+    } catch (e) {
+      alert("Erro: " + e.message);
+      btn.disabled = false;
+      btn.textContent = "✅ Confirmar";
+    }
+  }
+
+  async function rejectPendingPayment(paymentId, btn) {
+    if (!confirm("Tem certeza que deseja recusar este pagamento?")) return;
+    btn.disabled = true;
+    btn.textContent = "Recusando...";
+    try {
+      const data = await postJson("/api/vip/pix/reject", { payment_id: paymentId });
+      if (!data.ok) { alert(data.error || "Erro ao recusar"); btn.disabled = false; btn.textContent = "❌ Recusar"; return; }
+      loadPendingPayments();
+    } catch (e) {
+      alert("Erro: " + e.message);
+      btn.disabled = false;
+      btn.textContent = "❌ Recusar";
+    }
+  }
+
+  async function vipCheckoutVIP(priceId, button, amount) {
+    const restore = setBusy(button, "Gerando PIX...");
+    try {
+      const body = { price_id: priceId };
+      if (amount) body.amount = amount;
+      const data = await postJson("/api/vip/checkout", body);
+      if (data.ok === false) { alert(data.error || "Erro ao processar checkout"); return; }
+      showPixModal(data);
+    } catch (error) {
+      alert("Erro de rede: " + error.message);
+    } finally {
+      restore();
+    }
+  }
+
+  /* ── PIX Modal ──────────────────────────────────── */
+
+  let pixPollTimer = null;
+
+  function copyPixCode() {
+    const code = document.getElementById("pix-code-text");
+    if (!code) return;
+    navigator.clipboard.writeText(code.textContent).then(() => {
+      const btn = document.getElementById("pix-copy-btn");
+      if (btn) { btn.textContent = "✅ Copiado!"; setTimeout(() => { btn.textContent = "📋 Copiar"; }, 2000); }
+    }).catch(() => alert("Copie manualmente: " + code.textContent));
+  }
+
+  function updatePixStatus(status) {
+    const indicator = document.getElementById("pix-status-indicator");
+    if (!indicator) return;
+    if (status === "completed") {
+      indicator.className = "pix-modal-status success";
+      indicator.innerHTML = '<span class="pix-status-dot completed"></span> ✅ Pagamento confirmado!';
+    } else {
+      indicator.className = "pix-modal-status";
+      indicator.innerHTML = '<span class="pix-status-dot pending"></span> Aguardando pagamento...';
+    }
+  }
+
+  function closePixModal() {
+    if (pixPollTimer) { clearInterval(pixPollTimer); pixPollTimer = null; }
+    const ov = document.getElementById("pix-modal-overlay");
+    if (ov) ov.remove();
+  }
+
+  function showPixModal(pixData) {
+    closePixModal();
+    const overlay = document.createElement("div");
+    overlay.id = "pix-modal-overlay";
+    overlay.className = "pix-modal-overlay";
+    overlay.innerHTML = `
+      <div class="pix-modal">
+        <button class="pix-modal-close" type="button">✕</button>
+        <h2 class="pix-modal-title">💎 Pagamento PIX</h2>
+        <p class="pix-modal-plan">${esc(pixData.plan)} — <strong>R$ ${esc(pixData.amount)}</strong></p>
+        <div class="pix-modal-qr-wrapper">
+          <img class="pix-modal-qr" src="data:image/png;base64,${pixData.qr_code_base64}" alt="QR Code PIX">
+        </div>
+        <div class="pix-modal-code">
+          <label>Código PIX (copie e cole no seu banco)</label>
+          <div class="pix-code-box">
+            <code id="pix-code-text">${esc(pixData.pix_code)}</code>
+            <button class="btn btn-sm btn-filter" type="button" id="pix-copy-btn">📋 Copiar</button>
+          </div>
+        </div>
+        <div class="pix-modal-receipt">
+          <label class="pix-receipt-label">📎 Comprovante de pagamento</label>
+          <div class="pix-receipt-row">
+            <input type="file" class="pix-receipt-input" id="receipt-file-input" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf">
+            <button class="btn btn-blue btn-sm" type="button" id="receipt-upload-btn">📤 Enviar</button>
+          </div>
+          <div class="pix-receipt-status" id="receipt-upload-status"></div>
+        </div>
+        <div class="pix-modal-status" id="pix-status-indicator">
+          <span class="pix-status-dot pending"></span>
+          Aguardando pagamento...
+        </div>
+        <div class="pix-modal-actions">
+          <button class="btn btn-green" type="button" id="pix-confirm-btn">✅ Já paguei</button>
+          <button class="btn btn-red" type="button" id="pix-cancel-btn">Cancelar</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.style.display = "flex";
+
+    overlay.querySelector(".pix-modal-close").addEventListener("click", closePixModal);
+    overlay.querySelector("#pix-cancel-btn").addEventListener("click", closePixModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closePixModal(); });
+    overlay.querySelector("#pix-copy-btn").addEventListener("click", copyPixCode);
+
+    const confirmBtn = overlay.querySelector("#pix-confirm-btn");
+    confirmBtn.addEventListener("click", () => checkPixStatus(pixData.payment_id, confirmBtn));
+
+    const uploadBtn = overlay.querySelector("#receipt-upload-btn");
+    const fileInput = overlay.querySelector("#receipt-file-input");
+    const uploadStatus = overlay.querySelector("#receipt-upload-status");
+    uploadBtn.addEventListener("click", () => uploadReceipt(pixData.payment_id, fileInput, uploadStatus));
+
+    startPixPolling(pixData.payment_id);
+  }
+
+  function startPixPolling(paymentId) {
+    if (pixPollTimer) clearInterval(pixPollTimer);
+    pixPollTimer = setInterval(async () => {
+      const ov = document.getElementById("pix-modal-overlay");
+      if (!ov) { clearInterval(pixPollTimer); pixPollTimer = null; return; }
+      try {
+        const data = await fetchJson("/api/vip/pix/status?payment_id=" + encodeURIComponent(paymentId));
+        if (data.ok && data.status === "completed") {
+          clearInterval(pixPollTimer);
+          pixPollTimer = null;
+          updatePixStatus("completed");
+          setTimeout(() => { closePixModal(); loadVipData(); }, 2000);
+        }
+      } catch (_) {}
+    }, 5000);
+  }
+
+  async function checkPixStatus(paymentId, button) {
+    try {
+      const data = await fetchJson("/api/vip/pix/status?payment_id=" + encodeURIComponent(paymentId));
+      if (!data.ok) { alert(data.error || "Erro ao verificar status"); return; }
+      if (data.status === "completed") {
+        updatePixStatus("completed");
+        if (pixPollTimer) { clearInterval(pixPollTimer); pixPollTimer = null; }
+        setTimeout(() => { closePixModal(); loadVipData(); }, 1500);
+      } else {
+        alert("Pagamento ainda não confirmado. Após o pagamento, um administrador precisa confirmar manualmente.");
+      }
+    } catch (error) {
+      alert("Erro: " + error.message);
+    }
+  }
+
+  async function uploadReceipt(paymentId, fileInput, statusEl) {
+    const file = fileInput.files[0];
+    if (!file) { statusEl.textContent = "Selecione um arquivo primeiro."; statusEl.className = "pix-receipt-status error"; return; }
+    if (file.size > 10_485_760) { statusEl.textContent = "Arquivo muito grande. Máximo 10MB."; statusEl.className = "pix-receipt-status error"; return; }
+    statusEl.textContent = "Enviando...";
+    statusEl.className = "pix-receipt-status";
+    const form = new FormData();
+    form.append("payment_id", paymentId);
+    form.append("receipt", file);
+    try {
+      const resp = await fetch("/api/vip/pix/receipt", { method: "POST", body: form });
+      const data = await resp.json();
+      if (!data.ok) { statusEl.textContent = data.error || "Erro ao enviar comprovante."; statusEl.className = "pix-receipt-status error"; return; }
+      if (data.confirmed) {
+        statusEl.textContent = data.message; statusEl.className = "pix-receipt-status success";
+        updatePixStatus("completed");
+        if (pixPollTimer) { clearInterval(pixPollTimer); pixPollTimer = null; }
+        setTimeout(() => { closePixModal(); loadVipData(); }, 2000);
+      } else {
+        const ocrInfo = data.ocr ? ` (detectado: R$ ${data.ocr.amount || "?"} — ${data.ocr.sender || "?"})` : "";
+        statusEl.textContent = data.message + ocrInfo; statusEl.className = "pix-receipt-status";
+      }
+    } catch (error) {
+      statusEl.textContent = "Erro de rede: " + error.message; statusEl.className = "pix-receipt-status error";
+    }
+  }
+
+  /* ── Expose global handlers for inline onclick ── */
+
+  window.confirmPendingPayment = confirmPendingPayment;
+  window.rejectPendingPayment = rejectPendingPayment;
+  window.closePixModal = closePixModal;
 
   document.addEventListener("DOMContentLoaded", () => {
     bindEvents();

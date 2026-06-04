@@ -14,20 +14,29 @@ module RubyMC
     PAPER_API_URL = 'https://api.papermc.io/v2/projects/paper'
     FABRIC_META_URL = 'https://meta.fabricmc.net/v2/versions'
     FORGE_MAVEN_URL = 'https://maven.minecraftforge.net/net/minecraftforge/forge'
+    NEOFORGE_API_URL = 'https://api.neoforged.net/api/v1/versions/minecraft'
+    NEOFORGE_MAVEN_URL = 'https://maven.neoforged.net/releases/net/neoforged/neoforge'
+    QUILT_META_URL = 'https://meta.quiltmc.org/v3/versions'
+    QUILT_MAVEN_URL = 'https://maven.quiltmc.org/repository/release/org/quiltmc'
     TIMEOUT = 15
     DOWNLOAD_TIMEOUT = 120
 
-    LOADERS = %i[vanilla paper fabric forge].freeze
+    LOADERS = %i[vanilla paper fabric forge neoforge quilt].freeze
     LOADER_LABELS = {
       vanilla: 'Vanilla',
       paper: 'Paper',
       fabric: 'Fabric',
-      forge: 'Forge'
+      forge: 'Forge',
+      neoforge: 'NeoForge',
+      quilt: 'Quilt'
     }.freeze
 
     # Minecraft version formats:
     #   New: "26.1.1" (major=26)  → MC 1.21.5+
     #   Old: "1.21.5" (major=1)   → check second component
+    #
+    # Mapeamento 26.x → 1.21.x para loaders legados (Forge)
+    MAJOR_26_OFFSET = 4 # 26.0 → 1.21.4, 26.1 → 1.21.5, etc.
     #
     # Retorno padrão:
     #   {
@@ -191,6 +200,8 @@ module RubyMC
       when :paper then list_paper_versions(limit)
       when :fabric then list_fabric_versions
       when :forge then list_forge_versions
+      when :neoforge then list_neoforge_versions
+      when :quilt then list_quilt_versions
       else []
       end
     rescue StandardError => e
@@ -237,6 +248,8 @@ module RubyMC
       when :paper then install_paper(version_id, vdir)
       when :fabric then install_fabric(version_id, vdir, java_bin)
       when :forge then install_forge(version_id, vdir, java_bin)
+      when :neoforge then install_neoforge(version_id, vdir, java_bin)
+      when :quilt then install_quilt(version_id, vdir, java_bin)
       else { ok: false, error: "Loader desconhecido: #{loader}" }
       end
     end
@@ -380,6 +393,28 @@ module RubyMC
       end
     end
 
+    def list_neoforge_versions
+      data = get_json(NEOFORGE_API_URL)
+      (data || []).map do |v|
+        {
+          id: v['version'],
+          type: 'release',
+          loader: :neoforge
+        }
+      end
+    end
+
+    def list_quilt_versions
+      data = get_json("#{QUILT_META_URL}/game")
+      (data || []).map do |v|
+        {
+          id: v['version'],
+          type: v['stable'] ? 'release' : 'snapshot',
+          loader: :quilt
+        }
+      end
+    end
+
     def install_vanilla(version_id, vdir)
       manifest = get_json(MOJANG_MANIFEST_URL)
       entry = manifest['versions'].find { |v| v['id'] == version_id }
@@ -436,7 +471,10 @@ module RubyMC
       return { ok: false, error: "Fabric não suporta '#{version_id}'." } if loaders.empty?
 
       loader_version = loaders.first['loader']['version']
-      installer_url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/#{loader_version}/fabric-installer-#{loader_version}.jar"
+
+      installers = get_json("#{FABRIC_META_URL}/installer")
+      installer_version = installers.first['version']
+      installer_url = "https://maven.fabricmc.net/net/fabricmc/fabric-installer/#{installer_version}/fabric-installer-#{installer_version}.jar"
       installer_jar = File.join(vdir, 'fabric-installer.jar')
 
       download_file(installer_url, installer_jar)
@@ -473,18 +511,44 @@ module RubyMC
       data = get_json('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json')
       promos = data['promos'] || {}
 
-      recommended_key = promos.keys.find { |k| k.start_with?("#{version_id}-") && k.end_with?('-recommended') }
-      latest_key = promos.keys.find { |k| k.start_with?("#{version_id}-") && k.end_with?('-latest') }
-      forge_key = recommended_key || latest_key
+      forge_version = nil
+      candidates = [version_id]
+      if version_id =~ /\A26\.(\d+)\z/
+        candidates << "1.21.#{$1.to_i + MAJOR_26_OFFSET}"
+      end
 
-      return { ok: false, error: "Forge não disponível para '#{version_id}'." } unless forge_key
+      effective_id = nil
+      candidates.each do |vid|
+        key = promos.keys.find { |k| k.start_with?("#{vid}-") && k.end_with?('-recommended') } ||
+              promos.keys.find { |k| k.start_with?("#{vid}-") && k.end_with?('-latest') }
+        next unless key
+        forge_version = key.split('-', 2).last
+        effective_id = vid
+        break
+      end
 
-      forge_version = forge_key.split('-', 2).last
-      forge_url = "#{FORGE_MAVEN_URL}/#{version_id}-#{forge_version}/forge-#{version_id}-#{forge_version}-installer.jar"
+      return { ok: false, error: "Forge não disponível para '#{version_id}'." } unless forge_version
+
+      # Build candidate URLs — try effective_id first, then alternative if mismatched
+      url_candidates = ["#{FORGE_MAVEN_URL}/#{effective_id}-#{forge_version}/forge-#{effective_id}-#{forge_version}-installer.jar"]
+      candidates.each do |vid|
+        next if vid == effective_id
+        url_candidates << "#{FORGE_MAVEN_URL}/#{vid}-#{forge_version}/forge-#{vid}-#{forge_version}-installer.jar"
+      end
+
       installer_jar = File.join(vdir, 'forge-installer.jar')
+      downloaded = false
+      url_candidates.each do |url|
+        begin
+          download_file(url, installer_jar)
+          downloaded = true
+          break
+        rescue StandardError
+          next
+        end
+      end
 
-      download_file(forge_url, installer_jar)
-      return { ok: false, error: 'Download do Forge installer falhou.' } unless File.exist?(installer_jar)
+      return { ok: false, error: 'Download do Forge installer falhou.' } unless downloaded
 
       java = java_bin || recommended_java(version_id)[:java_path]
       cmd = [
@@ -520,6 +584,96 @@ module RubyMC
       }
     end
 
+    def install_neoforge(version_id, vdir, java_bin = nil)
+      data = get_json(NEOFORGE_API_URL)
+      entry = data.find { |v| v['version'] == version_id }
+      return { ok: false, error: "NeoForge não suporta '#{version_id}'." } unless entry
+
+      nf_version = entry['recommended'] || entry['latest']
+      return { ok: false, error: "Nenhuma versão do NeoForge para '#{version_id}'." } unless nf_version
+
+      fullver = "#{version_id}-#{nf_version}"
+      installer_url = "#{NEOFORGE_MAVEN_URL}/#{fullver}/neoforge-#{fullver}-installer.jar"
+      installer_jar = File.join(vdir, 'neoforge-installer.jar')
+
+      download_file(installer_url, installer_jar)
+      return { ok: false, error: 'Download do NeoForge installer falhou.' } unless File.exist?(installer_jar)
+
+      java = java_bin || recommended_java(version_id)[:java_path]
+      cmd = [
+        Shellwords.escape(java),
+        '-jar',
+        Shellwords.escape(installer_jar),
+        '--installServer'
+      ].join(' ')
+
+      out_jar = nil
+      Dir.chdir(vdir) do
+        output = `#{cmd} 2>&1`
+        unless $?.success?
+          FileUtils.rm_f(installer_jar)
+          return { ok: false, error: "NeoForge installer falhou: #{output.lines.last(5).join.strip}" }
+        end
+        out_jar = Dir.glob("neoforge-*.jar").reject { |j| j.include?('installer') }.first
+      end
+
+      FileUtils.rm_f(installer_jar)
+      return { ok: false, error: 'NeoForge não gerou server jar.' } unless out_jar && File.exist?(out_jar)
+
+      {
+        ok: true,
+        path: out_jar,
+        loader: :neoforge,
+        version: version_id,
+        neoforge_version: nf_version
+      }
+    end
+
+    def install_quilt(version_id, vdir, java_bin = nil)
+      loaders = get_json("#{QUILT_META_URL}/loader/#{version_id}")
+      return { ok: false, error: "Quilt não suporta '#{version_id}'." } if loaders.empty?
+
+      loader_version = loaders.first['loader']['version']
+
+      installers = get_json("#{QUILT_META_URL}/installer")
+      installer_version = installers.first['version']
+      installer_url = "#{QUILT_MAVEN_URL}/quilt-installer/#{installer_version}/quilt-installer-#{installer_version}.jar"
+      installer_jar = File.join(vdir, 'quilt-installer.jar')
+
+      download_file(installer_url, installer_jar)
+      return { ok: false, error: 'Download do Quilt installer falhou.' } unless File.exist?(installer_jar)
+
+      java = java_bin || recommended_java(version_id)[:java_path]
+      args = [java, '-jar', installer_jar, 'install', 'server', version_id,
+              '--loader=' + loader_version, '--download-minecraft']
+
+      out_jar = nil
+      Dir.chdir(vdir) do
+        output, _, status = Open3.capture3(*args)
+        unless status.success?
+          FileUtils.rm_f(installer_jar)
+          return { ok: false, error: "Quilt installer falhou: #{output.lines.last(5).join.strip}" }
+        end
+        out_jar = Dir.glob("quilt-server-launch*").first || Dir.glob("quilt-server-*.jar").first
+      end
+
+      unless out_jar && File.exist?(out_jar)
+        # fallback: procura qualquer .jar novo que não seja o installer
+        out_jar = Dir.glob(File.join(vdir, '*.jar')).reject { |j| j.include?('installer') }.first
+      end
+
+      FileUtils.rm_f(installer_jar)
+      return { ok: false, error: 'Quilt não gerou server jar.' } unless out_jar && File.exist?(out_jar)
+
+      {
+        ok: true,
+        path: out_jar,
+        loader: :quilt,
+        version: version_id,
+        loader_version: loader_version
+      }
+    end
+
     def get_json(url)
       response = HTTParty.get(url, timeout: TIMEOUT)
       raise "HTTP #{response.code} para #{url}" unless response.success?
@@ -550,6 +704,8 @@ module RubyMC
       return :paper if base.start_with?('paper')
       return :fabric if base.include?('fabric')
       return :forge if base.include?('forge')
+      return :neoforge if base.include?('neoforge')
+      return :quilt if base.include?('quilt')
       return :vanilla if base.start_with?('vanilla')
 
       :vanilla

@@ -54,6 +54,11 @@ servers:
     path: /caminho/para/ServidorMinecraftBedrock
     port: 19132
 
+pix:
+  key: "suachavepix@email.com"         # Chave PIX (email, CPF, CNPJ ou telefone)
+  merchant_name: "RubyMC"              # Nome do recebedor (max 25 caracteres)
+  merchant_city: "Sao Paulo"           # Cidade do recebedor (max 15 caracteres)
+
 ai_support:
   enabled: false
   provider: ollama

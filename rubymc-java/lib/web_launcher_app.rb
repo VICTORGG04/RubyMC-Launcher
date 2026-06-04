@@ -15,6 +15,8 @@ require 'cgi'
 require 'net/http'
 require 'uri'
 require 'set'
+require 'base64'
+require 'rqrcode'
 
 # Load .env file if present (must happen before any config loading)
 env_file = File.join(File.dirname(__dir__), '.env')
@@ -37,6 +39,16 @@ rescue LoadError
   # Gerenciamento de processo do servidor fica indisponível.
 end
 require 'securerandom'
+
+begin
+  require_relative 'receipt_ocr'
+rescue LoadError
+end
+
+begin
+  require_relative 'db_store'
+rescue LoadError
+end
 
 begin
   require_relative 'rubymc/rubymc_settings'
@@ -76,6 +88,95 @@ begin
   require_relative 'rubymc/minecraft_manager'
 rescue LoadError => e
   warn "RubyMC módulos de autenticação/launch não carregados: #{e.message}"
+end
+
+# ── Criptografia AES-256-GCM ─────────────────────────
+module EncryptedVault
+  ALGO = 'aes-256-gcm'.freeze
+
+  def self.encrypt(plaintext, key_hex)
+    key = [key_hex].pack('H*')
+    iv  = OpenSSL::Random.random_bytes(12)
+    cipher = OpenSSL::Cipher.new(ALGO)
+    cipher.encrypt
+    cipher.key = key
+    cipher.iv  = iv
+
+    ct = cipher.update(plaintext) + cipher.final
+    tag = cipher.auth_tag
+
+    Base64.strict_encode64({ ct: Base64.strict_encode64(ct), iv: Base64.strict_encode64(iv), tag: Base64.strict_encode64(tag) }.to_json)
+  end
+
+  def self.decrypt(payload_b64, key_hex)
+    key = [key_hex].pack('H*')
+    data = JSON.parse(Base64.strict_decode64(payload_b64))
+    iv  = Base64.strict_decode64(data['iv'])
+    ct  = Base64.strict_decode64(data['ct'])
+    tag = Base64.strict_decode64(data['tag'])
+
+    cipher = OpenSSL::Cipher.new(ALGO)
+    cipher.decrypt
+    cipher.key = key
+    cipher.iv  = iv
+    cipher.auth_tag = tag
+
+    cipher.update(ct) + cipher.final
+  end
+
+  def self.derive_key(secret)
+    salt = Digest::SHA256.hexdigest('RubyMC PIX Vault Salt')
+    OpenSSL::PKCS5.pbkdf2_hmac_sha1(secret, salt, 20_000, 32).unpack1('H*')
+  end
+end
+
+# ── Gerador EMV QRCPS (BR Code PIX) ──────────────
+module PixPayload
+  CRC_POLY = 0x1021
+
+  def self.generate(pix_key:, amount:, merchant_name:, merchant_city:)
+    payload = +''
+    payload << tlv('00', '01')                                                            # Payload Format Indicator
+    payload << tlv('01', '11')                                                            # Point of Initiation Method (static)
+    payload << tlv('26', build_mai(pix_key))                                              # Merchant Account Information
+    payload << tlv('52', '4900')                                                          # Merchant Category Code
+    payload << tlv('53', '986')                                                           # Transaction Currency (BRL)
+    payload << tlv('54', format('%.2f', amount))                                          # Transaction Amount
+    payload << tlv('58', 'BR')                                                            # Country Code
+    payload << tlv('59', merchant_name[0, 25].upcase)                                     # Merchant Name (max 25)
+    payload << tlv('60', merchant_city[0, 15].upcase)                                     # Merchant City (max 15)
+    payload << tlv('62', build_add)                                                       # Additional Data
+    payload << '6304'                                                                     # CRC16 tag + length
+    payload + calc_crc16(payload)
+  end
+
+  def self.build_mai(pix_key)
+    mai = +''
+    mai << tlv('00', 'br.gov.bcb.pix')
+    mai << tlv('01', pix_key)
+    mai
+  end
+
+  def self.build_add
+    tlv('05', '***')
+  end
+
+  def self.tlv(tag, value)
+    "#{tag}#{value.length.to_s.rjust(2, '0')}#{value}"
+  end
+
+  def self.calc_crc16(data)
+    crc = 0xFFFF
+    data.each_byte do |byte|
+      crc ^= (byte << 8)
+      8.times do
+        crc <<= 1
+        crc ^= CRC_POLY if (crc & 0x10000) != 0
+      end
+      crc &= 0xFFFF
+    end
+    crc.to_s(16).upcase.rjust(4, '0')
+  end
 end
 
 module RubyMC
@@ -218,22 +319,32 @@ module RubyMC
       when '/api/client/versions/available'
         tipo = (req.query['type'] || 'release').to_sym
         limit = (req.query['limit'] || 30).to_i
+        loader = (req.query['loader'] || 'vanilla').to_sym
         client_mgr = MinecraftManager.new
-        list = client_mgr.list_versions(tipo: tipo, limit: limit)
+        list = if loader == :vanilla
+                 client_mgr.list_versions(tipo: tipo, limit: limit)
+               else
+                 client_mgr.list_loader_versions(loader)
+               end
         installed = client_mgr.list_local_versions
         json(res, { ok: true, versions: list, installed: installed })
       when '/api/client/versions/install'
         params = parse_json(req.body) || {}
         version_id = (params['version_id'] || req.query['version_id']).to_s.strip
+        loader = (params['loader'] || 'vanilla').to_sym
         if version_id.empty?
           return json(res, { ok: false, error: 'version_id é obrigatório.' })
         end
-        with_thread_slot("install #{version_id}") do
+        with_thread_slot("install #{loader} #{version_id}") do
           client_mgr = MinecraftManager.new
-          client_mgr.install_version(version_id) { |msg| log('DOWNLOAD', msg) }
-          log('OK', "Versão #{version_id} instalada com sucesso.")
+          if loader == :vanilla
+            client_mgr.install_version(version_id) { |msg| log('DOWNLOAD', msg) }
+          else
+            client_mgr.install_loader(version_id, loader) { |msg| log('DOWNLOAD', msg) }
+          end
+          log('OK', "Versão #{version_id} (#{loader}) instalada com sucesso.")
         end
-        json(res, { ok: true, message: "Instalação de #{version_id} iniciada." })
+        json(res, { ok: true, message: "Instalação de #{version_id} (#{loader}) iniciada." })
       when '/api/user/version-status'
         json(res, user_version_status_payload)
       when '/api/versions'
@@ -262,6 +373,18 @@ module RubyMC
         handle_vip_history(req, res)
       when '/api/vip/checkout'
         handle_vip_checkout(req, res)
+      when '/api/vip/pix/status'
+        handle_vip_pix_status(req, res)
+      when '/api/vip/pix/confirm'
+        handle_vip_confirm_payment(req, res)
+      when '/api/vip/pix/reject'
+        handle_vip_pix_reject(req, res)
+      when '/api/vip/pix/qrcode'
+        handle_vip_pix_qrcode(req, res)
+      when '/api/vip/pix/receipt'
+        handle_vip_pix_receipt(req, res)
+      when %r{\A/api/vip/pix/receipt/([a-f0-9\-]+)\z}
+        handle_vip_serve_receipt(req, res, $1)
       when '/api/auth/status'
         handle_auth_status(req, res)
       when '/api/auth/discord/login'
@@ -282,6 +405,12 @@ module RubyMC
         handle_verify_confirm_discord_code(req, res)
       when '/api/auth/verify/complete'
         handle_verify_complete(req, res)
+      when '/api/admin/db/users'
+        handle_admin_db_users(req, res)
+      when '/api/admin/db/payments'
+        handle_admin_db_payments(req, res)
+      when '/api/admin/db/memberships'
+        handle_admin_db_memberships(req, res)
       when '/termos'
         serve_file(res, File.join(root, 'web', 'termos.html'))
       else
@@ -1762,7 +1891,27 @@ module RubyMC
       {}
     end
 
-    # ── VIP / Pagamentos ──────────────────────────────────
+    # ── VIP / Pagamentos (PIX com criptografia) ──────────
+    def encryption_key
+      secret = load_settings.dig('discord', 'oauth', 'client_secret') || ''
+      EncryptedVault.derive_key(secret)
+    end
+
+    def load_vip_data
+      file = File.join(root, 'tmp', 'vip_data.enc')
+      return nil unless File.exist?(file)
+      JSON.parse(EncryptedVault.decrypt(File.read(file), encryption_key), symbolize_names: true)
+    rescue
+      nil
+    end
+
+    def save_vip_data(data)
+      file = File.join(root, 'tmp', 'vip_data.enc')
+      File.write(file, EncryptedVault.encrypt(data.to_json, encryption_key))
+    rescue => e
+      log('ERRO', "Falha ao salvar vip_data: #{e.message}")
+    end
+
     def handle_vip_status(req, res)
       user = authenticated_user(req)
       if user
@@ -1802,62 +1951,477 @@ module RubyMC
       plans = [
         { id: 'vip_mensal', name: 'VIP Mensal', price: '4,90', period: 'mês', description: 'Cargo VIP no servidor, comandos exclusivos e prioridade.' },
         { id: 'vip_trimestral', name: 'VIP Trimestral', price: '9,90', period: 'trimestre', description: 'Todos os benefícios VIP com 3 meses de duração.' },
-        { id: 'vip_vitalicio', name: 'VIP Vitalício', price: '19,90', period: 'vitalício', description: 'Acesso VIP permanente com todos os benefícios.' }
+        { id: 'vip_vitalicio', name: 'VIP Vitalício', price: '19,90', period: 'vitalício', description: 'Acesso VIP permanente com todos os benefícios.' },
+        { id: 'doacao', name: 'Doação', price: 'Valor livre', period: '', description: 'Contribua com qualquer valor para ajudar o servidor.' }
       ]
       if user && user[:role] == :staff
         plans = plans.map do |p|
-          discounted = format('%.2f', p[:price].sub(',', '.').to_f / 2).sub('.', ',')
-          p.merge(price: discounted)
+          if p[:id] == 'doacao'
+            p
+          else
+            discounted = format('%.2f', p[:price].sub(',', '.').to_f / 2).sub('.', ',')
+            p.merge(price: discounted)
+          end
         end
       end
       json(res, { ok: true, plans: plans, staff_discount: user && user[:role] == :staff })
     end
 
     def handle_vip_history(_req, res)
-      vip_data = load_vip_data
-      payments = vip_data && vip_data[:payments] ? vip_data[:payments] : []
+      payments = []
+      begin
+        db_payments = DbStore.all_payments
+        payments = db_payments.map do |p|
+          date = p[:confirmed_at]&.iso8601 || p[:rejected_at]&.iso8601 || p[:created_at]&.iso8601 || ''
+          status_label = case p[:status]
+                         when 'completed' then 'Confirmado'
+                         when 'rejected'  then 'Recusado'
+                         when 'pending'   then 'Pendente'
+                         else p[:status]
+                         end
+          { id: p[:id], plan: p[:plan_id], plan_label: p[:plan_label],
+            amount: p[:amount]&.to_s('F'), status: p[:status],
+            date: date, status_label: status_label }
+        end
+      rescue => e
+        log('WARN', "DbStore.all_payments: #{e.message}")
+      end
+
+      if payments.empty?
+        vip_data = load_vip_data
+        raw = vip_data && vip_data[:payments] ? vip_data[:payments] : []
+        payments = raw.map do |p|
+          date = p[:confirmed_at] || p[:rejected_at] || p[:created_at] || p[:date] || ''
+          status_label = case p[:status]
+                         when 'completed' then 'Confirmado'
+                         when 'rejected'  then 'Recusado'
+                         when 'pending'   then 'Pendente'
+                         else p[:status]
+                         end
+          p.merge(date: date, status_label: status_label)
+        end
+      end
+
       json(res, { ok: true, payments: payments })
     rescue => e
       json(res, { ok: false, error: e.message, payments: [] })
     end
 
+    PLAN_PRICES = {
+      'vip_mensal'     => 4.90,
+      'vip_trimestral' => 9.90,
+      'vip_vitalicio'  => 19.90
+    }.freeze
+
+    PLAN_LABELS = {
+      'vip_mensal'     => 'VIP Mensal',
+      'vip_trimestral' => 'VIP Trimestral',
+      'vip_vitalicio'  => 'VIP Vitalício',
+      'doacao'         => 'Doação'
+    }.freeze
+
     def handle_vip_checkout(req, res)
       user = authenticated_user(req)
-      if user && user[:role] == :admin
+      unless user
+        return json(res, { ok: false, error: 'Faça login primeiro.' })
+      end
+      if user[:role] == :admin
         return json(res, { ok: false, error: 'Administradores já possuem acesso VIP Vitalício gratuito.' })
       end
 
       params = parse_json(req.body) || {}
-      price_id = params['price_id'] || req.query['price_id']
-      unless price_id
-        return json(res, { ok: false, error: 'price_id não informado.' })
+      plan_id = params['price_id'] || req.query['price_id']
+      payment_id = SecureRandom.uuid
+
+      pix_dir = File.join(root, 'web', 'assets', 'img', 'pix')
+
+      if plan_id == 'doacao'
+        amount = (params['amount'] || 0).to_f
+        if amount <= 0
+          return json(res, { ok: false, error: 'Valor inválido para doação.' })
+        end
+        plan_label = 'Doação'
+        price = amount
+
+        qr_file = File.join(pix_dir, 'doacao.png')
+        code_file = File.join(pix_dir, 'doacao.txt')
+        unless File.exist?(qr_file) && File.exist?(code_file)
+          return json(res, { ok: false, error: 'QR de doação não configurado.' })
+        end
+        pix_payload = File.read(code_file).strip
+        qr_code_base64 = Base64.strict_encode64(File.binread(qr_file))
+      else
+        unless plan_id && PLAN_PRICES[plan_id]
+          return json(res, { ok: false, error: 'Plano inválido.' })
+        end
+
+        price = user[:role] == :staff ? PLAN_PRICES[plan_id] / 2.0 : PLAN_PRICES[plan_id]
+        plan_label = PLAN_LABELS[plan_id]
+
+        staff_suffix = user[:role] == :staff ? '_staff' : ''
+        plan_filename = "#{plan_id}#{staff_suffix}"
+        qr_file = File.join(pix_dir, "#{plan_filename}.png")
+        code_file = File.join(pix_dir, "#{plan_filename}.txt")
+
+        unless File.exist?(qr_file) && File.exist?(code_file)
+          qr_file = File.join(pix_dir, "#{plan_id}.png")
+          code_file = File.join(pix_dir, "#{plan_id}.txt")
+        end
+
+        if File.exist?(qr_file) && File.exist?(code_file)
+          pix_payload = File.read(code_file).strip
+          qr_code_base64 = Base64.strict_encode64(File.binread(qr_file))
+        else
+          pix_cfg = load_settings['pix'] || {}
+          pix_key = pix_cfg['key'] || '+5584991696662'
+          merchant_name = pix_cfg['merchant_name'] || 'RubyMC'
+          merchant_city = pix_cfg['merchant_city'] || 'Natal'
+
+          pix_payload = PixPayload.generate(
+            pix_key:       pix_key,
+            amount:        price,
+            merchant_name: merchant_name,
+            merchant_city: merchant_city
+          )
+
+          qrcode = RQRCode::QRCode.new(pix_payload)
+          png = qrcode.as_png(
+            bit_depth: 8,
+            border_modules: 2,
+            color_mode: ChunkyPNG::COLOR_TRUECOLOR,
+            color: 'black',
+            file: nil,
+            fill: 'white',
+            module_px_size: 10,
+            resize: nil
+          )
+          qr_code_base64 = Base64.strict_encode64(png.to_s)
+        end
       end
 
-      cfg = load_settings.dig('stripe') || {}
+      payment = {
+        id: payment_id,
+        plan: plan_id,
+        plan_label: plan_label,
+        amount: format('%.2f', price),
+        pix_code: pix_payload,
+        qr_code_base64: qr_code_base64,
+        status: 'pending',
+        created_at: Time.now.iso8601,
+        user_id: user[:user_id]
+      }
 
-      if cfg['secret_key'] && !cfg['secret_key'].empty? && defined?(Stripe)
-        Stripe.api_key = cfg['secret_key']
-        base = "http://#{request_host(req)}"
-        session = Stripe::Checkout::Session.create({
-          mode: 'payment',
-          line_items: [{ price: price_id, quantity: 1 }],
-          success_url: "#{base}/?vip=success",
-          cancel_url: "#{base}/?vip=cancel"
-        })
-        return json(res, { ok: true, url: session.url })
+      vip_data = load_vip_data || { payments: [] }
+      vip_data[:pending_payments] ||= []
+      vip_data[:pending_payments] << payment
+      save_vip_data(vip_data)
+
+      begin
+        db_user = DbStore.find_user(user[:user_id])
+        DbStore.create_payment(payment.merge(user_id: db_user ? db_user[:id] : nil))
+      rescue => e
+        log('WARN', "DbStore.create_payment: #{e.message}")
       end
 
-      json(res, { ok: true, url: "https://checkout.stripe.com/pay/#{price_id}", sandbox: true })
+      json(res, { ok: true, payment_id: payment_id, pix_code: pix_payload, qr_code_base64: qr_code_base64, amount: format('%.2f', price), plan: plan_label })
     rescue => e
       json(res, { ok: false, error: e.message })
     end
 
-    def load_vip_data
-      file = File.join(root, 'tmp', 'vip_data.json')
-      return nil unless File.exist?(file)
-      JSON.parse(File.read(file), symbolize_names: true)
-    rescue
-      nil
+    def handle_vip_pix_status(req, res)
+      user = authenticated_user(req)
+
+      payment_id = req.query['payment_id']
+      unless payment_id
+        if user && (user[:role] == :admin || user[:role] == :staff)
+          vip_data = load_vip_data
+          pending = (vip_data && vip_data[:pending_payments] || [])
+          return json(res, { ok: true, pending: pending })
+        end
+        return json(res, { ok: false, error: 'payment_id não informado.' })
+      end
+
+      vip_data = load_vip_data
+      pending = (vip_data && vip_data[:pending_payments] || []).find { |p| p[:id] == payment_id }
+      if pending
+        return json(res, { ok: true, status: pending[:status], payment: pending })
+      end
+
+      payments = (vip_data && vip_data[:payments] || []).find { |p| p[:id] == payment_id }
+      if payments
+        return json(res, { ok: true, status: payments[:status], payment: payments })
+      end
+
+      json(res, { ok: false, error: 'Pagamento não encontrado.' })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_vip_confirm_payment(req, res)
+      user = authenticated_user(req)
+      unless user && (user[:role] == :admin || user[:role] == :staff)
+        return json(res, { ok: false, error: 'Apenas administradores e staff podem confirmar pagamentos.' })
+      end
+
+      params = parse_json(req.body) || {}
+      payment_id = params['payment_id']
+      unless payment_id
+        return json(res, { ok: false, error: 'payment_id não informado.' })
+      end
+
+      vip_data = load_vip_data || { payments: [] }
+      vip_data[:pending_payments] ||= []
+      payment = vip_data[:pending_payments].find { |p| p[:id] == payment_id }
+      unless payment
+        return json(res, { ok: false, error: 'Pagamento pendente não encontrado.' })
+      end
+
+      payment[:status] = 'completed'
+      payment[:confirmed_at] = Time.now.iso8601
+      payment[:confirmed_by] = user[:user_id]
+
+      vip_data[:pending_payments].delete_if { |p| p[:id] == payment_id }
+      vip_data[:payments] ||= []
+      vip_data[:payments] << payment
+
+      expires_at = case payment[:plan]
+      when 'vip_mensal'     then (Time.now + 30 * 86400).iso8601
+      when 'vip_trimestral' then (Time.now + 90 * 86400).iso8601
+      when 'vip_vitalicio'  then nil
+      end
+
+      vip_data[:active] = true
+      vip_data[:plan] = payment[:plan]
+      vip_data[:plan_label] = payment[:plan_label]
+      vip_data[:expires_at] = expires_at
+      save_vip_data(vip_data)
+
+      begin
+        confirmed = DbStore.confirm_payment(payment_id, confirmed_by: user[:user_id])
+        db_user = DbStore.find_user(payment[:user_id])
+        if db_user
+          DbStore.set_active_membership(db_user[:id],
+            plan_id: payment[:plan], plan_label: payment[:plan_label],
+            expires_at: expires_at ? Time.parse(expires_at) : nil
+          )
+        end
+      rescue => e
+        log('WARN', "DbStore.confirm_payment: #{e.message}")
+      end
+
+      json(res, { ok: true, message: "Pagamento #{payment[:plan_label]} confirmado com sucesso!" })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_vip_pix_reject(req, res)
+      user = authenticated_user(req)
+      unless user && (user[:role] == :admin || user[:role] == :staff)
+        return json(res, { ok: false, error: 'Apenas administradores e staff podem recusar pagamentos.' })
+      end
+
+      params = parse_json(req.body) || {}
+      payment_id = params['payment_id']
+      unless payment_id
+        return json(res, { ok: false, error: 'payment_id não informado.' })
+      end
+
+      vip_data = load_vip_data || { payments: [] }
+      vip_data[:pending_payments] ||= []
+      payment = vip_data[:pending_payments].find { |p| p[:id] == payment_id }
+      unless payment
+        return json(res, { ok: false, error: 'Pagamento pendente não encontrado.' })
+      end
+
+      payment[:status] = 'rejected'
+      payment[:rejected_at] = Time.now.iso8601
+      payment[:rejected_by] = user[:user_id]
+
+      vip_data[:pending_payments].delete_if { |p| p[:id] == payment_id }
+      vip_data[:payments] ||= []
+      vip_data[:payments] << payment
+      save_vip_data(vip_data)
+
+      begin
+        DbStore.reject_payment(payment_id, rejected_by: user[:user_id])
+      rescue => e
+        log('WARN', "DbStore.reject_payment: #{e.message}")
+      end
+
+      json(res, { ok: true, message: 'Pagamento recusado.' })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_vip_pix_receipt(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Faça login primeiro.' })
+      end
+
+      payment_id = req.query['payment_id']
+      unless payment_id
+        return json(res, { ok: false, error: 'payment_id não informado.' })
+      end
+
+      vip_data = load_vip_data || { payments: [] }
+      vip_data[:pending_payments] ||= []
+      payment = vip_data[:pending_payments].find { |p| p[:id] == payment_id }
+      unless payment
+        return json(res, { ok: false, error: 'Pagamento pendente não encontrado.' })
+      end
+      if payment[:user_id] != user[:user_id]
+        return json(res, { ok: false, error: 'Este pagamento não pertence a você.' })
+      end
+
+      file_field = req.query['receipt']
+      unless file_field
+        return json(res, { ok: false, error: 'Nenhum comprovante enviado.' })
+      end
+
+      filename = file_field.respond_to?(:filename) ? file_field.filename : 'receipt.png'
+      ext = File.extname(filename).downcase
+      allowed = ['.png', '.jpg', '.jpeg', '.pdf', '.gif', '.webp']
+      unless allowed.include?(ext)
+        return json(res, { ok: false, error: 'Formato de arquivo não permitido. Use PNG, JPG, JPEG, GIF, WebP ou PDF.' })
+      end
+
+      file_data = upload_body(file_field)
+      if file_data.bytesize > 10_485_760
+        return json(res, { ok: false, error: 'Arquivo muito grande. Máximo 10MB.' })
+      end
+
+      receipt_dir = File.join(root, 'tmp', 'receipts')
+      FileUtils.mkdir_p(receipt_dir)
+      dest = File.join(receipt_dir, "#{payment_id}#{ext}")
+
+      File.open(dest, 'wb') { |f| f.write(file_data) }
+
+      ocr_result = ReceiptOcr.process(dest)
+
+      payment[:receipt] = dest
+      payment[:receipt_ext] = ext
+      payment[:ocr_amount] = ocr_result[:amount]
+      payment[:ocr_sender] = ocr_result[:sender]
+      payment[:ocr_raw] = ocr_result[:raw_text]
+
+      begin
+        db_user = DbStore.find_user(user[:user_id])
+        DbStore.attach_receipt(payment_id,
+          receipt_path: dest, receipt_ext: ext,
+          ocr_amount: ocr_result[:amount], ocr_sender: ocr_result[:sender]
+        )
+      rescue => e
+        log('WARN', "DbStore.attach_receipt: #{e.message}")
+      end
+
+      if ocr_result[:amount] && ReceiptOcr.match_payment?(ocr_result, payment)
+        same_amount = vip_data[:pending_payments].count { |p| p[:id] != payment_id && (p[:amount].to_s.sub(',', '.').to_f - ocr_result[:amount]).abs < 0.01 }
+        if same_amount == 0
+          payment[:status] = 'completed'
+          payment[:confirmed_at] = Time.now.iso8601
+          payment[:confirmed_by] = 'auto-ocr'
+          vip_data[:pending_payments].delete_if { |p| p[:id] == payment_id }
+          vip_data[:payments] ||= []
+          vip_data[:payments] << payment
+
+          expires_at = case payment[:plan]
+          when 'vip_mensal'     then (Time.now + 30 * 86400).iso8601
+          when 'vip_trimestral' then (Time.now + 90 * 86400).iso8601
+          when 'vip_vitalicio'  then nil
+          end
+          vip_data[:active] = true
+          vip_data[:plan] = payment[:plan]
+          vip_data[:plan_label] = payment[:plan_label]
+          vip_data[:expires_at] = expires_at
+          save_vip_data(vip_data)
+
+          begin
+            confirmed = DbStore.confirm_payment(payment_id, confirmed_by: 'auto-ocr')
+            if db_user
+              DbStore.set_active_membership(db_user[:id],
+                plan_id: payment[:plan], plan_label: payment[:plan_label],
+                expires_at: expires_at ? Time.parse(expires_at) : nil
+              )
+            end
+          rescue => e
+            log('WARN', "DbStore auto-confirm: #{e.message}")
+          end
+
+          return json(res, { ok: true, confirmed: true, message: "Pagamento confirmado automaticamente! #{payment[:plan_label]} ativado 🎉" })
+        end
+      end
+
+      save_vip_data(vip_data)
+      json(res, { ok: true, confirmed: false, message: 'Comprovante recebido. Aguardando verificação manual.', ocr: { amount: ocr_result[:amount], sender: ocr_result[:sender] } })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_vip_serve_receipt(req, res, payment_id)
+      user = authenticated_user(req)
+      unless user && (user[:role] == :admin || user[:role] == :staff)
+        return json(res, { ok: false, error: 'Acesso restrito.' })
+      end
+
+      vip_data = load_vip_data || {}
+      all_payments = (vip_data[:pending_payments] || []) + (vip_data[:payments] || [])
+      payment = all_payments.find { |p| p[:id] == payment_id }
+      unless payment && payment[:receipt]
+        res.status = 404
+        return json(res, { ok: false, error: 'Comprovante não encontrado.' })
+      end
+
+      unless File.exist?(payment[:receipt])
+        res.status = 404
+        return json(res, { ok: false, error: 'Arquivo de comprovante não encontrado em disco.' })
+      end
+
+      ext = payment[:receipt_ext] || File.extname(payment[:receipt]).downcase
+      content_type = {
+        '.png' => 'image/png', '.jpg' => 'image/jpeg', '.jpeg' => 'image/jpeg',
+        '.gif' => 'image/gif', '.webp' => 'image/webp', '.pdf' => 'application/pdf'
+      }.fetch(ext, 'application/octet-stream')
+
+      res['Content-Type'] = content_type
+      res['Cache-Control'] = 'no-store'
+      res.body = File.binread(payment[:receipt])
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_vip_pix_qrcode(req, res)
+      payment_id = req.query['payment_id']
+      unless payment_id
+        res.status = 400
+        return json(res, { ok: false, error: 'payment_id não informado.' })
+      end
+
+      vip_data = load_vip_data
+      payment = (vip_data && vip_data[:pending_payments] || []).find { |p| p[:id] == payment_id }
+      unless payment
+        res.status = 404
+        return json(res, { ok: false, error: 'Pagamento não encontrado.' })
+      end
+
+      pix_code = payment[:pix_code]
+      qrcode = RQRCode::QRCode.new(pix_code)
+      png = qrcode.as_png(
+        bit_depth: 8,
+        border_modules: 2,
+        color_mode: ChunkyPNG::COLOR_TRUECOLOR,
+        color: 'black',
+        file: nil,
+        fill: 'white',
+        module_px_size: 10,
+        resize: nil
+      )
+      res['Content-Type'] = 'image/png'
+      res['Cache-Control'] = 'no-cache'
+      res.body = png.to_s
+    rescue => e
+      res.status = 500
+      json(res, { ok: false, error: e.message })
     end
 
     # ── Auth / Sessão ────────────────────────────────────
@@ -1890,7 +2454,11 @@ module RubyMC
     end
 
     def session_hmac_key
-      @session_hmac_key ||= SecureRandom.random_bytes(32)
+      @session_hmac_key ||= begin
+        secret = load_settings.dig('discord', 'oauth', 'client_secret') || ''
+        salt = Digest::SHA256.hexdigest('RubyMC Session HMAC Salt')
+        OpenSSL::PKCS5.pbkdf2_hmac_sha1(secret, salt, 20_000, 32)
+      end
     end
 
     def compute_session_hmac(payload)
@@ -2013,10 +2581,12 @@ module RubyMC
     def handle_discord_login(req, res)
       oauth = oauth_config
       state = SecureRandom.hex(16)
-      (@oauth_states ||= {})[state] = Time.now + 300
+      admin_mode = req.query['admin_update_redirect']
+      (@oauth_states ||= {})[state] = { expires: Time.now + 300, admin_mode: admin_mode }
       cb = oauth[:redirect_uri].to_s.strip
       cb = DISCORD_CALLBACK_URL if cb.empty?
-      url = "https://discord.com/api/oauth2/authorize?client_id=#{oauth[:client_id]}&redirect_uri=#{CGI.escape(cb)}&response_type=code&scope=identify&state=#{state}"
+      scope = admin_mode ? 'identify applications.commands.update' : 'identify'
+      url = "https://discord.com/api/oauth2/authorize?client_id=#{oauth[:client_id]}&redirect_uri=#{CGI.escape(cb)}&response_type=code&scope=#{CGI.escape(scope)}&state=#{state}"
       res.status = 302
       res['Location'] = url
     end
@@ -2032,11 +2602,13 @@ module RubyMC
       end
 
       # Validate OAuth state parameter (CSRF protection)
-      if state.nil? || !(@oauth_states ||= {}).key?(state) || @oauth_states[state] < Time.now
+      state_data = (@oauth_states ||= {})[state]
+      if state.nil? || !state_data || state_data[:expires] < Time.now
         res.status = 302
         res['Location'] = '/?login=error&reason=invalid_state'
         return
       end
+      admin_mode = state_data[:admin_mode]
       @oauth_states.delete(state)
 
       oauth = oauth_config
@@ -2066,6 +2638,35 @@ module RubyMC
 
       token_data = JSON.parse(token_resp.body)
       access_token = token_data['access_token']
+
+      # Admin mode: update Discord OAuth redirect URIs
+      if admin_mode
+        update_uri = URI("https://discord.com/api/v10/oauth2/applications/#{oauth[:client_id]}")
+        update_req = Net::HTTP::Patch.new(update_uri)
+        update_req['Authorization'] = "Bearer #{access_token}"
+        update_req['Content-Type'] = 'application/json'
+        new_uris = ['https://rubymc.187.19.156.135.sslip.io/api/auth/discord/callback']
+        update_req.body = JSON.generate({ redirect_uris: new_uris })
+        begin
+          update_resp = Net::HTTP.start(update_uri.hostname, update_uri.port, use_ssl: true) { |http| http.request(update_req) }
+          if update_resp.code.to_i == 200
+            puts "[ADMIN] Redirect URIs updated successfully"
+            res.status = 302
+            res['Location'] = '/?login=success&admin_redirect_updated=1'
+            return
+          else
+            puts "[ADMIN] Failed to update redirect URIs: #{update_resp.code} #{update_resp.body}"
+            res.status = 302
+            res['Location'] = "/?login=error&reason=admin_update_failed&details=#{CGI.escape(update_resp.body)}"
+            return
+          end
+        rescue => e
+          puts "[ADMIN] Error updating redirect URIs: #{e.message}"
+          res.status = 302
+          res['Location'] = "/?login=error&reason=admin_update_error&details=#{CGI.escape(e.message)}"
+          return
+        end
+      end
 
       # 2. Get user info
       user_uri = URI('https://discord.com/api/v10/users/@me')
@@ -2106,7 +2707,15 @@ module RubyMC
       # 4. Determine launcher role
       role = launcher_role_for(discord_roles)
 
-      # 5. Create session
+      # 5. Upsert user in database
+      begin
+        avatar_url = user_data['avatar'] ? "https://cdn.discordapp.com/avatars/#{user_id}/#{user_data['avatar']}.png" : nil
+        DbStore.upsert_user(user_id, username: user_data['username'], avatar_url: avatar_url, role: role.to_s)
+      rescue => e
+        log('WARN', "DbStore.upsert_user: #{e.message}")
+      end
+
+      # 6. Create session
       session_id = SecureRandom.hex(32)
       @sessions[session_id] = {
         user_id: user_id,
@@ -2323,6 +2932,60 @@ module RubyMC
       json(res, { ok: true, role: 'player', message: 'Parabéns! Agora você é Membro Ruby.' })
     rescue => e
       json(res, { ok: false, error: e.message })
+    end
+
+    def handle_admin_db_users(req, res)
+      user = authenticated_user(req)
+      unless user && (user[:role] == :admin || user[:role] == :staff)
+        return json(res, { ok: false, error: 'Acesso restrito.' })
+      end
+      begin
+        users = DbStore.all_users.map do |u|
+          { id: u[:discord_id], username: u[:username], avatar_url: u[:avatar_url],
+            role: u[:role], created_at: u[:created_at]&.iso8601 }
+        end
+        json(res, { ok: true, users: users })
+      rescue => e
+        json(res, { ok: false, error: e.message })
+      end
+    end
+
+    def handle_admin_db_payments(req, res)
+      user = authenticated_user(req)
+      unless user && (user[:role] == :admin || user[:role] == :staff)
+        return json(res, { ok: false, error: 'Acesso restrito.' })
+      end
+      begin
+        payments = DbStore.all_payments.map do |p|
+          db_user = DbStore.db[:users].where(id: p[:user_id]).first if p[:user_id]
+          { id: p[:id].to_s[0..7], user: db_user ? db_user[:username] : (p[:user_id] || '—'),
+            plan: p[:plan_label] || p[:plan_id], amount: p[:amount]&.to_s('F'),
+            status: p[:status], created_at: p[:created_at]&.iso8601,
+            confirmed_at: p[:confirmed_at]&.iso8601 }
+        end
+        json(res, { ok: true, payments: payments })
+      rescue => e
+        json(res, { ok: false, error: e.message })
+      end
+    end
+
+    def handle_admin_db_memberships(req, res)
+      user = authenticated_user(req)
+      unless user && (user[:role] == :admin || user[:role] == :staff)
+        return json(res, { ok: false, error: 'Acesso restrito.' })
+      end
+      begin
+        memberships = DbStore.db[:active_memberships].order(Sequel.desc(:created_at)).all.map do |m|
+          db_user = DbStore.db[:users].where(id: m[:user_id]).first if m[:user_id]
+          { user: db_user ? db_user[:username] : (m[:user_id] || '—'),
+            plan: m[:plan_label] || m[:plan_id],
+            expires_at: m[:expires_at]&.iso8601 || '—',
+            created_at: m[:created_at]&.iso8601 }
+        end
+        json(res, { ok: true, memberships: memberships })
+      rescue => e
+        json(res, { ok: false, error: e.message })
+      end
     end
 
     def verification_hmac_key

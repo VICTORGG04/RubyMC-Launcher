@@ -1,0 +1,362 @@
+/* =========================================================
+   RubyMC Emergency Layout Restore + Discord Polish
+   Não substitui HTML. Apenas estabiliza o layout original.
+   ========================================================= */
+
+html,
+body {
+  min-height: 100%;
+  background-color: #03040a !important;
+  overflow-x: hidden !important;
+}
+
+body {
+  font-family: "Rajdhani", "Segoe UI", system-ui, sans-serif;
+  color: #f6f8ff;
+}
+
+/* Garante que o app principal volte ao tamanho correto */
+.rubymc-shell {
+  width: min(1560px, calc(100% - 40px)) !important;
+  margin: 24px auto 42px !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+.launcher-window {
+  width: 100% !important;
+  min-height: 680px !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+}
+
+.app-window {
+  display: grid !important;
+  grid-template-columns: 178px minmax(0, 1fr) !important;
+  min-height: 680px !important;
+}
+
+.app-sidebar {
+  width: 178px !important;
+  min-width: 178px !important;
+  padding: 15px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.app-content {
+  min-width: 0 !important;
+  min-height: 680px !important;
+  padding: 34px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.tab-nav {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+}
+
+.tab-link {
+  min-height: 38px !important;
+  width: 100% !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 0 12px !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+}
+
+.tab-panel {
+  display: none !important;
+  min-height: 600px !important;
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+  border-radius: 14px !important;
+  padding: 24px !important;
+}
+
+.tab-panel.active {
+  display: block !important;
+  animation: rubymcTabFade .22s ease both !important;
+}
+
+@keyframes rubymcTabFade {
+  from { opacity: 0; transform: translateY(8px) scale(.995); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.panel-grid {
+  display: grid !important;
+  grid-template-columns: minmax(360px, 620px) minmax(360px, 1fr) !important;
+  gap: 30px !important;
+  align-items: start !important;
+}
+
+#tab-display .panel-grid {
+  grid-template-columns: 1fr !important;
+}
+
+#tab-modpacks .panel-grid,
+#tab-server .panel-grid {
+  grid-template-columns: minmax(360px, 780px) !important;
+}
+
+.panel-heading h2,
+.panel-copy h1 {
+  color: #fff !important;
+  text-shadow: 0 0 20px rgba(255,23,79,.24), 0 2px 12px rgba(0,0,0,.78) !important;
+}
+
+.panel-heading h2 {
+  font-size: 36px !important;
+  line-height: 1 !important;
+  margin: 0 0 10px !important;
+}
+
+.panel-copy h1 {
+  font-size: clamp(42px, 5vw, 72px) !important;
+  line-height: .95 !important;
+  margin: 12px 0 !important;
+}
+
+.panel-copy p,
+.panel-heading p {
+  color: #9ca8bd !important;
+  font-size: 17px !important;
+  line-height: 1.55 !important;
+}
+
+.btn {
+  min-height: 42px !important;
+  padding: 0 24px !important;
+  border-radius: 8px !important;
+  font-weight: 900 !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+}
+
+.btn-red {
+  color: #fff !important;
+  background: linear-gradient(180deg,#ff2b5f,#a3002b) !important;
+  box-shadow: 0 0 18px rgba(255,23,79,.30) !important;
+}
+
+.btn-dark {
+  color: #fff !important;
+  background: linear-gradient(180deg,rgba(32,36,51,.96),rgba(8,10,20,.96)) !important;
+}
+
+input,
+select,
+textarea {
+  width: 100% !important;
+  min-height: 43px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255,255,255,.13) !important;
+  background: rgba(7,10,20,.88) !important;
+  color: #f6f8ff !important;
+  padding: 0 14px !important;
+  outline: none !important;
+}
+
+/* Fundos com troca suave */
+:root {
+  --ruby-page-home-bg: url("/assets/img/rubymc-page-home-bg.jpg");
+  --ruby-page-modpacks-bg: url("/assets/img/rubymc-page-modpacks-orb-bg.jpg");
+  --ruby-page-server-bg: url("/assets/img/rubymc-page-server-bg.jpg");
+  --ruby-page-discord-bg: url("/assets/img/rubymc-page-discord-bg.jpg");
+  --ruby-page-project-bg: url("/assets/img/rubymc-page-project-bg.jpg");
+  --ruby-page-display-bg: url("/assets/img/rubymc-display-logs.png");
+}
+
+.app-content::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity .35s ease, filter .35s ease;
+  background:
+    linear-gradient(90deg, rgba(5,7,16,.94), rgba(5,7,16,.66), rgba(5,7,16,.26)),
+    radial-gradient(circle at 18% 12%, rgba(255,23,79,.14), transparent 34%),
+    radial-gradient(circle at 78% 14%, rgba(53,234,255,.10), transparent 36%);
+}
+
+.app-content > * {
+  position: relative;
+  z-index: 1;
+}
+
+body[data-current-tab="home"] .app-content::before {
+  background:
+    linear-gradient(90deg, rgba(5,7,16,.92), rgba(5,7,16,.62), rgba(5,7,16,.22)),
+    var(--ruby-page-home-bg) center center / cover no-repeat;
+}
+
+body[data-current-tab="modpacks"] .app-content::before {
+  background:
+    linear-gradient(90deg, rgba(5,7,16,.90), rgba(5,7,16,.60), rgba(5,7,16,.22)),
+    var(--ruby-page-modpacks-bg) center center / cover no-repeat;
+}
+
+body[data-current-tab="server"] .app-content::before {
+  background:
+    linear-gradient(90deg, rgba(5,7,16,.90), rgba(5,7,16,.62), rgba(5,7,16,.24)),
+    var(--ruby-page-server-bg) center center / cover no-repeat;
+}
+
+body[data-current-tab="discord"] .app-content::before {
+  background:
+    linear-gradient(90deg, rgba(5,7,16,.88), rgba(5,7,16,.58), rgba(5,7,16,.22)),
+    radial-gradient(circle at 20% 18%, rgba(88,101,242,.20), transparent 34%),
+    radial-gradient(circle at 72% 14%, rgba(255,23,79,.16), transparent 36%),
+    var(--ruby-page-discord-bg) center center / cover no-repeat;
+}
+
+body[data-current-tab="project"] .app-content::before,
+body[data-current-tab="projeto"] .app-content::before {
+  background:
+    linear-gradient(90deg, rgba(5,7,16,.90), rgba(5,7,16,.62), rgba(5,7,16,.24)),
+    var(--ruby-page-project-bg) center center / cover no-repeat;
+}
+
+body[data-current-tab="display"] .app-content::before {
+  background:
+    linear-gradient(90deg, rgba(5,7,16,.92), rgba(5,7,16,.70), rgba(5,7,16,.34)),
+    var(--ruby-page-display-bg) center center / cover no-repeat;
+}
+
+/* Cards mais legíveis */
+.tab-panel article,
+.status-box,
+.permission-box,
+.about-box,
+.list-box,
+.dropzone,
+.discord-command-center,
+.discord-status-card,
+.discord-diagnostic-card,
+.discord-permission-card {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(53,234,255,.10), transparent 32%),
+    radial-gradient(circle at 84% 16%, rgba(255,23,79,.12), transparent 30%),
+    linear-gradient(145deg, rgba(6,9,18,.84), rgba(4,6,15,.76)) !important;
+  border: 1px solid rgba(53,234,255,.20) !important;
+  border-radius: 14px !important;
+  backdrop-filter: blur(6px) !important;
+  box-shadow:
+    inset 0 0 48px rgba(0,0,0,.22),
+    0 0 26px rgba(53,234,255,.08),
+    0 0 22px rgba(255,23,79,.08) !important;
+}
+
+/* Discord melhorado */
+.discord-command-center {
+  padding: 20px !important;
+  display: grid !important;
+  gap: 16px !important;
+}
+
+.discord-kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.discord-kpi {
+  min-height: 76px !important;
+  padding: 12px !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  border-radius: 12px !important;
+  background: rgba(4,7,16,.70) !important;
+}
+
+.discord-kpi span {
+  display: block !important;
+  color: #8ea0b8 !important;
+  font-size: 11px !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: .7px !important;
+}
+
+.discord-kpi strong {
+  display: block !important;
+  color: #fff !important;
+  font-size: 20px !important;
+  margin-top: 5px !important;
+}
+
+.discord-actions-grid {
+  display: grid !important;
+  grid-template-columns: repeat(3, minmax(160px, 1fr)) !important;
+  gap: 10px !important;
+}
+
+.discord-log-box {
+  min-height: 140px !important;
+  max-height: 240px !important;
+  overflow: auto !important;
+  padding: 12px !important;
+  border-radius: 12px !important;
+  background: rgba(0,0,0,.46) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  color: #84ff97 !important;
+  font-family: "JetBrains Mono", "Fira Code", monospace !important;
+  font-size: 12px !important;
+  white-space: pre-wrap !important;
+}
+
+/* Evita imagens duplicadas nas abas que já têm fundo */
+#tab-modpacks figure.preview-frame,
+#tab-server figure.preview-frame,
+#tab-discord figure.preview-frame {
+  display: none !important;
+}
+
+@media (max-width: 1280px) {
+  .panel-grid,
+  #tab-home .panel-grid,
+  #tab-project .panel-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .discord-kpi-grid,
+  .discord-actions-grid {
+    grid-template-columns: 1fr 1fr !important;
+  }
+}
+
+@media (max-width: 820px) {
+  .rubymc-shell {
+    width: calc(100% - 16px) !important;
+    margin: 10px auto !important;
+  }
+
+  .app-window {
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-sidebar {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  .tab-nav {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .app-content {
+    padding: 18px !important;
+  }
+
+  .discord-kpi-grid,
+  .discord-actions-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

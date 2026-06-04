@@ -11,6 +11,8 @@ gem "tty-spinner",             "~> 0.9"    # Animações de carregamento
 gem "tty-box",                 "~> 0.7"    # Caixas de texto estilizadas
 gem "pastel",                  "~> 0.8"    # Cores no terminal
 gem "websocket-client-simple", "~> 0.7"    # Gateway WebSocket do Discord (bot de boas-vindas)
+gem "rqrcode", "~> 2.2"                   # Geração de QR Code PIX
+gem "base64"                              # Base64 encoding/decoding
 
 
 
@@ -184,3 +186,5 @@ gem "websocket-client-simple", "~> 0.7"    # Gateway WebSocket do Discord (bot d
 gem "webrick", "~> 1.9"
 gem "rubyzip", "~> 2.3"
 gem "json"
+gem "sequel", "~> 5.0"
+gem "pg", "~> 1.5"

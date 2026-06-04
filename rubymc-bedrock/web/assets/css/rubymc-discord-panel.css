@@ -1,0 +1,371 @@
+/* =========================================================
+   RubyMC Discord Panel + Background Transition
+   Carregar depois de launcher.css.
+   ========================================================= */
+:root {
+  --rubymc-bg-home: url("/assets/img/rubymc-tela-inicio.png");
+  --rubymc-bg-modpacks: url("/assets/img/rubymc-modpacks.png");
+  --rubymc-bg-server: url("/assets/img/rubymc-servidor-comunidade.png");
+  --rubymc-bg-discord: url("/assets/img/rubymc-discord-bot.png");
+  --rubymc-bg-display: url("/assets/img/rubymc-display-logs.png");
+  --rubymc-bg-project: url("/assets/img/rubymc-projeto.png");
+  --rubymc-bg-settings: url("/assets/img/rubymc-configuracoes.png");
+}
+
+.app-content {
+  position: relative !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+  background: linear-gradient(145deg, rgba(5,7,16,.98), rgba(7,8,19,.94)) !important;
+}
+
+.rubymc-bg-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transform: scale(1.025);
+  transition: opacity .55s ease, transform .9s ease, filter .55s ease;
+  filter: saturate(1.1) contrast(1.05);
+}
+
+.rubymc-bg-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(5,7,16,.94) 0%, rgba(5,7,16,.70) 44%, rgba(5,7,16,.30) 100%),
+    radial-gradient(circle at 18% 16%, rgba(255,23,79,.14), transparent 32%),
+    radial-gradient(circle at 78% 12%, rgba(53,234,255,.10), transparent 32%),
+    repeating-linear-gradient(0deg, rgba(255,255,255,.012) 0 1px, transparent 1px 4px);
+}
+
+.rubymc-bg-layer.is-visible {
+  opacity: .92;
+  transform: scale(1);
+}
+
+body[data-current-tab="discord"] .rubymc-bg-layer.is-visible {
+  opacity: .98;
+  filter: saturate(1.22) contrast(1.06);
+}
+
+.app-content > *:not(.rubymc-bg-layer) {
+  position: relative;
+  z-index: 1;
+}
+
+/* Deixa as abas dependerem da camada de fundo animada */
+.tab-panel,
+.tab-panel.active,
+.ruby-panel {
+  background-image: none !important;
+}
+
+.tab-panel {
+  opacity: 0;
+  transform: translateY(12px) scale(.992);
+  transition: opacity .22s ease, transform .22s ease;
+}
+
+.tab-panel.active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Discord PRO */
+.discord-panel-pro {
+  border-color: rgba(88,101,242,.35) !important;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(88,101,242,.16), transparent 34%),
+    radial-gradient(circle at 86% 18%, rgba(255,23,79,.13), transparent 32%),
+    linear-gradient(145deg, rgba(6,9,18,.82), rgba(4,6,15,.72)) !important;
+  box-shadow:
+    inset 0 0 58px rgba(0,0,0,.24),
+    0 0 36px rgba(88,101,242,.14),
+    0 0 30px rgba(255,23,79,.10) !important;
+  backdrop-filter: blur(7px);
+}
+
+.discord-pro-header {
+  align-items: flex-start !important;
+}
+
+.discord-pro-header > div:first-child {
+  max-width: 760px;
+}
+
+.discord-kicker {
+  display: inline-block;
+  color: #35eaff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  text-shadow: 0 0 14px rgba(53,234,255,.28);
+}
+
+.discord-pro-header h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.discord-health-pill {
+  min-width: 170px;
+  border: 1px solid rgba(88,101,242,.32);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background:
+    radial-gradient(circle at 18% 10%, rgba(88,101,242,.25), transparent 34%),
+    linear-gradient(145deg, rgba(7,10,22,.80), rgba(4,6,15,.66));
+  box-shadow: 0 0 28px rgba(88,101,242,.12), inset 0 0 40px rgba(0,0,0,.18);
+}
+
+.discord-health-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 50%;
+  margin-right: 8px;
+  background: #62ff8f;
+  box-shadow: 0 0 14px rgba(98,255,143,.75);
+}
+
+.discord-health-pill strong {
+  color: #fff;
+  font-size: 14px;
+}
+
+.discord-health-pill small {
+  display: block;
+  margin-top: 4px;
+  color: #8ea0b8;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .8px;
+}
+
+.discord-dashboard-pro {
+  display: grid;
+  grid-template-columns: minmax(360px, 1.12fr) minmax(320px, .88fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
+.discord-main-card,
+.discord-diagnostic-card,
+.discord-permission-card {
+  border: 1px solid rgba(88,101,242,.24);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 18% 12%, rgba(88,101,242,.18), transparent 34%),
+    radial-gradient(circle at 86% 18%, rgba(255,23,79,.12), transparent 32%),
+    linear-gradient(145deg, rgba(6,9,18,.82), rgba(4,6,15,.72));
+  box-shadow:
+    inset 0 0 54px rgba(0,0,0,.24),
+    0 0 34px rgba(88,101,242,.10),
+    0 0 28px rgba(255,23,79,.08);
+  backdrop-filter: blur(7px);
+  padding: 18px;
+}
+
+.discord-main-card {
+  grid-row: span 2;
+}
+
+.discord-main-top {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.discord-logo-orb {
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 24px;
+  border: 1px solid rgba(88,101,242,.42);
+  background:
+    radial-gradient(circle at 45% 35%, rgba(255,255,255,.10), transparent 28%),
+    linear-gradient(145deg, rgba(88,101,242,.28), rgba(255,23,79,.12));
+  box-shadow: 0 0 30px rgba(88,101,242,.24);
+}
+
+.discord-logo-orb img {
+  width: 62px;
+  height: 62px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(255,23,79,.62));
+}
+
+.discord-main-top h3 {
+  margin: 4px 0 6px;
+  font-size: clamp(26px, 3vw, 40px);
+  line-height: .95;
+  color: #fff;
+  text-transform: uppercase;
+}
+
+.discord-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.discord-metrics-grid div,
+.discord-check-row {
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 14px;
+  background: rgba(4,7,16,.66);
+  backdrop-filter: blur(6px);
+}
+
+.discord-metrics-grid div {
+  min-height: 86px;
+  padding: 14px;
+}
+
+.discord-metrics-grid span {
+  display: block;
+  color: #8ea0b8;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+}
+
+.discord-metrics-grid strong {
+  display: block;
+  margin-top: 8px;
+  color: #62ff8f;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.discord-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.discord-card-title {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.discord-card-title > span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border-radius: 14px;
+  background: rgba(88,101,242,.16);
+  border: 1px solid rgba(88,101,242,.28);
+  box-shadow: 0 0 20px rgba(88,101,242,.12);
+  font-size: 22px;
+}
+
+.discord-card-title h3 {
+  margin: 0 0 5px;
+  font-size: 22px;
+}
+
+.discord-card-title p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.discord-check-list {
+  display: grid;
+  gap: 9px;
+}
+
+.discord-check-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.discord-check-row > span {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #35eaff;
+  box-shadow: 0 0 12px rgba(53,234,255,.72);
+}
+
+.discord-check-row strong {
+  display: block;
+  color: #fff;
+  font-size: 14px;
+}
+
+.discord-check-row small {
+  display: block;
+  color: #9ca8bd;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.discord-permission-card ul {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: #b8c4d8;
+}
+
+.discord-permission-card li {
+  margin: 7px 0;
+}
+
+@media (max-width: 1280px) {
+  .discord-dashboard-pro {
+    grid-template-columns: 1fr;
+  }
+
+  .discord-main-card {
+    grid-row: auto;
+  }
+}
+
+@media (max-width: 780px) {
+  .discord-pro-header {
+    display: grid !important;
+  }
+
+  .discord-health-pill {
+    width: 100%;
+  }
+
+  .discord-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .discord-main-top {
+    align-items: flex-start;
+  }
+
+  .discord-logo-orb {
+    width: 72px;
+    height: 72px;
+    border-radius: 20px;
+  }
+
+  .discord-logo-orb img {
+    width: 52px;
+    height: 52px;
+  }
+}

@@ -232,6 +232,28 @@ module RubyMC
       { ok: false, error: "#{e.class}: #{e.message}" }
     end
 
+    def logs(version: nil, lines: 120)
+      data = installed
+      servers = data[:servers]
+
+      if version && !version.to_s.strip.empty?
+        server = servers.find { |s| s[:version].to_s == version.to_s || s[:id].to_s == version.to_s }
+        raise "Versão Bedrock #{version} não encontrada." unless server
+
+        log_file = File.join(server[:path], "rubymc-bds.log")
+        return { ok: true, version: version, lines: tail(log_file, lines), path: server[:path] }
+      end
+
+      result = servers.map do |s|
+        log_file = File.join(s[:path], "rubymc-bds.log")
+        { version: s[:version], lines: tail(log_file, lines), path: s[:path] }
+      end
+
+      { ok: true, logs: result }
+    rescue StandardError => e
+      { ok: false, error: "#{e.class}: #{e.message}" }
+    end
+
     def stop(version: nil)
       targets = installed[:servers]
       targets = targets.select { |item| item[:version].to_s == version.to_s || item[:id].to_s == version.to_s } if version && !version.to_s.strip.empty?

@@ -17,6 +17,7 @@
           <button class="tab-link" data-tab="versions">📦 <span>Versões</span></button>
           <button class="tab-link" data-tab="ai">🧠 <span>IA</span></button>
           <button class="tab-link" data-tab="vip">💎 <span>VIP</span></button>
+          <button class="tab-link" data-tab="db" id="tab-btn-db" style="display:none">📊 <span>DB</span></button>
           <button class="tab-link" data-tab="display">▣ <span>Display</span></button>
           <button class="tab-link" data-tab="project">🧪 <span>Projeto</span></button>
         </nav>
@@ -135,7 +136,7 @@
                     </div>
                   </div>
                   <button class="btn btn-discord dash-invite-btn" onclick="handleDiscordServerJoin()" id="discord-join-btn">
-                    🚪 Entrar no Servidor
+                    🚪 Entrar na Comunidade Discord
                   </button>
                 </div>
               </div>
@@ -245,25 +246,6 @@
 
             </div>
 
-            <!-- ─── ADMIN ─── -->
-            <div class="dash-admin" id="admin-actions-card" style="display:none;">
-              <div class="dash-admin-header">
-                <span class="dash-admin-icon">⚙️</span>
-                <span>Painel Administrativo</span>
-              </div>
-              <p class="dash-admin-desc">Gerencie integrações e ações do Discord diretamente do launcher.</p>
-              <div class="dash-admin-status">
-                <span>Bot: <strong id="discord-bot-state">--</strong></span>
-                <span>Log: <strong id="logs-channel-state">--</strong></span>
-                <span>Config: <strong id="discord-config-state">--</strong></span>
-              </div>
-              <div class="dash-admin-actions">
-                <button class="dash-admin-btn" data-action="join_server">🔗 Entrar via Bot</button>
-                <button class="dash-admin-btn" data-action="validate_discord">✅ Validar Discord</button>
-                <button class="dash-admin-btn" data-action="discord_simulate" id="discord-simulate-btn">▶ Simular Discord</button>
-              </div>
-            </div>
-
           </div>
         </section>
         <section id="tab-modpacks" class="tab-panel" data-panel-title="Modpacks">
@@ -358,6 +340,8 @@
                     <option value="paper">Paper</option>
                     <option value="fabric">Fabric</option>
                     <option value="forge">Forge</option>
+                    <option value="neoforge">NeoForge</option>
+                    <option value="quilt">Quilt</option>
                   </select>
                   <label for="version-id">Versão</label>
                   <select id="version-id"><option>Selecione um loader primeiro</option></select>
@@ -377,6 +361,15 @@
             <article class="panel-copy" id="version-client-panel" style="display:none;">
               <div class="version-section">
                 <h3>Versões Disponíveis</h3>
+                <div class="client-loader-select">
+                  <label for="client-loader">Loader</label>
+                  <select id="client-loader">
+                    <option value="vanilla">Vanilla</option>
+                    <option value="fabric">Fabric</option>
+                    <option value="quilt">Quilt</option>
+                    <option value="neoforge">NeoForge</option>
+                  </select>
+                </div>
                 <div class="version-client-filter">
                   <button class="btn btn-sm btn-filter active" data-type="release">Release</button>
                   <button class="btn btn-sm btn-filter" data-type="snapshot">Snapshot</button>
@@ -433,13 +426,58 @@
                 </div>
               </div>
 
-              <div class="vip-history-section">
-                <h3>Histórico de Pagamentos</h3>
-                <div id="vip-payment-history" class="vip-history-list">
-                  <span class="loading-dots">Carregando...</span>
-                </div>
+              <div id="vip-pending-section" class="vip-pending-section" style="display:none;">
+                <h3>🕐 Pagamentos Pendentes</h3>
+                <div id="vip-pending-list" class="vip-pending-list"></div>
               </div>
             </article>
+          </div>
+        </section>
+        <section id="tab-db" class="tab-panel" data-panel-title="Banco de Dados">
+          <header class="panel-heading with-actions">
+            <div><h2>📊 Banco de Dados</h2><p>Registros do PostgreSQL — usuários, pagamentos e membresias ativas.</p></div>
+            <div class="actions db-actions">
+              <label class="db-auto-refresh-label">
+                <input type="checkbox" id="db-auto-refresh" checked>
+                <span>Auto</span>
+              </label>
+              <button class="btn btn-dark" id="db-refresh-btn">🔄 Atualizar</button>
+            </div>
+          </header>
+          <div class="panel-grid db-grid">
+            <div class="db-card">
+              <div class="db-card-header">
+                <h3>👥 Usuários <span class="db-count" id="db-count-users"></span></h3>
+                <div class="db-card-actions">
+                  <input type="text" class="db-search" id="db-search-users" placeholder="Filtrar..." title="Filtrar tabela">
+                  <button class="btn btn-dark btn-xs" data-db-export="users" title="Exportar CSV">📥</button>
+                </div>
+              </div>
+              <div id="db-users" class="db-table-wrap"><span class="loading-dots">Carregando...</span></div>
+            </div>
+            <div class="db-card">
+              <div class="db-card-header">
+                <h3>📋 Histórico de Pagamentos <span class="db-count" id="db-count-payments"></span></h3>
+                <div class="db-history-filters">
+                  <button class="db-filter-btn active" data-filter="all">Todos</button>
+                  <button class="db-filter-btn" data-filter="completed">Confirmados</button>
+                  <button class="db-filter-btn" data-filter="rejected">Recusados</button>
+                </div>
+              </div>
+              <div id="db-payment-history" class="db-history-list">
+                <span class="loading-dots">Carregando...</span>
+              </div>
+            </div>
+            <div class="db-card">
+              <div class="db-card-header">
+                <h3>👑 Membresias Ativas <span class="db-count" id="db-count-memberships"></span></h3>
+                <div class="db-card-actions">
+                  <input type="text" class="db-search" id="db-search-memberships" placeholder="Filtrar..." title="Filtrar tabela">
+                  <button class="btn btn-dark btn-xs" data-db-export="memberships" title="Exportar CSV">📥</button>
+                </div>
+              </div>
+              <div id="db-memberships" class="db-table-wrap"><span class="loading-dots">Carregando...</span></div>
+            </div>
           </div>
         </section>
         <section id="tab-display" class="tab-panel" data-panel-title="Display">

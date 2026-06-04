@@ -1,0 +1,529 @@
+/* =========================================================
+   RubyMC Force CSS Layout Fix
+   Correção emergencial para tela espremida/quebrada.
+   ========================================================= */
+
+/* RESET DE ESCALA */
+html {
+  width: 100% !important;
+  min-width: 1180px !important;
+  min-height: 100% !important;
+  font-size: 16px !important;
+  zoom: 1 !important;
+  transform: none !important;
+  overflow-x: auto !important;
+}
+
+body {
+  width: 100% !important;
+  min-width: 1180px !important;
+  min-height: 100vh !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  zoom: 1 !important;
+  transform: none !important;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  font-size: 16px !important;
+  line-height: 1.4 !important;
+  background: #03050b !important;
+  color: #f7f9ff !important;
+}
+
+/* Remove qualquer escala/transform aplicada por patches anteriores */
+body *,
+body *::before,
+body *::after {
+  box-sizing: border-box !important;
+  transform-origin: center center;
+}
+
+/* Mata zoom acidental no app */
+#app,
+.app,
+.rubymc-app,
+.rubymc-shell,
+.launcher-shell,
+.launcher-root,
+.launcher-window,
+.app-window,
+.window,
+.main-window,
+main {
+  zoom: 1 !important;
+  transform: none !important;
+  scale: 1 !important;
+}
+
+/* CONTAINER PRINCIPAL */
+.rubymc-shell,
+.launcher-shell,
+.launcher-root,
+#launcher,
+#app,
+.app {
+  width: min(1328px, calc(100vw - 40px)) !important;
+  min-width: 1040px !important;
+  min-height: 720px !important;
+  margin: 24px auto !important;
+  padding: 0 !important;
+  position: relative !important;
+  display: block !important;
+}
+
+/* JANELA PRINCIPAL */
+.launcher-window,
+.app-window,
+.main-window,
+.window,
+.rubymc-window {
+  width: 100% !important;
+  min-width: 1040px !important;
+  min-height: 720px !important;
+  max-width: none !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: 176px minmax(0, 1fr) !important;
+  align-items: stretch !important;
+  border: 1px solid rgba(255, 23, 79, .55) !important;
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  background:
+    linear-gradient(135deg, rgba(4, 6, 14, .98), rgba(8, 9, 22, .96)) !important;
+  box-shadow:
+    0 0 0 1px rgba(53, 234, 255, .16),
+    0 0 40px rgba(255, 23, 79, .18),
+    0 0 70px rgba(0, 0, 0, .65) !important;
+}
+
+/* SIDEBAR */
+.app-sidebar,
+.sidebar,
+.side-nav,
+nav.sidebar,
+aside {
+  width: 176px !important;
+  min-width: 176px !important;
+  max-width: 176px !important;
+  min-height: 720px !important;
+  padding: 16px 12px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 12px !important;
+  background: rgba(2, 5, 13, .86) !important;
+  border-right: 1px solid rgba(255, 255, 255, .08) !important;
+  overflow: hidden !important;
+}
+
+/* CONTEÚDO */
+.app-content,
+.content,
+.main-content,
+.page-content,
+main {
+  min-width: 0 !important;
+  width: 100% !important;
+  min-height: 720px !important;
+  padding: 32px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  background:
+    radial-gradient(circle at 22% 8%, rgba(255, 23, 79, .12), transparent 32%),
+    radial-gradient(circle at 80% 10%, rgba(53, 234, 255, .08), transparent 36%),
+    rgba(3, 5, 13, .64) !important;
+}
+
+/* CABEÇALHO / HERO */
+.hero,
+.launcher-hero,
+.header,
+.page-header,
+.panel-header {
+  width: 100% !important;
+  margin: 0 0 24px !important;
+  padding: 0 !important;
+  display: block !important;
+}
+
+.hero h1,
+.launcher-hero h1,
+.page-header h1,
+.panel-header h1,
+h1 {
+  font-size: clamp(38px, 4vw, 64px) !important;
+  line-height: .95 !important;
+  margin: 0 0 12px !important;
+  letter-spacing: .02em !important;
+  color: #fff !important;
+  text-shadow: 0 0 22px rgba(255, 23, 79, .25) !important;
+}
+
+h2 {
+  font-size: 32px !important;
+  line-height: 1.05 !important;
+  margin: 0 0 14px !important;
+}
+
+h3 {
+  font-size: 22px !important;
+  line-height: 1.15 !important;
+  margin: 0 0 12px !important;
+}
+
+p,
+label,
+small,
+span,
+li,
+button,
+input,
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+small {
+  font-size: 13px !important;
+}
+
+/* NAVEGAÇÃO */
+.tab-nav,
+.nav-list,
+.sidebar-menu,
+.menu {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.tab-link,
+.nav-item,
+.menu-item,
+.sidebar button,
+.sidebar a,
+.app-sidebar button,
+.app-sidebar a,
+[data-tab] {
+  width: 100% !important;
+  min-height: 40px !important;
+  max-height: none !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: initial !important;
+  font-size: 15px !important;
+  font-weight: 800 !important;
+  line-height: 1.1 !important;
+  color: #dfe8ff !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.tab-link.active,
+.nav-item.active,
+.menu-item.active,
+.sidebar button.active,
+.sidebar a.active,
+.app-sidebar button.active,
+.app-sidebar a.active,
+[data-tab].active {
+  background: linear-gradient(180deg, #d9104d, #8c0030) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 28px rgba(255, 23, 79, .24) !important;
+}
+
+/* ABAS */
+.tab-panel,
+.page,
+.page-panel,
+section[id^="tab-"],
+.section-panel {
+  width: 100% !important;
+  min-width: 0 !important;
+  min-height: 610px !important;
+  display: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: visible !important;
+}
+
+.tab-panel.active,
+.page.active,
+.page-panel.active,
+section[id^="tab-"].active,
+.section-panel.active {
+  display: block !important;
+}
+
+/* GRID DAS PÁGINAS */
+.panel-grid,
+.grid,
+.dashboard-grid,
+.content-grid,
+.home-grid,
+.cards-grid {
+  width: 100% !important;
+  display: grid !important;
+  grid-template-columns: minmax(360px, 1fr) minmax(360px, 1fr) !important;
+  gap: 24px !important;
+  align-items: start !important;
+}
+
+#tab-home .panel-grid,
+#home .panel-grid,
+#tab-inicio .panel-grid {
+  grid-template-columns: minmax(420px, .9fr) minmax(420px, 1.1fr) !important;
+}
+
+#tab-display .panel-grid,
+#display .panel-grid {
+  grid-template-columns: 1fr !important;
+}
+
+#tab-projeto .panel-grid,
+#tab-project .panel-grid,
+#project .panel-grid {
+  grid-template-columns: minmax(420px, 620px) 1fr !important;
+}
+
+/* CARDS */
+.card,
+.panel-card,
+.glass-card,
+.status-card,
+.info-card,
+article,
+.preview-frame,
+.status-box,
+.list-box,
+.dropzone,
+.console,
+.terminal,
+.log-box {
+  width: 100% !important;
+  min-width: 0 !important;
+  padding: 22px !important;
+  border-radius: 14px !important;
+  border: 1px solid rgba(53, 234, 255, .20) !important;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(53, 234, 255, .10), transparent 30%),
+    radial-gradient(circle at 84% 10%, rgba(255, 23, 79, .12), transparent 32%),
+    linear-gradient(145deg, rgba(5, 8, 18, .88), rgba(5, 5, 14, .78)) !important;
+  box-shadow:
+    inset 0 0 36px rgba(0, 0, 0, .22),
+    0 0 22px rgba(53, 234, 255, .08),
+    0 0 22px rgba(255, 23, 79, .08) !important;
+  backdrop-filter: blur(8px) !important;
+  overflow: hidden !important;
+}
+
+/* BOTÕES */
+.actions,
+.button-row,
+.btn-row {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 10px !important;
+  align-items: center !important;
+  margin-top: 18px !important;
+}
+
+button,
+.btn,
+.button {
+  min-width: 120px !important;
+  min-height: 42px !important;
+  padding: 0 20px !important;
+  border-radius: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 15px !important;
+  font-weight: 900 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  border: 1px solid rgba(255, 255, 255, .13) !important;
+  white-space: nowrap !important;
+}
+
+.btn-red,
+button.primary,
+button[data-action],
+.btn.primary {
+  color: #fff !important;
+  background: linear-gradient(180deg, #ff2b62, #a50034) !important;
+  box-shadow: 0 0 18px rgba(255, 23, 79, .28) !important;
+}
+
+.btn-dark,
+button.secondary,
+.btn.secondary {
+  color: #fff !important;
+  background: linear-gradient(180deg, rgba(34, 40, 58, .96), rgba(10, 13, 24, .96)) !important;
+}
+
+/* FORMULÁRIOS */
+input,
+select,
+textarea {
+  width: 100% !important;
+  min-height: 44px !important;
+  margin: 6px 0 12px !important;
+  padding: 0 14px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, .14) !important;
+  background: rgba(5, 8, 18, .92) !important;
+  color: #f7f9ff !important;
+  outline: none !important;
+}
+
+textarea {
+  padding: 12px 14px !important;
+  min-height: 120px !important;
+}
+
+/* STATS */
+.stats,
+.status-grid,
+.metrics-grid,
+.kpi-grid {
+  display: grid !important;
+  grid-template-columns: repeat(4, minmax(120px, 1fr)) !important;
+  gap: 12px !important;
+  margin: 18px 0 !important;
+}
+
+.stat,
+.metric,
+.kpi {
+  min-height: 82px !important;
+  padding: 14px !important;
+  border-radius: 12px !important;
+  background: rgba(5, 8, 18, .78) !important;
+  border: 1px solid rgba(255, 255, 255, .10) !important;
+}
+
+/* IMAGENS */
+img {
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+.preview-frame img,
+figure img {
+  width: 100% !important;
+  display: block !important;
+  border-radius: 10px !important;
+  object-fit: cover !important;
+}
+
+/* CONSOLE */
+.console,
+.terminal,
+.log-box,
+#display-output,
+#console-output {
+  min-height: 380px !important;
+  max-height: 520px !important;
+  overflow: auto !important;
+  background: rgba(0, 0, 0, .58) !important;
+  font-family: "JetBrains Mono", "Fira Code", Consolas, monospace !important;
+  color: #76ff91 !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+/* ESCONDE ELEMENTOS DUPLICADOS DE PREVIEW SE VIRAREM FUNDO */
+#tab-modpacks figure.preview-frame,
+#tab-server figure.preview-frame,
+#tab-discord figure.preview-frame {
+  display: none !important;
+}
+
+/* CORREÇÃO DE ELEMENTOS ABSOLUTOS QUE PODEM ESTAR FORA DA ESCALA */
+[style*="zoom"],
+[style*="transform: scale"],
+[style*="font-size: 0"],
+[style*="font-size:0"] {
+  zoom: 1 !important;
+  transform: none !important;
+  font-size: inherit !important;
+}
+
+/* RESPONSIVO CONTROLADO */
+@media (max-width: 1180px) {
+  html,
+  body {
+    min-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+
+  .rubymc-shell,
+  .launcher-shell,
+  .launcher-root,
+  #launcher,
+  #app,
+  .app {
+    width: calc(100vw - 16px) !important;
+    min-width: 0 !important;
+    margin: 8px auto !important;
+  }
+
+  .launcher-window,
+  .app-window,
+  .main-window,
+  .window,
+  .rubymc-window {
+    min-width: 0 !important;
+    grid-template-columns: 1fr !important;
+  }
+
+  .app-sidebar,
+  .sidebar,
+  .side-nav,
+  nav.sidebar,
+  aside {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    min-height: auto !important;
+  }
+
+  .tab-nav,
+  .nav-list,
+  .sidebar-menu,
+  .menu {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .panel-grid,
+  .grid,
+  .dashboard-grid,
+  .content-grid,
+  .home-grid,
+  .cards-grid,
+  #tab-home .panel-grid,
+  #home .panel-grid,
+  #tab-inicio .panel-grid,
+  #tab-projeto .panel-grid,
+  #tab-project .panel-grid,
+  #project .panel-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .stats,
+  .status-grid,
+  .metrics-grid,
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}

@@ -58,8 +58,8 @@
   ]);
 
   const ROLE_TABS = {
-    admin: ['home', 'server', 'versions', 'modpacks', 'ai', 'vip', 'display', 'project', 'settings'],
-    staff: ['home', 'server', 'versions', 'modpacks', 'ai', 'vip', 'display', 'project', 'settings'],
+    admin: ['home', 'server', 'versions', 'modpacks', 'ai', 'vip', 'db', 'display', 'project', 'settings'],
+    staff: ['home', 'server', 'versions', 'modpacks', 'ai', 'vip', 'db', 'display', 'project', 'settings'],
     player: ['home', 'server', 'versions', 'modpacks', 'ai', 'vip', 'display', 'project', 'settings'],
     member: ['home', 'modpacks', 'display', 'settings']
   };
@@ -203,6 +203,7 @@
     }
     if (tab === "versions") setTimeout(loadVersions, 100);
     if (tab === "vip") setTimeout(loadVipData, 100);
+    if (tab === "db") setTimeout(loadDbPanel, 100);
     if (tab === "settings") setTimeout(loadAccounts, 200);
   }
 
@@ -755,10 +756,11 @@
   }
 
   async function loadClientVersions() {
+    const loader = document.getElementById('client-loader')?.value || 'vanilla';
     try {
       const [listRes, availRes] = await Promise.all([
         apiFetch('/api/client/versions'),
-        apiFetch('/api/client/versions/available?type=' + clientVersionType + '&limit=30')
+        apiFetch('/api/client/versions/available?type=' + clientVersionType + '&limit=30&loader=' + loader)
       ]);
       if (listRes.ok) clientInstalledVersions = listRes.installed || [];
       const available = availRes.ok ? (availRes.versions || []) : [];
@@ -814,15 +816,16 @@
   }
 
   async function installClientVersion(versionId) {
+    const loader = document.getElementById('client-loader')?.value || 'vanilla';
     const btn = document.querySelector(`[data-client-install="${versionId}"]`);
     if (btn) {
       btn.disabled = true;
       btn.textContent = 'Baixando...';
     }
     try {
-      const res = await apiPost('/api/client/versions/install', { version_id: versionId });
+      const res = await apiPost('/api/client/versions/install', { version_id: versionId, loader: loader });
       if (res.ok) {
-        log('OK', `Instalação de ${versionId} iniciada.`);
+        log('OK', `Instalação de ${versionId} (${loader}) iniciada.`);
         setTimeout(loadClientVersions, 3000);
       } else {
         alert(res.error || 'Falha ao iniciar instalação.');
@@ -1340,6 +1343,14 @@
       });
     });
 
+    // Client loader select
+    const clientLoader = document.getElementById('client-loader');
+    if (clientLoader) {
+      clientLoader.addEventListener('change', () => {
+        loadClientVersions();
+      });
+    }
+
     document.addEventListener("click", handleDelegatedClick, true);
   }
 
@@ -1427,6 +1438,19 @@
       return;
     }
 
+    const doacaoBtn = event.target.closest(".doacao-btn");
+    if (doacaoBtn) {
+      const card = doacaoBtn.closest(".vip-plan-card");
+      const input = card ? card.querySelector(".doacao-input") : null;
+      const amount = parseFloat((input ? input.value : "0").replace(",", "."));
+      if (isNaN(amount) || amount <= 0) {
+        alert("Digite um valor válido para doação.");
+        return;
+      }
+      vipCheckoutVIP("doacao", doacaoBtn, amount);
+      return;
+    }
+
     const vipCheckout = event.target.closest("[data-vip-price-id]");
     if (vipCheckout) {
       vipCheckoutVIP(vipCheckout.dataset.vipPriceId, vipCheckout);
@@ -1474,7 +1498,7 @@
     await Promise.allSettled([
       loadVipStatus(),
       loadVipPlans(),
-      loadVipHistory()
+      loadPendingPayments()
     ]);
   }
 
@@ -1486,7 +1510,7 @@
       const data = await apiFetch("/api/vip/status");
       if (!data.ok) throw new Error(data.error || "Falha");
 
-      if (data.active) {
+      if (data.active && data.plan != 'doacao') {
         const badge = data.role_granted
           ? '<span class="vip-role-badge team">Gratuito pela Equipe</span>'
           : '';
@@ -1521,64 +1545,467 @@
         return;
       }
 
-      grid.innerHTML = plans.map((plan) => `
+      grid.innerHTML = plans.map((plan) => {
+        if (plan.id === 'doacao') {
+          return `
+        <div class="vip-plan-card${data.staff_discount ? ' staff-discount' : ''}">
+          <span class="vip-plan-name">${esc(plan.name)}</span>
+          <span class="vip-plan-price">${esc(plan.price)}</span>
+          <span class="vip-plan-desc">${esc(plan.description || "")}</span>
+          <div class="doacao-row">
+            <input type="number" class="doacao-input" min="1" step="0.01" placeholder="Valor (R$)">
+            <button class="btn btn-green btn-sm doacao-btn" data-vip-price-id="doacao">Doar</button>
+          </div>
+        </div>`;
+        }
+        return `
         <div class="vip-plan-card${data.staff_discount ? ' staff-discount' : ''}">
           ${data.staff_discount ? '<span class="vip-staff-badge">50% OFF Equipe</span>' : ''}
           <span class="vip-plan-name">${esc(plan.name)}</span>
           <span class="vip-plan-price">R$ ${esc(plan.price)} <small>/${esc(plan.period || "mês")}</small></span>
           <span class="vip-plan-desc">${esc(plan.description || "")}</span>
           <button class="btn btn-red btn-sm vip-checkout-btn" data-vip-price-id="${esc(plan.id)}">Assinar</button>
-        </div>
-      `).join("");
+        </div>`;
+      }).join("");
     } catch (error) {
       grid.innerHTML = `<span style="color:var(--muted);font-style:italic;">Erro ao carregar planos: ${esc(error.message)}</span>`;
     }
   }
 
+  let currentHistoryFilter = 'all';
+  let allPayments = [];
+
   async function loadVipHistory() {
-    const list = document.getElementById("vip-payment-history");
+    const list = document.getElementById("db-payment-history");
     if (!list) return;
 
     try {
       const data = await apiFetch("/api/vip/history");
       if (!data.ok) throw new Error(data.error || "Falha");
 
-      const payments = data.payments || [];
-      if (!payments.length) {
-        list.innerHTML = '<span style="color:var(--muted);font-style:italic;">Nenhum pagamento encontrado.</span>';
-        return;
-      }
-
-      list.innerHTML = payments.map((p) => `
-        <div class="vip-history-item">
-          <span class="vip-history-date">${esc(p.date || "")}</span>
-          <span class="vip-history-plan">${esc(p.plan || "")}</span>
-          <span class="vip-history-amount">R$ ${esc(p.amount || "0")}</span>
-          <span class="vip-history-status ${p.status || "pending"}">${esc(p.status_label || p.status || "")}</span>
-        </div>
-      `).join("");
+      allPayments = data.payments || [];
+      const countEl = document.getElementById("db-count-payments");
+      if (countEl) countEl.textContent = `(${allPayments.length})`;
+      renderVipHistory();
     } catch (error) {
       list.innerHTML = `<span style="color:var(--muted);font-style:italic;">Erro ao carregar histórico: ${esc(error.message)}</span>`;
     }
   }
 
-  async function vipCheckoutVIP(priceId, button) {
-    const restore = setBusy(button, "Redirecionando...");
+  function renderVipHistory() {
+    const list = document.getElementById("db-payment-history");
+    if (!list) return;
+
+    const filtered = currentHistoryFilter === 'all'
+      ? allPayments
+      : allPayments.filter(p => p.status === currentHistoryFilter);
+
+    if (!filtered.length) {
+      list.innerHTML = '<span style="color:var(--muted);font-style:italic;">Nenhum pagamento encontrado.</span>';
+      return;
+    }
+
+    list.innerHTML = filtered.map((p) => `
+      <div class="db-history-item">
+        <span class="db-history-date">${esc(p.date || "")}</span>
+        <span class="db-history-plan">${esc(p.plan_label || p.plan || "")}</span>
+        <span class="db-history-amount">R$ ${esc(p.amount || "0")}</span>
+        <span class="db-history-status ${p.status || "pending"}">${esc(p.status_label || p.status || "")}</span>
+      </div>
+    `).join("");
+  }
+
+  function setupHistoryFilters() {
+    document.querySelectorAll(".db-filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".db-filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentHistoryFilter = btn.dataset.filter;
+        renderVipHistory();
+      });
+    });
+  }
+
+  async function loadPendingPayments() {
+    const section = document.getElementById("vip-pending-section");
+    const list = document.getElementById("vip-pending-list");
+    if (!section || !list) return;
+
     try {
-      const data = await apiPost("/api/vip/checkout", { price_id: priceId });
+      const data = await apiFetch("/api/vip/pix/status");
+      if (!data.ok) return;
+      const pending = data.pending || [];
+      if (!pending.length) { section.style.display = "none"; return; }
+      section.style.display = "";
+
+      list.innerHTML = pending.map((p) => `
+        <div class="vip-pending-item" data-payment-id="${esc(p.id)}">
+          <div class="pending-header">
+            <span class="pending-plan">${esc(p.plan_label || p.plan)}</span>
+            <span class="pending-amount">R$ ${esc(p.amount)}</span>
+          </div>
+          <div class="pending-user">Usuário: ${esc(p.user_id || "?")}</div>
+          ${p.ocr_amount ? `<div class="pending-ocr">OCR: R$ ${esc(p.ocr_amount)} — ${esc(p.ocr_sender || "?")}</div>` : ""}
+          ${p.receipt ? `<div class="pending-receipt"><a href="/api/vip/pix/receipt/${esc(p.id)}" target="_blank"><img src="/api/vip/pix/receipt/${esc(p.id)}" alt="Comprovante"></a></div>` : '<div class="pending-ocr" style="color:#fbbf24;">⏳ Aguardando upload do comprovante...</div>'}
+          ${p.receipt ? `
+          <div class="pending-actions">
+            <button class="btn-confirm" onclick="confirmPendingPayment('${esc(p.id)}', this)">✅ Confirmar</button>
+            <button class="btn-reject" onclick="rejectPendingPayment('${esc(p.id)}', this)">❌ Recusar</button>
+          </div>` : ""}
+        </div>
+      `).join("");
+    } catch (_) {
+      section.style.display = "none";
+    }
+  }
+
+  async function confirmPendingPayment(paymentId, btn) {
+    btn.disabled = true;
+    btn.textContent = "Confirmando...";
+    try {
+      const data = await apiPost("/api/vip/pix/confirm", { payment_id: paymentId });
+      if (!data.ok) { alert(data.error || "Erro ao confirmar"); btn.disabled = false; btn.textContent = "✅ Confirmar"; return; }
+      alert(data.message);
+      loadPendingPayments();
+    } catch (e) {
+      alert("Erro: " + e.message);
+      btn.disabled = false;
+      btn.textContent = "✅ Confirmar";
+    }
+  }
+
+  async function rejectPendingPayment(paymentId, btn) {
+    if (!confirm("Tem certeza que deseja recusar este pagamento?")) return;
+    btn.disabled = true;
+    btn.textContent = "Recusando...";
+    try {
+      const data = await apiPost("/api/vip/pix/reject", { payment_id: paymentId });
+      if (!data.ok) { alert(data.error || "Erro ao recusar"); btn.disabled = false; btn.textContent = "❌ Recusar"; return; }
+      loadPendingPayments();
+    } catch (e) {
+      alert("Erro: " + e.message);
+      btn.disabled = false;
+      btn.textContent = "❌ Recusar";
+    }
+  }
+
+  async function vipCheckoutVIP(priceId, button, amount) {
+    const restore = setBusy(button, "Gerando PIX...");
+    try {
+      const body = { price_id: priceId };
+      if (amount) body.amount = amount;
+      const data = await apiPost("/api/vip/checkout", body);
       if (data.ok === false) {
         alert(data.error || "Erro ao processar checkout");
         return;
       }
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert("Erro ao criar checkout: " + (data.error || "URL não recebida"));
-      }
+      showPixModal(data);
     } catch (error) {
       alert("Erro de rede: " + error.message);
     } finally {
       restore();
+    }
+  }
+
+  /* ── Modal PIX ──────────────────────────────────── */
+  let pixPollTimer = null;
+
+  function closePixModal() {
+    if (pixPollTimer) { clearInterval(pixPollTimer); pixPollTimer = null; }
+    const ov = document.getElementById("pix-modal-overlay");
+    if (ov) ov.remove();
+  }
+
+  function showPixModal(pixData) {
+    closePixModal();
+
+    const overlay = document.createElement("div");
+    overlay.id = "pix-modal-overlay";
+    overlay.className = "pix-modal-overlay";
+
+    overlay.innerHTML = `
+      <div class="pix-modal">
+        <button class="pix-modal-close" type="button">✕</button>
+        <h2 class="pix-modal-title">💎 Pagamento PIX</h2>
+        <p class="pix-modal-plan">${esc(pixData.plan)} — <strong>R$ ${esc(pixData.amount)}</strong></p>
+
+        <div class="pix-modal-qr-wrapper">
+          <img class="pix-modal-qr" src="data:image/png;base64,${pixData.qr_code_base64}" alt="QR Code PIX">
+        </div>
+
+        <div class="pix-modal-code">
+          <label>Código PIX (copie e cole no seu banco)</label>
+          <div class="pix-code-box">
+            <code id="pix-code-text">${esc(pixData.pix_code)}</code>
+            <button class="btn btn-sm btn-filter" type="button" id="pix-copy-btn">📋 Copiar</button>
+          </div>
+        </div>
+
+        <div class="pix-modal-receipt">
+          <label class="pix-receipt-label">📎 Comprovante de pagamento</label>
+          <div class="pix-receipt-row">
+            <input type="file" class="pix-receipt-input" id="receipt-file-input" accept="image/png,image/jpeg,image/gif,image/webp,application/pdf">
+            <button class="btn btn-blue btn-sm" type="button" id="receipt-upload-btn">📤 Enviar</button>
+          </div>
+          <div class="pix-receipt-status" id="receipt-upload-status"></div>
+        </div>
+
+        <div class="pix-modal-status" id="pix-status-indicator">
+          <span class="pix-status-dot pending"></span>
+          Aguardando pagamento...
+        </div>
+
+        <div class="pix-modal-actions">
+          <button class="btn btn-green" type="button" id="pix-confirm-btn">✅ Já paguei</button>
+          <button class="btn btn-red" type="button" id="pix-cancel-btn">Cancelar</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.style.display = "flex";
+
+    overlay.querySelector(".pix-modal-close").addEventListener("click", closePixModal);
+    overlay.querySelector("#pix-cancel-btn").addEventListener("click", closePixModal);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) closePixModal(); });
+
+    overlay.querySelector("#pix-copy-btn").addEventListener("click", copyPixCode);
+
+    const confirmBtn = overlay.querySelector("#pix-confirm-btn");
+    confirmBtn.addEventListener("click", () => checkPixStatus(pixData.payment_id, confirmBtn));
+
+    const uploadBtn = overlay.querySelector("#receipt-upload-btn");
+    const fileInput = overlay.querySelector("#receipt-file-input");
+    const uploadStatus = overlay.querySelector("#receipt-upload-status");
+    uploadBtn.addEventListener("click", () => uploadReceipt(pixData.payment_id, fileInput, uploadStatus));
+
+    startPixPolling(pixData.payment_id);
+  }
+
+  function startPixPolling(paymentId) {
+    if (pixPollTimer) clearInterval(pixPollTimer);
+    pixPollTimer = setInterval(async () => {
+      const ov = document.getElementById("pix-modal-overlay");
+      if (!ov) { clearInterval(pixPollTimer); pixPollTimer = null; return; }
+      try {
+        const data = await apiFetch("/api/vip/pix/status?payment_id=" + encodeURIComponent(paymentId));
+        if (data.ok && data.status === "completed") {
+          clearInterval(pixPollTimer);
+          pixPollTimer = null;
+          updatePixStatus("completed");
+          setTimeout(() => { closePixModal(); loadVipData(); }, 2000);
+        }
+      } catch (_) {}
+    }, 5000);
+  }
+
+  async function checkPixStatus(paymentId, button) {
+    try {
+      const data = await apiFetch("/api/vip/pix/status?payment_id=" + encodeURIComponent(paymentId));
+      if (!data.ok) {
+        alert(data.error || "Erro ao verificar status");
+        return;
+      }
+      if (data.status === "completed") {
+        updatePixStatus("completed");
+        if (pixPollTimer) { clearInterval(pixPollTimer); pixPollTimer = null; }
+        setTimeout(() => { closePixModal(); loadVipData(); }, 1500);
+      } else {
+        alert("Pagamento ainda não confirmado. Após o pagamento, um administrador precisa confirmar manualmente.");
+      }
+    } catch (error) {
+      alert("Erro: " + error.message);
+    }
+  }
+
+  async function uploadReceipt(paymentId, fileInput, statusEl) {
+    const file = fileInput.files[0];
+    if (!file) {
+      statusEl.textContent = "Selecione um arquivo primeiro.";
+      statusEl.className = "pix-receipt-status error";
+      return;
+    }
+    if (file.size > 10_485_760) {
+      statusEl.textContent = "Arquivo muito grande. Máximo 10MB.";
+      statusEl.className = "pix-receipt-status error";
+      return;
+    }
+
+    statusEl.textContent = "Enviando...";
+    statusEl.className = "pix-receipt-status";
+
+    const form = new FormData();
+    form.append("payment_id", paymentId);
+    form.append("receipt", file);
+
+    try {
+      const resp = await fetch("/api/vip/pix/receipt", { method: "POST", body: form });
+      const data = await resp.json();
+      if (!data.ok) {
+        statusEl.textContent = data.error || "Erro ao enviar comprovante.";
+        statusEl.className = "pix-receipt-status error";
+        return;
+      }
+      if (data.confirmed) {
+        statusEl.textContent = data.message;
+        statusEl.className = "pix-receipt-status success";
+        updatePixStatus("completed");
+        if (pixPollTimer) { clearInterval(pixPollTimer); pixPollTimer = null; }
+        setTimeout(() => { closePixModal(); loadVipData(); }, 2000);
+      } else {
+        const ocrInfo = data.ocr ? ` (detectado: R$ ${data.ocr.amount || "?"} — ${data.ocr.sender || "?"})` : "";
+        statusEl.textContent = data.message + ocrInfo;
+        statusEl.className = "pix-receipt-status";
+      }
+    } catch (error) {
+      statusEl.textContent = "Erro de rede: " + error.message;
+      statusEl.className = "pix-receipt-status error";
+    }
+  }
+
+  let dbData = { users: [], payments: [], memberships: [] };
+  let dbAutoTimer = null;
+  let dbPanelSetup = false;
+
+  let dbHistoryFiltersSetup = false;
+
+  async function loadDbPanel() {
+    if (!dbPanelSetup) {
+      setupDbPanel();
+      dbPanelSetup = true;
+    }
+    const usersEl = document.getElementById("db-users");
+    const membershipsEl = document.getElementById("db-memberships");
+    if (!usersEl || !membershipsEl) return;
+
+    if (!dbHistoryFiltersSetup) {
+      setupHistoryFilters();
+      dbHistoryFiltersSetup = true;
+    }
+
+    const [usersRes, membershipsRes] = await Promise.allSettled([
+      apiFetch("/api/admin/db/users"),
+      apiFetch("/api/admin/db/memberships")
+    ]);
+
+    if (usersRes.value?.ok) dbData.users = usersRes.value.users || [];
+    if (membershipsRes.value?.ok) dbData.memberships = membershipsRes.value.memberships || [];
+
+    renderDbTables();
+    loadVipHistory();
+  }
+
+  function renderDbTables() {
+    renderDbUsers();
+    renderDbMemberships();
+  }
+
+  function filterDbRows(type) {
+    const q = (document.getElementById(`db-search-${type}`)?.value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return dbData[type].filter(r => JSON.stringify(Object.values(r)).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").includes(q));
+  }
+
+  function statusLabel(s) {
+    const m = { completed: "Confirmado", rejected: "Recusado", pending: "Pendente" };
+    return m[s] || s;
+  }
+
+  function renderDbUsers() {
+    const el = document.getElementById("db-users");
+    if (!el) return;
+    const rows = filterDbRows("users");
+    document.getElementById("db-count-users").textContent = `(${rows.length})`;
+    if (!rows.length) {
+      el.innerHTML = '<span class="db-empty">Nenhum usuário encontrado.</span>';
+      return;
+    }
+    el.innerHTML = `<table class="db-table"><tr><th>Discord ID</th><th>Username</th><th>Role</th><th>Desde</th></tr>${rows.map(u => `<tr><td class="db-cell-id" title="Clique para copiar" onclick="navigator.clipboard.writeText('${esc(u.id)}');this.classList.add('db-copied');setTimeout(()=>this.classList.remove('db-copied'),800)">${esc(u.id)}</td><td>${esc(u.username)}${u.avatar_url ? `<a href="${esc(u.avatar_url)}" target="_blank" class="db-avatar-link" title="Abrir avatar">🖼</a>` : ''}</td><td><span class="db-role-badge role-${esc(u.role)}">${esc(u.role)}</span></td><td class="db-cell-date">${esc((u.created_at || "").slice(0,10))}</td></tr>`).join("")}</table>`;
+  }
+
+  function renderDbPayments() {
+    const el = document.getElementById("db-payments");
+    if (!el) return;
+    const rows = filterDbRows("payments");
+    document.getElementById("db-count-payments").textContent = `(${rows.length})`;
+    if (!rows.length) {
+      el.innerHTML = '<span class="db-empty">Nenhum pagamento encontrado.</span>';
+      return;
+    }
+    el.innerHTML = `<table class="db-table"><tr><th>ID</th><th>Usuário</th><th>Plano</th><th>Valor</th><th>Status</th><th>Data</th></tr>${rows.map(p => `<tr><td class="db-cell-id">${esc(p.id)}</td><td>${esc(p.user)}</td><td>${esc(p.plan)}</td><td class="db-amount ${p.status}">R$ ${esc(p.amount)}</td><td><span class="db-status-badge ${p.status}">${esc(statusLabel(p.status))}</span></td><td class="db-cell-date">${esc((p.created_at || "").slice(0,10))}</td></tr>`).join("")}</table>`;
+  }
+
+  function renderDbMemberships() {
+    const el = document.getElementById("db-memberships");
+    if (!el) return;
+    const rows = filterDbRows("memberships");
+    document.getElementById("db-count-memberships").textContent = `(${rows.length})`;
+    if (!rows.length) {
+      el.innerHTML = '<span class="db-empty">Nenhuma membresia ativa.</span>';
+      return;
+    }
+    el.innerHTML = `<table class="db-table"><tr><th>Usuário</th><th>Plano</th><th>Expira</th><th>Criada</th></tr>${rows.map(m => `<tr><td>${esc(m.user)}</td><td>${esc(m.plan)}</td><td class="db-cell-date">${esc(m.expires_at ? m.expires_at.slice(0,10) : "—")}</td><td class="db-cell-date">${esc((m.created_at || "").slice(0,10))}</td></tr>`).join("")}</table>`;
+  }
+
+  function setupDbPanel() {
+    const refreshBtn = document.getElementById("db-refresh-btn");
+    if (refreshBtn) refreshBtn.addEventListener("click", loadDbPanel);
+
+    const autoToggle = document.getElementById("db-auto-refresh");
+    if (autoToggle) {
+      autoToggle.addEventListener("change", () => {
+        if (dbAutoTimer) { clearInterval(dbAutoTimer); dbAutoTimer = null; }
+        if (autoToggle.checked) dbAutoTimer = setInterval(loadDbPanel, 30000);
+      });
+      dbAutoTimer = setInterval(loadDbPanel, 30000);
+    }
+
+    document.querySelectorAll(".db-search").forEach(input => {
+      input.addEventListener("input", renderDbTables);
+    });
+
+    document.querySelectorAll("[data-db-export]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const type = btn.dataset.dbExport;
+        const rows = dbData[type] || [];
+        if (!rows.length) return;
+        const headers = Object.keys(rows[0]);
+        const csv = [headers.join(","), ...rows.map(r => headers.map(h => `"${(r[h]||"").replace(/"/g,'""')}"`).join(","))].join("\n");
+        const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `rubymc_${type}_${new Date().toISOString().slice(0,10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+    });
+  }
+
+  function updatePixStatus(status) {
+    const indicator = document.getElementById("pix-status-indicator");
+    if (!indicator) return;
+    if (status === "completed") {
+      indicator.innerHTML = `<span class="pix-status-dot completed"></span> Pagamento confirmado! Seu VIP está ativo. 🎉`;
+      indicator.className = "pix-modal-status success";
+    } else {
+      indicator.innerHTML = `<span class="pix-status-dot pending"></span> Aguardando pagamento...`;
+      indicator.className = "pix-modal-status";
+    }
+  }
+
+  function copyPixCode() {
+    const code = document.getElementById("pix-code-text");
+    if (!code) return;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code.textContent).then(() => {
+        const btn = code.nextElementSibling;
+        if (btn) { btn.textContent = "✅ Copiado!"; setTimeout(() => { btn.textContent = "📋 Copiar"; }, 2000); }
+      });
+    } else {
+      const range = document.createRange();
+      range.selectNodeContents(code);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
     }
   }
 
@@ -1644,11 +2071,6 @@
     const aiContext = document.querySelector('.ai-context-panel');
     if (aiContext) {
       aiContext.style.display = (role !== 'member') ? '' : 'none';
-    }
-
-    const adminDiscordActions = document.getElementById('admin-actions-card');
-    if (adminDiscordActions) {
-      adminDiscordActions.style.display = (role === 'admin' || role === 'staff') ? '' : 'none';
     }
 
     const serverAdminPanel = document.getElementById('server-admin-panel');
@@ -2010,4 +2432,6 @@
 
   window.runRubyMCAction = runAction;
   window.refreshServerLiveStatus = refreshServerLiveStatus;
+  window.confirmPendingPayment = confirmPendingPayment;
+  window.rejectPendingPayment = rejectPendingPayment;
 })();

@@ -7,106 +7,246 @@
   <link rel="stylesheet" href="/assets/css/launcher.css?v=rubymc-ui-logic-fix-1">
 </head>
 <body data-current-tab="home">
-  <div class="rubymc-page">
-    <header class="top-showcase">
-      <section class="brand-showcase">
-        <img class="brand-logo-img" src="/assets/img/rubymc-logo-banner.png" alt="RubyMC Launcher">
-        <div class="brand-title">
-          <span>MINECRAFT</span>
-          <strong>RUBY</strong>
-          <em>LAUNCHER</em>
-          <p>Sua experiência Minecraft, elevada.</p>
-        </div>
+  <div class="rubymc-shell">
+    <section class="launcher-window app-window">
+      <aside class="app-sidebar">
+        <div class="app-title"><span>💎</span><strong>RUBYMC LAUNCHER</strong></div>
+        <nav class="tab-nav" aria-label="Abas do RubyMC Launcher">
+          <button class="tab-link active" data-tab="home">🏠 <span>Início</span></button>
+          <button class="tab-link" data-tab="modpacks">📦 <span>Modpacks</span></button>
+          <button class="tab-link" data-tab="server">🌐 <span>Servidor</span></button>
+          <button class="tab-link" data-tab="discord"><img class="nav-discord-icon" src="/assets/img/DISCORD.png" alt=""> <span>Discord</span></button>
+          <button class="tab-link" data-tab="vip">💎 <span>VIP</span></button>
+          <button class="tab-link" data-tab="display">▣ <span>Display</span></button>
+          <button class="tab-link" data-tab="versions">🔧 <span>Versões</span></button>
+          <button class="tab-link" data-tab="project">🧪 <span>Projeto</span></button>
+        </nav>
+        <button class="tab-link settings-link" data-tab="settings">⚙️ <span>Configurações</span></button>
+        <footer class="sidebar-status"><span></span><small id="connection-status">Você está conectado</small></footer>
+      </aside>
+      <main class="app-content">
+        <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+      <section id="tab-home" class="tab-panel active" data-panel-title="Início">
+          <div class="dash">
 
-        <div class="feature-row" aria-label="Recursos do RubyMC">
-          <div><b>🛡️</b><span>Autenticação<br>Microsoft</span></div>
-          <div><b>📦</b><span>Gerenciamento<br>de Modpacks</span></div>
-          <div><b>🎮</b><span>Discord<br>Integrado</span></div>
-          <div><b>🔄</b><span>Atualizações<br>Automáticas</span></div>
-          <div><b>⛶</b><span>Modo<br>Offline</span></div>
-        </div>
-      </section>
-
-      <section class="hero-window">
-        <aside class="mini-sidebar">
-          <div class="mini-title">💎 RUBYMC LAUNCHER</div>
-          <button class="side-link active" data-tab="home">🏠 Início</button>
-          <button class="side-link" data-tab="modpacks">📦 Modpacks</button>
-          <button class="side-link" data-tab="server">🌐 Servidor</button>
-          <button class="side-link" data-tab="discord">🎮 Discord</button>
-          <button class="side-link" data-tab="display">▣ Display</button>
-          <button class="side-link" data-tab="project">🧪 Projeto</button>
-          <button class="side-link settings-link" data-tab="settings">⚙️ Configurações</button>
-        </aside>
-
-        <main class="hero-content">
-          <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
-          <span class="cyan-label">BEM-VINDO(A)!</span>
-          <h1>Pronto para jogar?</h1>
-          <p>Gerencie suas contas, modpacks, servidores e muito mais com o RubyMC Launcher.</p>
-
-          <div class="actions">
-            <button class="btn btn-primary" data-action="play">Jogar Minecraft</button>
-            <button class="btn btn-secondary" data-action="join_server">Entrar no servidor</button>
-          </div>
-
-          <div class="quick-stats">
-            <div><span>VERSÃO</span><strong id="minecraft-version">1.21.4</strong><em>Instalada</em></div>
-            <div><span>PERFIL ATIVO</span><strong id="active-profile">Vanilla</strong><em>Online</em></div>
-            <div><span>SERVIDOR</span><strong id="server-state">Online</strong><em id="server-players">0 jogadores</em></div>
-            <div><span>STATUS</span><strong id="launcher-state">Tudo certo!</strong><em>Pronto para jogar</em></div>
-          </div>
-
-          <footer class="connection-line"><span></span> Você está conectado</footer>
-        </main>
-      </section>
-    </header>
-
-    <main class="content-area">
-      <section id="tab-home" class="tab-panel active">
-        <div class="home-grid">
-          <article class="ruby-panel main-home-panel">
-            <div class="panel-header">
-              <h2>🏠 Início</h2>
-              <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+            <!-- HERO -->
+            <div class="dash-hero">
+              <div class="dash-hero-left">
+                <span class="dash-hero-emoji">🎮</span>
+                <div class="dash-hero-text">
+                  <h1 class="dash-hero-title">BEM-VINDO(A)!</h1>
+                  <p class="dash-hero-sub">Pronto para jogar?</p>
+                </div>
+                <p class="dash-hero-desc">Gerencie suas contas, modpacks, servidores e muito mais.</p>
+                <div class="dash-actions">
+                  <button class="btn btn-red" data-action="play">▶ Jogar Minecraft</button>
+                  <button class="btn btn-glass" data-action="join_server">🚪 Entrar no servidor</button>
+                </div>
+              </div>
+              <div class="dash-hero-right">
+                <label class="dash-profile-label" for="profile-select">Perfil ativo</label>
+                <select id="profile-select"><option value="vanilla">Vanilla / sem modpack</option></select>
+              </div>
             </div>
-            <div class="panel-body two-col">
-              <div class="panel-copy">
-                <span class="cyan-label">PAINEL LOCAL</span>
-                <h3>Minecraft Ruby Launcher</h3>
-                <p>Interface Web com visual gamer, display integrado, servidor da comunidade, Discord Bot e suporte a modpacks.</p>
 
-                <label for="profile-select">Perfil</label>
-                <select id="profile-select">
-                  <option value="vanilla">Vanilla / sem modpack</option>
-                </select>
+            <!-- STATS -->
+            <div class="dash-stats">
+              <div class="dash-stat" data-stat="version">
+                <span class="dash-stat-icon">📦</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">VERSÃO</span>
+                  <strong class="dash-stat-value" id="minecraft-version">1.21.4</strong>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="profile">
+                <span class="dash-stat-icon">🎯</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">PERFIL ATIVO</span>
+                  <strong class="dash-stat-value" id="active-profile">Vanilla</strong>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="server">
+                <span class="dash-stat-icon">🌐</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">SERVIDOR</span>
+                  <strong class="dash-stat-value" id="server-state">Online</strong>
+                  <small id="server-players">0 jogadores</small>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="status">
+                <span class="dash-stat-icon">✅</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">STATUS</span>
+                  <strong class="dash-stat-value" id="launcher-state">Tudo certo!</strong>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="launcher-version">
+                <span class="dash-stat-icon">⚡</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">LAUNCHER</span>
+                  <strong class="dash-stat-value" id="launcher-version">--</strong>
+                </div>
+              </div>
+              <div class="dash-stat" data-stat="modpacks">
+                <span class="dash-stat-icon">📥</span>
+                <div class="dash-stat-body">
+                  <span class="dash-stat-label">MODPACKS</span>
+                  <strong class="dash-stat-value"><span id="home-modpacks-count">--</span></strong>
+                  <small>instalados</small>
+                </div>
+              </div>
+            </div>
 
-                <div class="actions">
-                  <button class="btn btn-primary" data-action="play">Jogar</button>
-                  <button class="btn btn-secondary" data-action="join_server">Entrar no servidor</button>
+            <!-- MAIN GRID -->
+            <div class="dash-grid">
+
+              <!-- Community Card -->
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <span class="dash-card-header-icon">💬</span>
+                  <h3>Comunidade</h3>
+                </div>
+                <div class="dash-card-body">
+                  <div class="dash-guild-banner"></div>
+                  <div class="dash-guild-info">
+                    <div class="dash-guild-avatar">
+                      <svg viewBox="0 0 28 28" width="28" height="28" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#5865f2"/><path d="M15.5 8.5h-7a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V9a.5.5 0 0 0-.5-.5z" fill="#fff"/><circle cx="12" cy="12" r="2.5" fill="#5865f2"/></svg>
+                      <span class="dash-guild-dot"></span>
+                    </div>
+                    <div class="dash-guild-meta">
+                      <strong class="dash-guild-name" id="discord-guild-name">RubyMC</strong>
+                      <span class="dash-guild-badge">COMUNIDADE</span>
+                    </div>
+                  </div>
+                  <div class="dash-guild-stats">
+                    <div class="dash-guild-stat">
+                      <span>👥</span>
+                      <div>
+                        <strong id="discord-member-count">--</strong>
+                        <small>Membros</small>
+                      </div>
+                    </div>
+                    <div class="dash-guild-stat">
+                      <span>🟢</span>
+                      <div>
+                        <strong id="discord-online-count">--</strong>
+                        <small>Online</small>
+                      </div>
+                    </div>
+                  </div>
+                  <button class="btn btn-discord dash-invite-btn" onclick="handleDiscordServerJoin()" id="discord-join-btn">
+                    <img src="/assets/img/DISCORD.png" alt="" class="btn-icon-discord"> Entrar na Comunidade Discord
+                  </button>
                 </div>
               </div>
 
-              <figure class="preview-card">
-                <img src="/assets/img/rubymc-tela-inicio.png" alt="Preview da tela inicial do RubyMC">
-              </figure>
-            </div>
-          </article>
-
-          <article class="ruby-panel display-shortcut-panel">
-            <div class="panel-header compact">
-              <h2>🖥️ Display Interno</h2>
-            </div>
-            <div class="panel-body">
-              <p>Tudo que for executado aparece no display: testes, erros, imports, servidor e comandos.</p>
-              <div class="actions">
-                <button class="btn btn-secondary" data-tab-jump="display">Abrir display</button>
-                <button class="btn btn-secondary" data-action="clear_display">Limpar</button>
+              <!-- Verification Card -->
+              <div class="dash-card dash-card-verify" id="verification-box">
+                <div class="dash-card-header">
+                  <span class="dash-card-header-icon">✦</span>
+                  <h3>Verificação</h3>
+                </div>
+                <div class="dash-card-body">
+                  <!-- Step 1: Terms -->
+                  <div class="dash-vstep" id="vstep-terms">
+                    <div class="dash-vstep-marker">
+                      <span id="vstep-terms-status" class="dash-vstep-status">pendente</span>
+                    </div>
+                    <div class="dash-vstep-body">
+                      <div class="dash-vstep-title">1. Aceitar Termos</div>
+                      <div class="dash-vstep-desc">Leia e aceite os termos de uso do servidor.</div>
+                      <div class="dash-vstep-controls">
+                        <label class="dash-terms-check">
+                          <input type="checkbox" id="terms-checkbox">
+                          <span>Li e aceito os <button class="dash-link-btn" id="terms-show-btn">termos de uso</button></span>
+                        </label>
+                        <button class="btn btn-discord-sm" id="terms-accept-btn" disabled>Confirmar Termos</button>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Step 2: Discord -->
+                  <div class="dash-vstep" id="vstep-discord" style="opacity:0.4;pointer-events:none;">
+                    <div class="dash-vstep-marker">
+                      <span id="vstep-discord-status" class="dash-vstep-status">bloqueado</span>
+                    </div>
+                    <div class="dash-vstep-body">
+                      <div class="dash-vstep-title">2. Verificação Discord</div>
+                      <div class="dash-vstep-desc">Entre no servidor e receba um código no DM.</div>
+                      <div id="vstep-discord-join" class="dash-vstep-box">
+                        <div class="dash-vstep-box-row">
+                          <button class="btn btn-discord-sm" onclick="handleDiscordServerJoin()" id="discord-join-verify-btn">▶ Entrar no Servidor</button>
+                          <button class="btn btn-dark-sm" id="discord-check-guild-btn">Verificar presença</button>
+                        </div>
+                        <div id="discordGuildMsg" class="dash-msg" style="display:none;"></div>
+                      </div>
+                      <div id="vstep-discord-code" class="dash-vstep-box" style="display:none;">
+                        <div class="dash-vstep-box-row">
+                          <button class="btn btn-discord-sm" id="discord-send-code-btn">Enviar código</button>
+                          <input id="discord-code-input" class="dash-code-input" type="text" placeholder="000000" maxlength="6" disabled>
+                          <button class="btn btn-red-sm" id="discord-confirm-code-btn" disabled>Confirmar</button>
+                        </div>
+                        <div id="discord-code-msg" class="dash-msg" style="display:none;"></div>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Step 3: Complete -->
+                  <div class="dash-vstep" id="vstep-complete">
+                    <div class="dash-vstep-marker">
+                      <span class="dash-vstep-status">—</span>
+                    </div>
+                    <div class="dash-vstep-body">
+                      <div class="dash-vstep-title">3. Finalizar</div>
+                      <div class="dash-vstep-desc">Complete o processo e torne-se Membro Ruby.</div>
+                      <button class="btn ds-btn-complete" id="complete-verification-btn" disabled>
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16z" stroke="currentColor" stroke-width="1.5"/><path d="M7.5 10.5l1.5 1.5 3.5-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                        Tornar-se Membro Ruby
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
+
+              <!-- Member Status Card (shown when verified, replaces verification card) -->
+              <div class="dash-card dash-card-member" id="member-status-card" style="display:none;">
+                <div class="dash-card-header">
+                  <span class="dash-card-header-icon">✦</span>
+                  <h3>Membro Verificado</h3>
+                  <span class="dash-verified-badge">✓</span>
+                </div>
+                <div class="dash-card-body">
+                  <div class="dash-member-stats">
+                    <div class="dash-member-stat">
+                      <span class="dash-member-stat-icon">🟢</span>
+                      <div>
+                        <span class="dash-member-stat-label">Status</span>
+                        <strong class="dash-member-stat-value">Ativo</strong>
+                      </div>
+                    </div>
+                    <div class="dash-member-stat">
+                      <span class="dash-member-stat-icon">🌐</span>
+                      <div>
+                        <span class="dash-member-stat-label">Servidor</span>
+                        <strong class="dash-member-stat-value" id="msc-guild-name">RubyMC</strong>
+                      </div>
+                    </div>
+                    <div class="dash-member-stat">
+                      <span class="dash-member-stat-icon">🏷️</span>
+                      <div>
+                        <span class="dash-member-stat-label">Cargo</span>
+                        <strong class="dash-member-stat-value" id="msc-member-role">Membro</strong>
+                      </div>
+                    </div>
+                  </div>
+                  <button class="btn btn-discord dash-invite-btn" data-action="join_server">
+                    🚪 Entrar no Servidor
+                  </button>
+                </div>
+              </div>
+
             </div>
-          </article>
-        </div>
-      </section>
+
+          </div>
+        </section>
 
       <section id="tab-modpacks" class="tab-panel">
         <article class="ruby-panel">
@@ -216,6 +356,32 @@
         </article>
       </section>
 
+      <section id="tab-vip" class="tab-panel" data-panel-title="VIP">
+        <header class="panel-heading"><h2>💎 Plano VIP</h2><p>Desbloqueie cargos exclusivos no servidor com benefícios especiais.</p></header>
+        <div class="panel-grid vip-grid">
+          <article class="panel-copy">
+            <div id="vip-status-card" class="vip-status-card">
+              <h3>Seu Plano Atual</h3>
+              <div id="vip-status-detail">
+                <span class="loading-dots">Carregando...</span>
+              </div>
+            </div>
+
+            <div class="vip-plans-section">
+              <h3>Planos Disponíveis</h3>
+              <div id="vip-plans-grid" class="vip-plans-grid">
+                <span class="loading-dots">Carregando...</span>
+              </div>
+            </div>
+
+            <div id="vip-pending-section" class="vip-pending-section" style="display:none;">
+              <h3>🕐 Pagamentos Pendentes</h3>
+              <div id="vip-pending-list" class="vip-pending-list"></div>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section id="tab-display" class="tab-panel">
         <article class="ruby-panel">
           <div class="panel-header">
@@ -235,6 +401,20 @@
             <figure class="preview-card display-preview">
               <img src="/assets/img/rubymc-display-logs.png" alt="Preview do display interno">
             </figure>
+          </div>
+        </article>
+      </section>
+
+      <section id="tab-versions" class="tab-panel">
+        <article class="ruby-panel">
+          <div class="panel-header">
+            <h2>🔧 Versões Bedrock</h2>
+            <div class="window-controls" aria-hidden="true"><span></span><span></span></div>
+          </div>
+          <div class="panel-body">
+            <div class="panel-copy">
+              <p class="text-muted">Carregando gerenciador de versões...</p>
+            </div>
           </div>
         </article>
       </section>
@@ -293,9 +473,29 @@
                 <input id="settings-ram" type="number" value="2048" placeholder="RAM (MB)">
               </div>
 
+              <label>Username Offline</label>
+              <input id="settings-username" type="text" value="VictorGG" placeholder="Seu nickname no jogo">
+
               <label>Discord</label>
               <div class="toggle-row"><span>Rich Presence</span><button class="toggle active" data-toggle="rich_presence"></button></div>
               <div class="toggle-row"><span>Ativar Bot Discord</span><button class="toggle active" data-toggle="discord_bot"></button></div>
+
+              <footer class="settings-connected">
+                <span></span>
+                <small>Você está conectado</small>
+              </footer>
+
+              <div id="settings-user-info" class="settings-user-info" style="display:none">
+                <hr>
+                <div class="sui-row">
+                  <span class="sui-avatar" id="sui-avatar"></span>
+                  <div class="sui-details">
+                    <strong id="sui-name">---</strong>
+                    <small id="sui-role">---</small>
+                  </div>
+                </div>
+                <button class="btn btn-logout" id="logout-btn">Sair</button>
+              </div>
 
               <div class="actions">
                 <button class="btn btn-secondary" data-action="check_updates">Verificar atualizações</button>
@@ -313,9 +513,11 @@
           </div>
         </article>
       </section>
-    </main>
+      </main>
+    </section>
   </div>
 
   <script src="/assets/js/launcher.js?v=rubymc-ui-logic-fix-1"></script>
+  <script src="/assets/js/bedrock-game-version-fix.js?v=rubymc-ui-logic-fix-1"></script>
 </body>
 </html>
