@@ -93,6 +93,10 @@ class LauncherCLI
   # Fluxo de autenticação
   # ---------------------------------------------------------------------------
   def handle_authentication_flow
+    if @config.dig("launcher", "offline_mode") == true
+      return setup_offline_session
+    end
+
     choices = {}
 
     unless @bank.empty?
@@ -201,10 +205,13 @@ class LauncherCLI
 
   # Sessão offline / pirata
   def setup_offline_session
-    username = @prompt.ask("Digite o apelido (Username) para o jogo:") do |q|
-      q.required true
-      q.modify :strip
-      q.validate(/\A\w{3,16}\z/, "Nome deve ter 3–16 caracteres (letras, números, _)")
+    username = @config.dig("launcher", "offline_username").to_s.strip
+    if username.empty?
+      username = @prompt.ask("Digite o apelido (Username) para o jogo:") do |q|
+        q.required true
+        q.modify :strip
+        q.validate(/\A\w{3,16}\z/, "Nome deve ter 3–16 caracteres (letras, números, _)")
+      end
     end
 
     {

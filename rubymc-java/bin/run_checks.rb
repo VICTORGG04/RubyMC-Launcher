@@ -3,6 +3,7 @@
 
 require 'open3'
 require 'rbconfig'
+require 'yaml'
 
 ROOT = File.expand_path('..', __dir__)
 IGNORE_DIRS = %w[.git .bundle vendor tmp log node_modules].freeze
@@ -75,6 +76,46 @@ if File.file?(File.join(ROOT, 'Gemfile'))
     puts stdout
     puts stderr
   end
+end
+puts
+
+puts '== Verificação LM Studio =='
+begin
+  require_relative '../lib/rubymc/lm_studio_service'
+
+  settings_path = File.join(ROOT, 'config', 'settings.yml')
+  if File.exist?(settings_path)
+    settings = YAML.safe_load(File.read(settings_path))
+    lm_cfg = settings.dig("ai_support", "lm_studio")
+
+    if lm_cfg
+      host = lm_cfg.fetch("host", RubyMC::LMStudioService::LM_STUDIO_DEFAULTS[:host])
+      model = lm_cfg.fetch("model", RubyMC::LMStudioService::LM_STUDIO_DEFAULTS[:model])
+      enabled = lm_cfg["enabled"] == true
+
+      puts "   Host: #{host}"
+      puts "   Modelo: #{model}"
+      puts "   Habilitado: #{enabled}"
+
+      if enabled
+        status = RubyMC::LMStudioService.status(settings)
+        if status[:ok]
+          puts "✅ LM Studio online (#{status[:models].size} modelo(s) disponível(is))."
+        else
+          error_msg = status[:error] || "Não foi possível conectar. Execute: lms server start"
+          puts "⚠️  LM Studio offline: #{error_msg}"
+        end
+      else
+        puts "⏭️  LM Studio desabilitado — teste de conectividade ignorado."
+      end
+    else
+      puts "⚠️  Seção 'ai_support.lm_studio' não encontrada em config/settings.yml"
+    end
+  else
+    puts "⚠️  config/settings.yml não encontrado"
+  end
+rescue => e
+  puts "❌ Erro ao verificar LM Studio: #{e.message}"
 end
 puts
 

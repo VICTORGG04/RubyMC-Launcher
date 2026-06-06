@@ -129,7 +129,15 @@ module RubyMC
       #   1.21.4
       #   26.1.2
       #   fabric-loader-1.21.4
-      clean = raw[/\d+(?:\.\d+){0,2}/].to_s
+      #   fabric-loader-0.19.3-26.1.2  ← extrair o ÚLTIMO grupo numérico (MC version)
+      # Usar scan para pegar todos os grupos A.B.C, usar o último
+      candidates = raw.scan(/\d+(?:\.\d+){0,2}/)
+      clean = if candidates.length > 1 && raw.match?(/\A(?:fabric|quilt)-loader-\d/)
+                candidates.last
+              else
+                candidates.first
+              end
+      clean = clean.to_s
       parts = clean.split('.').map(&:to_i)
       parts = [1, 21, 0] if parts.empty?
 
@@ -485,10 +493,12 @@ module RubyMC
       args = [java, '-jar', installer_jar, 'server', '-mcversion', version_id, '-loader', loader_version, '-downloadMinecraft']
 
       Dir.chdir(vdir) do
-        output, _, status = Open3.capture3(*args)
+        output, err_output, status = Open3.capture3(*args)
         unless status.success?
           FileUtils.rm_f(installer_jar)
-          return { ok: false, error: "Fabric installer falhou: #{output.lines.last(5).join.strip}" }
+          detail = err_output.lines.last(5).map(&:strip).reject(&:empty?)
+          detail = output.lines.last(5).map(&:strip).reject(&:empty?) if detail.empty?
+          return { ok: false, error: "Fabric installer falhou (#{status.exitstatus}): #{detail.last(3).join(' | ')}" }
         end
       end
 
@@ -649,10 +659,12 @@ module RubyMC
 
       out_jar = nil
       Dir.chdir(vdir) do
-        output, _, status = Open3.capture3(*args)
+        output, err_output, status = Open3.capture3(*args)
         unless status.success?
           FileUtils.rm_f(installer_jar)
-          return { ok: false, error: "Quilt installer falhou: #{output.lines.last(5).join.strip}" }
+          detail = err_output.lines.last(5).map(&:strip).reject(&:empty?)
+          detail = output.lines.last(5).map(&:strip).reject(&:empty?) if detail.empty?
+          return { ok: false, error: "Quilt installer falhou (#{status.exitstatus}): #{detail.last(3).join(' | ')}" }
         end
         out_jar = Dir.glob("quilt-server-launch*").first || Dir.glob("quilt-server-*.jar").first
       end

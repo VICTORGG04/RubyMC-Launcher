@@ -23,6 +23,8 @@
 
   const ACTION_ALIASES = {
     play: ["play", "start_minecraft", "launch_minecraft"],
+    play_online: ["play_online", "play", "start_minecraft", "launch_minecraft"],
+    play_offline: ["play_offline", "play", "start_minecraft", "launch_minecraft"],
     join_server: ["join_server", "server_join"],
     enter_server: ["enter_server"],
     update_modpacks: ["update_modpacks", "refresh_modpacks", "list_modpacks"],
@@ -46,8 +48,8 @@
     "test_logs_channel", "test_all_channels", "discord_test_channels", "test_channels",
     "create_invite", "discord_create_invite", "generate_invite", "join_server",
     "server_join", "enter_server", "start_server", "server_start", "stop_server",
-    "server_stop", "restart_server", "server_restart", "play", "start_minecraft",
-    "launch_minecraft", "launch_classic"
+    "server_stop", "restart_server", "server_restart", "play", "play_online",
+    "play_offline", "start_minecraft", "launch_minecraft", "launch_classic"
   ]);
 
   const SERVER_CONTROL_ACTIONS = new Set([
@@ -205,6 +207,7 @@
     if (tab === "vip") setTimeout(loadVipData, 100);
     if (tab === "db") setTimeout(loadDbPanel, 100);
     if (tab === "settings") setTimeout(loadAccounts, 200);
+    if (tab === "modpacks") setTimeout(() => updateModpacks(false), 100);
   }
 
   function actionPayload(action) {
@@ -216,7 +219,7 @@
       server_version_id: $("#server-version-select")?.value || "",
       server_loader: $("#server-version-select")?.selectedOptions?.[0]?.dataset?.loader || "",
       settings: {
-        version: $("#settings-version")?.value || "",
+        version: $("#home-version-select")?.value || $("#settings-version")?.value || "",
         ram: $("#settings-ram")?.value || "",
         username: $("#settings-username")?.value || "",
         account: window._activeAccount || ""
@@ -255,6 +258,20 @@
         try {
           applyResult(await backendAction(action), action);
         } catch (_) {}
+      } else if (action === "play_online") {
+        if (!window._activeAccount) {
+          log("ERROR", "Nenhuma conta Microsoft selecionada. Adicione uma nas Configurações.");
+        } else {
+          applyResult(await backendAction("play"), action);
+        }
+      } else if (action === "play_offline") {
+        const savedAccount = window._activeAccount;
+        window._activeAccount = "";
+        try {
+          applyResult(await backendAction("play"), action);
+        } finally {
+          window._activeAccount = savedAccount;
+        }
       } else {
         applyResult(await backendAction(action), action);
       }
@@ -357,16 +374,27 @@
 
       const profileSelect = $("#profile-select");
       if (profileSelect) {
-        profileSelect.dataset.installedVersions = JSON.stringify(status.versions.installed || []);
         populateProfileSelect(profileSelect);
+      }
+
+      // Merge server versions (status.versions.installed) and client versions (status.versions.client_installed)
+      const serverVersions = status.versions.installed || [];
+      const clientVersions = status.versions.client_installed || [];
+      const seen = new Set();
+      const allVersions = [];
+      serverVersions.forEach(v => { seen.add(v.id); allVersions.push(v); });
+      clientVersions.forEach(v => { if (!seen.has(v.id)) { seen.add(v.id); allVersions.push(v); } });
+
+      const homeVersion = $("#home-version-select");
+      if (homeVersion) {
+        populateHomeVersionSelect(homeVersion, allVersions, active.id);
       }
 
       const settingsVersion = $("#settings-version");
       if (settingsVersion) {
         const current = settingsVersion.value;
-        const versions = status.versions.installed || [];
-        settingsVersion.innerHTML = versions
-            .map((version) => `<option value="${esc(version.id)}">${esc(version.id)} (${esc(version.loader_label || version.loader || "vanilla")})</option>`)
+        settingsVersion.innerHTML = allVersions
+            .map((v) => `<option value="${esc(v.id)}">${esc(v.id)} (${esc(v.loader_label || v.loader || "vanilla")})</option>`)
             .join("") || '<option value="">Nenhuma versão instalada</option>';
 
         if ([...settingsVersion.options].some((option) => option.value === current)) {
@@ -397,23 +425,23 @@
     const current = select.value;
     let html = '<option value="vanilla">Vanilla / sem modpack</option>';
     html += select._modpackOptions || "";
-
-    try {
-      const raw = select.dataset.installedVersions;
-      if (raw) {
-        const versions = JSON.parse(raw);
-        if (Array.isArray(versions) && versions.length) {
-          html += '<option disabled>── Versões ──</option>';
-          versions.forEach((version) => {
-            const label = version.loader_label || version.loader || "vanilla";
-            html += `<option value="version:${esc(version.id)}">🎮 ${esc(version.id)} (${esc(label)})</option>`;
-          });
-        }
-      }
-    } catch (_) {}
-
     select.innerHTML = html;
     if ([...select.options].some((option) => option.value === current)) select.value = current;
+  }
+
+  function populateHomeVersionSelect(select, versions, activeVersion) {
+    if (!select) return;
+    const current = select.value;
+    let html = '<option value="">Selecione uma versão</option>';
+    if (Array.isArray(versions) && versions.length) {
+      versions.forEach((v) => {
+        const label = v.loader_label || v.loader || "vanilla";
+        const selected = v.id === activeVersion ? ' selected' : '';
+        html += `<option value="${esc(v.id)}"${selected}>${esc(v.id)} (${esc(label)})</option>`;
+      });
+    }
+    select.innerHTML = html;
+    if (current && [...select.options].some((o) => o.value === current)) select.value = current;
   }
 
   async function refreshStatus() {
@@ -522,7 +550,8 @@
     if (select) {
       select._modpackOptions = modpacks.map((item) => {
         const name = typeof item === "string" ? item : (item.name || item.profile || item.title || "Modpack");
-        return `<option value="${esc(name)}">${esc(name)}</option>`;
+        const id = typeof item === "object" ? (item.id || item.profile_id || name) : name;
+        return `<option value="${esc(id)}">${esc(name)}</option>`;
       }).join("");
       populateProfileSelect(select);
     }
@@ -544,26 +573,35 @@
   async function handleProfileChange(value) {
     if (!value) return;
 
-    if (value.startsWith("version:")) {
-      const versionId = value.slice(8);
-      busy = true;
-      try {
-        const data = await apiPost("/api/action", { action: "profile_select", version_id: versionId });
-        if (data.ok) {
-          log("OK", "Perfil alterado para versão " + versionId);
-          refreshStatus();
-        } else {
-          log("ERROR", "Falha ao ativar versão: " + (data.error || "erro desconhecido"));
-        }
-      } catch (error) {
-        log("ERROR", "Falha ao alterar perfil: " + error.message);
-      } finally {
-        busy = false;
-      }
+    if (value === "vanilla") {
+      log("ACTION", "Perfil alterado para vanilla");
       return;
     }
 
-    log("ACTION", "Perfil alterado para: " + value);
+    busy = true;
+    try {
+      const data = await apiPost("/api/action", { action: "profile_select", version_id: value });
+      if (data.ok) {
+        log("OK", "Modpack ativado: " + value);
+        if (data.active && data.active.id) {
+          const homeVer = $("#home-version-select");
+          if (homeVer && [...homeVer.options].some((o) => o.value === data.active.id)) {
+            homeVer.value = data.active.id;
+          }
+          const settingsVer = $("#settings-version");
+          if (settingsVer && [...settingsVer.options].some((o) => o.value === data.active.id)) {
+            settingsVer.value = data.active.id;
+          }
+        }
+        refreshStatus();
+      } else {
+        log("WARN", "Modpack não encontrado: " + (data.error || value));
+      }
+    } catch (error) {
+      log("WARN", "Falha ao ativar modpack: " + error.message);
+    } finally {
+      busy = false;
+    }
   }
 
   function normalizeServerStatus(payload) {
@@ -774,7 +812,7 @@
   function renderClientAvailable(available) {
     const grid = document.getElementById('client-versions-grid');
     if (!grid) return;
-    const installedSet = new Set(clientInstalledVersions);
+    const installedSet = new Set(clientInstalledVersions.map(v => typeof v === 'string' ? v : v.id));
     if (!available.length) {
       grid.innerHTML = '<span class="empty-state">Nenhuma versão encontrada.</span>';
       return;
@@ -788,7 +826,7 @@
             <span class="client-version-type">${esc(v.type)}</span>
           </div>
           ${isInstalled
-            ? '<span class="client-version-badge">Instalado</span>'
+            ? '<span class="client-version-badge">✔ Instalado</span>'
             : `<button class="btn btn-red btn-sm" data-client-install="${esc(v.id)}">Instalar</button>`
           }
         </div>
@@ -806,13 +844,26 @@
       list.innerHTML = '<span class="empty-state">Nenhuma versão instalada.</span>';
       return;
     }
-    list.innerHTML = clientInstalledVersions.map(v => `
-      <div class="version-item">
-        <div class="version-item-info">
-          <strong>${esc(v)}</strong>
+    list.innerHTML = clientInstalledVersions.map(v => {
+      const id = typeof v === 'string' ? v : v.id;
+      const loader = typeof v === 'string' ? '' : (v.loader || '');
+      const inherits = typeof v === 'string' ? '' : (v.inheritsFrom || '');
+      const type = typeof v === 'string' ? '' : (v.type || '');
+      const size = typeof v === 'string' ? '' : v.size_kb;
+      const loaderBadge = loader ? `<span class="version-item-loader">${esc(loader)}</span>` : '';
+      const inheritsHint = inherits ? `<small>→ ${esc(inherits)}</small>` : '';
+      const sizeHint = size ? `<small>${size} KB</small>` : '';
+      return `
+        <div class="version-item">
+          <div class="version-item-info">
+            <strong>${esc(id)}</strong>
+            ${loaderBadge}
+            ${inheritsHint}
+            ${sizeHint}
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   async function installClientVersion(versionId) {
@@ -820,23 +871,39 @@
     const btn = document.querySelector(`[data-client-install="${versionId}"]`);
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Baixando...';
+      btn.textContent = 'Instalando...';
     }
     try {
       const res = await apiPost('/api/client/versions/install', { version_id: versionId, loader: loader });
-      if (res.ok) {
-        log('OK', `Instalação de ${versionId} (${loader}) iniciada.`);
-        setTimeout(loadClientVersions, 3000);
-      } else {
+      if (!res.ok) {
         alert(res.error || 'Falha ao iniciar instalação.');
+        if (btn) { btn.disabled = false; btn.textContent = 'Instalar'; }
+        return;
       }
+      log('OK', `Instalação de ${versionId} (${loader}) iniciada.`);
+
+      // Poll until the version appears in the installed list
+      const pollInterval = setInterval(async () => {
+        try {
+          const listRes = await apiFetch('/api/client/versions');
+          if (!listRes.ok) return;
+          const installed = (listRes.installed || []).map(v => typeof v === 'string' ? v : v.id);
+          if (installed.includes(versionId)) {
+            clearInterval(pollInterval);
+            clearTimeout(pollTimeout);
+            log('OK', `${versionId} (${loader}) instalado com sucesso.`);
+            loadClientVersions();
+          }
+        } catch (_) {}
+      }, 2000);
+
+      const pollTimeout = setTimeout(() => {
+        clearInterval(pollInterval);
+        log('WARN', `Instalação de ${versionId} excedeu o tempo limite.`);
+        loadClientVersions();
+      }, 300000);
     } catch (e) {
       alert('Erro de rede: ' + e.message);
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = 'Instalar';
-      }
     }
   }
 
@@ -1271,10 +1338,38 @@
     const profileSelect = document.getElementById("profile-select");
     if (profileSelect) profileSelect.addEventListener("change", () => handleProfileChange(profileSelect.value));
 
+    const homeVersion = document.getElementById("home-version-select");
+    if (homeVersion) {
+      homeVersion.addEventListener("change", () => {
+        const settingsVer = document.getElementById("settings-version");
+        if (settingsVer && homeVersion.value) {
+          if ([...settingsVer.options].some((o) => o.value === homeVersion.value)) {
+            settingsVer.value = homeVersion.value;
+          }
+        }
+      });
+    }
+
     const settingsVersion = document.getElementById("settings-version");
     if (settingsVersion) {
       settingsVersion.addEventListener("change", () => {
-        if (settingsVersion.value) handleProfileChange("version:" + settingsVersion.value);
+        const homeVer = document.getElementById("home-version-select");
+        if (homeVer && settingsVersion.value && [...homeVer.options].some((o) => o.value === settingsVersion.value)) {
+          homeVer.value = settingsVersion.value;
+        }
+        if (settingsVersion.value) {
+          busy = true;
+          apiPost("/api/action", { action: "profile_select", version_id: settingsVersion.value }).then(data => {
+            if (data.ok) {
+              log("OK", "Versão ativada: " + settingsVersion.value);
+              refreshStatus();
+            } else {
+              log("WARN", "Falha ao ativar versão: " + (data.error || settingsVersion.value));
+            }
+          }).catch(error => {
+            log("WARN", "Falha ao ativar versão: " + error.message);
+          }).finally(() => { busy = false; });
+        }
       });
     }
 

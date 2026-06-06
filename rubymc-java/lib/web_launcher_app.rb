@@ -90,6 +90,13 @@ rescue LoadError => e
   warn "RubyMC módulos de autenticação/launch não carregados: #{e.message}"
 end
 
+begin
+  require_relative 'rubymc/lm_studio_service'
+  require_relative 'rubymc/ai_skill_service'
+rescue LoadError => e
+  warn "RubyMC LM Studio / AI Skill não carregados: #{e.message}"
+end
+
 # ── Criptografia AES-256-GCM ─────────────────────────
 module EncryptedVault
   ALGO = 'aes-256-gcm'.freeze
@@ -297,6 +304,139 @@ module RubyMC
           server: server_info,
           logs: read_logs.last(20)
         })
+
+      when '/api/ai/lm/status'
+        settings = load_settings
+        json(res, RubyMC::LMStudioService.status(settings).merge(
+          skills: RubyMC::AISkillService.available_skills
+        ))
+
+      when '/api/ai/lm/chat'
+        settings = load_settings
+        payload = parse_json(req.body)
+        message = payload["message"].to_s.strip
+        skill = payload["skill"].to_s.strip
+        model = payload["model"].to_s.strip
+
+        if message.empty?
+          res.status = 400
+          return json(res, { ok: false, error: "Mensagem vazia." })
+        end
+
+        skill = "knowledge-work" if skill.empty?
+        system_prompt = RubyMC::AISkillService.system_prompt_for(skill)
+
+        result = RubyMC::LMStudioService.chat(
+          user_message: message,
+          system_prompt: system_prompt,
+          model: model,
+          temperature: 0.6,
+          max_tokens: 900,
+          settings: settings
+        )
+
+        json(res, result)
+
+      when '/api/ai/lm/analyze-log'
+        settings = load_settings
+        payload = parse_json(req.body)
+        log = payload["log"].to_s.strip
+        model = payload["model"].to_s.strip
+
+        if log.empty?
+          res.status = 400
+          return json(res, { ok: false, error: "Log vazio." })
+        end
+
+        system_prompt = RubyMC::AISkillService.system_prompt_for("code-review")
+        prompt = <<~PROMPT
+          Analise o log abaixo de um servidor Minecraft/BDS/RubyMC.
+
+          Faça:
+          1. resumo do problema;
+          2. provável causa;
+          3. comandos seguros para diagnóstico;
+          4. possíveis correções;
+          5. riscos antes de alterar arquivos.
+
+          LOG:
+          #{log}
+        PROMPT
+
+        result = RubyMC::LMStudioService.chat(
+          user_message: prompt,
+          system_prompt: system_prompt,
+          model: model,
+          temperature: 0.5,
+          max_tokens: 1000,
+          settings: settings
+        )
+
+        json(res, result)
+
+      when '/api/ai/lm/review-ui'
+        settings = load_settings
+        payload = parse_json(req.body)
+        code = payload["code"].to_s.strip
+        model = payload["model"].to_s.strip
+
+        if code.empty?
+          res.status = 400
+          return json(res, { ok: false, error: "Código vazio." })
+        end
+
+        system_prompt = RubyMC::AISkillService.system_prompt_for("taste-skill")
+        prompt = <<~PROMPT
+          Analise este código de interface do painel RubyMC.
+
+          Quero melhorar:
+          - alinhamento;
+          - larguras;
+          - espaçamento;
+          - responsividade;
+          - aparência geral;
+          - organização visual.
+
+          Preserve a lógica existente.
+
+          CÓDIGO:
+          #{code}
+        PROMPT
+
+        result = RubyMC::LMStudioService.chat(
+          user_message: prompt,
+          system_prompt: system_prompt,
+          model: model,
+          temperature: 0.5,
+          max_tokens: 1200,
+          settings: settings
+        )
+
+        json(res, result)
+
+      when '/api/ai/lm/improve-text'
+        settings = load_settings
+        payload = parse_json(req.body)
+        text = payload["text"].to_s.strip
+        model = payload["model"].to_s.strip
+
+        if text.empty?
+          res.status = 400
+          return json(res, { ok: false, error: "Texto vazio." })
+        end
+
+        system_prompt = RubyMC::AISkillService.system_prompt_for("stop-slop")
+
+        result = RubyMC::LMStudioService.chat(
+          user_message: text,
+          system_prompt: system_prompt,
+          model: model,
+          temperature: 0.6,
+          max_tokens: 900,
+          settings: settings
+        )
+
+        json(res, result)
 
       when '/api/action'
         handle_action(req, res)
@@ -568,7 +708,7 @@ module RubyMC
         modpack_profile = nil
         if profile_id && defined?(MinecraftRubyLauncher::ModpackManager)
           begin
-            modpack_mgr = MinecraftRubyLauncher::ModpackManager.new
+            modpack_mgr = MinecraftRubyLauncher::ModpackManager.new(load_settings)
             modpack_profile = modpack_mgr.find(profile_id)
           rescue => e
             log('DEBUG', "ModpackManager não disponível ou erro: #{e.message}")
@@ -583,6 +723,12 @@ module RubyMC
             game_directory = launch_opts[:game_directory]
             loader = launch_opts[:loader]
             loader_version = launch_opts[:loader_version]
+
+            # Para modpacks com loader (Fabric/Quilt), usar a versão do loader
+            if loader && loader != 'vanilla' && loader_version
+              target_version = "#{loader}-loader-#{loader_version}-#{target_version}"
+            end
+
             log('INFO', "Launch com modpack: #{profile_id} (v#{target_version}, loader: #{loader})")
           rescue => e
             log('WARN', "Falha ao obter opções de launch para modpack #{profile_id}: #{e.message}")
@@ -595,16 +741,17 @@ module RubyMC
         if !modpack_profile && profile_id && version_manager
           begin
             activate_result = version_manager.activate(profile_id)
-            unless activate_result[:ok]
-              log('WARN', "Falha ao ativar versão #{profile_id}: #{activate_result[:error]}")
-              profile_id = nil
+            if activate_result[:ok]
+              log('INFO', "Versão #{profile_id} ativada no servidor.")
+            else
+              log('WARN', "Servidor não reconhece #{profile_id}: #{activate_result[:error]} — launch continuará com versão cliente.")
             end
           rescue => e
-            log('WARN', "Erro ao ativar versão: #{e.message}")
-            profile_id = nil
+            log('WARN', "Erro ao ativar versão no servidor: #{e.message} — launch continuará com versão cliente.")
           end
           
-          target_version ||= profile_id || (version_manager&.active_version&.dig(:id) || resolve_launch_version)
+          # Usa a versão selecionada mesmo se ativação no servidor falhar
+          target_version ||= profile_id
         end
         
         # Se ainda não tem target_version, usar o default
@@ -779,7 +926,7 @@ module RubyMC
         modpack_mgr = nil
         if defined?(MinecraftRubyLauncher::ModpackManager)
           begin
-            modpack_mgr = MinecraftRubyLauncher::ModpackManager.new
+            modpack_mgr = MinecraftRubyLauncher::ModpackManager.new(load_settings)
             modpack_profile = modpack_mgr.find(vid)
           rescue => e
             log('DEBUG', "ModpackManager erro: #{e.message}")
@@ -954,6 +1101,8 @@ module RubyMC
     def status_payload
       modpacks = list_modpack_payloads
       ver_mgr = version_manager
+      client_mgr = MinecraftManager.new rescue nil
+      client_versions = client_mgr&.list_local_versions || []
       {
         ok: true,
         display_connected: true,
@@ -963,7 +1112,7 @@ module RubyMC
         modpacks: modpacks,
         server: server_info,
         discord: discord_status_payload,
-        versions: ver_mgr ? { active: ver_mgr.active_version, installed: ver_mgr.list_installed } : nil,
+        versions: ver_mgr ? { active: ver_mgr.active_version, installed: ver_mgr.list_installed, client_installed: client_versions } : nil,
         project_root: root,
         time: Time.now.strftime('%H:%M:%S')
       }
@@ -1887,28 +2036,34 @@ module RubyMC
       modpack_profile = nil
       if profile_id && defined?(MinecraftRubyLauncher::ModpackManager)
         begin
-          modpack_mgr = MinecraftRubyLauncher::ModpackManager.new
-          modpack_profile = modpack_mgr.find(profile_id)
-        rescue => e
-          log('DEBUG', "ModpackManager não disponível ou erro: #{e.message}")
+            modpack_mgr = MinecraftRubyLauncher::ModpackManager.new(load_settings)
+            modpack_profile = modpack_mgr.find(profile_id)
+          rescue => e
+            log('DEBUG', "ModpackManager não disponível ou erro: #{e.message}")
+          end
         end
-      end
         
-      if modpack_profile
-        # É um modpack - obter opções de launch
-        begin
-          launch_opts = modpack_mgr.launch_options(profile_id)
-          target_version = launch_opts[:minecraft_version]
-          game_directory = launch_opts[:game_directory]
-          loader = launch_opts[:loader]
-          loader_version = launch_opts[:loader_version]
-          log('INFO', "Launch com modpack: #{profile_id} (v#{target_version}, loader: #{loader})")
-        rescue => e
-          log('WARN', "Falha ao obter opções de launch para modpack #{profile_id}: #{e.message}")
-          # Tentar como versão normal
-          modpack_profile = nil
+        if modpack_profile
+          # É um modpack - obter opções de launch
+          begin
+            launch_opts = modpack_mgr.launch_options(profile_id)
+            target_version = launch_opts[:minecraft_version]
+            game_directory = launch_opts[:game_directory]
+            loader = launch_opts[:loader]
+            loader_version = launch_opts[:loader_version]
+
+            # Para modpacks com loader (Fabric/Quilt), usar a versão do loader
+            if loader && loader != 'vanilla' && loader_version
+              target_version = "#{loader}-loader-#{loader_version}-#{target_version}"
+            end
+
+            log('INFO', "Launch com modpack: #{profile_id} (v#{target_version}, loader: #{loader})")
+          rescue => e
+            log('WARN', "Falha ao obter opções de launch para modpack #{profile_id}: #{e.message}")
+            # Tentar como versão normal
+            modpack_profile = nil
+          end
         end
-      end
         
       # Se não é modpack ou falhou, tratar como versão normal
       if !modpack_profile && profile_id && version_manager

@@ -3107,8 +3107,19 @@ button.is-loading,
   border-color: rgba(255,255,255,.12);
 }
 .client-version-card.installed {
-  border-color: rgba(98,255,143,.2);
-  background: rgba(98,255,143,.04);
+  border-color: rgba(98,255,143,.35);
+  background: rgba(98,255,143,.06);
+  box-shadow: 0 0 8px rgba(98,255,143,.08);
+}
+.client-version-card.installed .client-version-badge {
+  background: rgba(98,255,143,.18);
+  color: #62ff8f;
+}
+.client-version-card .btn.is-installing {
+  background: rgba(53,234,255,.12);
+  color: var(--cyan);
+  cursor: wait;
+  opacity: .7;
 }
 .client-version-info {
   display: flex;
@@ -3804,17 +3815,25 @@ button.is-loading,
   padding: 6px;
 }
 
-#tab-versions .version-item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 8px;
-  align-items: center;
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 8px;
-  border: 1px solid rgba(255, 255, 255, .10);
-  border-radius: 10px;
-  background: rgba(4, 7, 16, .65);
+#tab-versions #client-installed-list .version-item {
+  padding: 10px 14px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 8px;
+  background: rgba(5,7,16,.4);
+}
+#tab-versions #client-installed-list .version-item .version-item-info {
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+#tab-versions #client-installed-list .version-item small {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: .8;
+}
+#tab-versions #client-installed-list .version-item .version-item-loader {
+  font-size: 10px;
+  padding: 1px 6px;
 }
 
 #tab-versions .version-item-actions {
@@ -5438,6 +5457,53 @@ button.is-loading,
   cursor: pointer;
 }
 
+/* ── Launch Settings (Perfil + Versão na Home) ── */
+
+.launch-settings {
+  display: flex;
+  gap: 16px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.launch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+  flex: 1;
+}
+
+.launch-label {
+  font-size: 11px;
+  font-weight: 800;
+  color: #8792a7;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+
+.launch-field select {
+  min-width: 180px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(2,4,12,.7);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.launch-field select:hover {
+  border-color: rgba(255,255,255,.25);
+}
+
+.launch-field select:focus {
+  outline: none;
+  border-color: var(--red);
+  box-shadow: 0 0 12px rgba(255,23,79,.2);
+}
+
 /* ── Stats Row ── */
 
 .dash-stats {
@@ -6175,4 +6241,127 @@ button.is-loading,
   color: #fff;
   background: rgba(255,255,255,.06);
   border-color: rgba(255,255,255,.15);
+}
+
+/* =========================================================
+   RubyMC LM Studio Panel
+   ========================================================= */
+
+.lm-panel {
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(4, 7, 16, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.lm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.lm-header h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #fff;
+}
+
+.lm-status {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.lm-status.ok {
+  background: rgba(0, 180, 100, 0.18);
+  color: #64f0a8;
+  border: 1px solid rgba(0, 180, 100, 0.25);
+}
+
+.lm-status.err {
+  background: rgba(220, 60, 60, 0.18);
+  color: #ff8a8a;
+  border: 1px solid rgba(220, 60, 60, 0.25);
+}
+
+.lm-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.lm-controls label {
+  font-size: 13px;
+  color: #9ca8bd;
+  font-weight: 600;
+}
+
+.lm-controls select {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #101018;
+  color: #f5f5f5;
+  padding: 10px;
+  font-family: inherit;
+}
+
+.lm-input {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 140px;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(4, 7, 16, 0.66);
+  color: #f5f5f5;
+  font-family: monospace;
+  resize: vertical;
+  outline: none;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.lm-input:focus {
+  border-color: rgba(255, 23, 79, 0.40);
+  box-shadow: 0 0 12px rgba(255, 23, 79, 0.08);
+}
+
+.lm-input::placeholder {
+  color: #5a6a89;
+}
+
+.lm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.lm-actions .btn {
+  padding: 9px 14px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.lm-output {
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 100px;
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 14px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #d9e4f7;
+  font-family: monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
 }

@@ -108,20 +108,71 @@ class MinecraftManager
   end
 
   def version_installed?(version_id)
-    File.exist?(File.join(@versions_dir, version_id, "#{version_id}.jar"))
+    dir = File.join(@versions_dir, version_id)
+    File.exist?(File.join(dir, "#{version_id}.jar")) || File.exist?(File.join(dir, "#{version_id}.json"))
   end
 
   # Lista versões já instaladas localmente em ~/.minecraft/versions
   def list_local_versions
     return [] unless Dir.exist?(@versions_dir)
     Dir.children(@versions_dir).select do |entry|
-      File.exist?(File.join(@versions_dir, entry, "#{entry}.jar"))
-    end.sort.reverse
+      dir = File.join(@versions_dir, entry)
+      File.directory?(dir) && (File.exist?(File.join(dir, "#{entry}.jar")) || File.exist?(File.join(dir, "#{entry}.json")))
+    end.sort.reverse.map do |entry|
+      json_path = File.join(@versions_dir, entry, "#{entry}.json")
+      info = { id: entry }
+      if File.exist?(json_path)
+        meta = JSON.parse(File.read(json_path)) rescue {}
+        info[:type] = meta["type"] || (meta["inheritsFrom"] ? "loader" : "unknown")
+        info[:inheritsFrom] = meta["inheritsFrom"] if meta["inheritsFrom"]
+        if meta["mainClass"]
+          info[:loader] = "fabric" if meta["mainClass"].include?("fabric")
+          info[:loader] = "quilt" if meta["mainClass"].include?("quilt")
+          info[:loader] = "forge" if meta["mainClass"].include?("forge")
+        end
+        jar_path = File.join(@versions_dir, entry, "#{entry}.jar")
+        info[:size_kb] = (File.size(jar_path) / 1024) rescue 0
+      end
+      info
+    end
   end
 
   # Garante que a versão e suas dependências estejam instaladas,
   # baixando o necessário com progresso no terminal.
   def ensure_version_dependencies(version_id)
+    # Instalar Fabric/Quilt automaticamente se for uma versão fabric-loader-*
+    if version_id =~ /\A(fabric|quilt)-loader-(\d+\.\d+\.\d+)-(.*)\z/
+      loader_type = $1
+      loader_ver = $2
+      base_version = $3
+      loader_json = File.join(@versions_dir, version_id, "#{version_id}.json")
+      unless File.exist?(loader_json)
+        puts "  #{loader_type.capitalize} #{loader_ver} para #{base_version} não instalado. Instalando..."
+        if loader_type == 'fabric'
+          install_fabric_client(base_version, loader_version: loader_ver) { |msg| print "\r  #{msg}#{" " * 20}" }
+        else
+          install_quilt_client(base_version, loader_version: loader_ver) { |msg| print "\r  #{msg}#{" " * 20}" }
+        end
+        puts "\n  Instalação #{loader_type.capitalize} concluída."
+      end
+    end
+
+    json_path = File.join(@versions_dir, version_id, "#{version_id}.json")
+    return unless File.exist?(json_path)
+
+    meta = JSON.parse(File.read(json_path))
+
+    # If inheritsFrom, ensure base version is installed
+    if meta["inheritsFrom"]
+      base_id = meta["inheritsFrom"]
+      unless version_installed?(base_id)
+        puts "  Versão base #{base_id} necessária. Instalando..."
+        install_version(base_id) { |msg| print "\r  #{msg}#{" " * 20}" }
+        puts "\n  Download concluído."
+      end
+    end
+
+    # Download any missing libraries (only those with download URLs)
     unless version_installed?(version_id)
       puts "  Baixando Minecraft #{version_id} e dependências..."
       install_version(version_id) { |msg| print "\r  #{msg}#{" " * 20}" }
@@ -163,7 +214,12 @@ class MinecraftManager
       game_directory: effective_game_dir
     )
 
-    pid = spawn(*([java] + args), chdir: effective_game_dir, out: :out, err: :err)
+    log_path = File.join(@mc_dir, "logs", "launch-#{version_id}-#{Time.now.to_i}.log")
+    FileUtils.mkdir_p(File.dirname(log_path))
+    log_file = File.open(log_path, 'w')
+    log_file.sync = true
+    pid = spawn(*([java] + args), chdir: effective_game_dir, out: log_file, err: log_file)
+    log_file.close
     Process.detach(pid)
     pid
   end
@@ -192,12 +248,22 @@ class MinecraftManager
     JSON.parse(res.body)
   end
 
-  def install_fabric_client(version_id, &cb)
+  def install_fabric_client(version_id, loader_version: nil, &cb)
     cb&.call("Buscando versão do Fabric loader...")
     loader_data = fetch_json("#{FABRIC_META_URL}/loader/#{version_id}")
     raise "Fabric não suporta '#{version_id}'." if loader_data.empty?
 
-    loader_ver = loader_data.first["loader"]["version"]
+    if loader_version
+      match = loader_data.find { |entry| entry["loader"]["version"] == loader_version }
+      if match
+        loader_ver = loader_version
+      else
+        cb&.call("Versão #{loader_version} não encontrada, usando a mais recente.")
+        loader_ver = loader_data.first["loader"]["version"]
+      end
+    else
+      loader_ver = loader_data.first["loader"]["version"]
+    end
 
     installer_data = fetch_json("#{FABRIC_META_URL}/installer")
     installer_ver = installer_data.first["version"]
@@ -215,11 +281,20 @@ class MinecraftManager
             "-mcversion", version_id, "-loader", loader_ver, "-downloadMinecraft"]
 
     cb&.call("Executando Fabric installer...")
-    out, _, status = Open3.capture3(*args)
+    out, err, status = Open3.capture3(*args)
     FileUtils.rm_f(installer_path)
-    raise "Fabric installer falhou: #{out.lines.last(5).join.strip}" unless status.success?
-
     loader_id = "fabric-loader-#{loader_ver}-#{version_id}"
+    unless status.success?
+      loader_json = File.join(@versions_dir, loader_id, "#{loader_id}.json")
+      if File.exist?(loader_json)
+        cb&.call("Fabric #{loader_id} instalado (com avisos).")
+        return loader_id
+      end
+      detail = err.lines.last(5).map(&:strip).reject(&:empty?)
+      detail = out.lines.last(5).map(&:strip).reject(&:empty?) if detail.empty?
+      raise "Fabric installer falhou (#{status.exitstatus}): #{detail.last(3).join(' | ')}"
+    end
+
     cb&.call("Fabric #{loader_id} instalado.")
     loader_id
   end
@@ -247,11 +322,20 @@ class MinecraftManager
             "--loader=#{loader_ver}", "--download-minecraft", "--install-dir=#{@mc_dir}"]
 
     cb&.call("Executando Quilt installer...")
-    out, _, status = Open3.capture3(*args)
+    out, err, status = Open3.capture3(*args)
     FileUtils.rm_f(installer_path)
-    raise "Quilt installer falhou: #{out.lines.last(5).join.strip}" unless status.success?
-
     loader_id = "quilt-loader-#{loader_ver}-#{version_id}"
+    unless status.success?
+      loader_json = File.join(@versions_dir, loader_id, "#{loader_id}.json")
+      if File.exist?(loader_json)
+        cb&.call("Quilt #{loader_id} instalado (com avisos).")
+        return loader_id
+      end
+      detail = err.lines.last(5).map(&:strip).reject(&:empty?)
+      detail = out.lines.last(5).map(&:strip).reject(&:empty?) if detail.empty?
+      raise "Quilt installer falhou (#{status.exitstatus}): #{detail.last(3).join(' | ')}"
+    end
+
     cb&.call("Quilt #{loader_id} instalado.")
     loader_id
   end
@@ -393,17 +477,24 @@ class MinecraftManager
     objs  = JSON.parse(File.read(index_path))["objects"] || {}
     total = objs.size
     count = 0
+    failed = 0
     objs.each_value do |obj|
       hash   = obj["hash"]
       prefix = hash[0..1]
       dest   = File.join(@assets_dir, "objects", prefix, hash)
-      unless File.exist?(dest)
-        count += 1
-        cb&.call("Assets: #{count}/#{total}") if count == 1 || (count % 100).zero?
-        FileUtils.mkdir_p(File.dirname(dest))
+      next if File.exist?(dest)
+
+      count += 1
+      cb&.call("Assets: #{count}/#{total}") if count == 1 || (count % 100).zero?
+      FileUtils.mkdir_p(File.dirname(dest))
+      begin
         download_file("#{RESOURCES_URL}/#{prefix}/#{hash}", dest)
+      rescue => e
+        failed += 1
+        cb&.call("Assets #{count}/#{total} — pulando (#{e.message})") if (count % 50).zero?
       end
     end
+    cb&.call("Assets concluído (#{failed} falhas, #{count} baixados).") if count > 0
   end
 
   def download_natives(meta, version_id, &cb)
@@ -446,13 +537,55 @@ class MinecraftManager
 
   def build_classpath(version_id, meta)
     paths = []
+    seen = Set.new
+    resolve_classpath_chain(version_id, meta, paths, seen)
+    paths.join(":")
+  end
+
+  def resolve_classpath_chain(version_id, meta, paths, seen)
+    return unless meta
+    return unless seen.add?(version_id)
+
+    # Add libraries from this version
     (meta["libraries"] || []).each do |lib|
       next unless should_install_library?(lib)
+
       a = lib.dig("downloads", "artifact")
-      paths << File.join(@libraries_dir, a["path"]) if a
+      if a && a["path"]
+        path = File.join(@libraries_dir, a["path"])
+        paths << path if File.exist?(path)
+      elsif lib["name"]
+        # Resolve Maven coordinate (group:artifact:version)
+        maven_rel = maven_coord_to_path(lib["name"])
+        full_path = File.join(@libraries_dir, maven_rel)
+        paths << full_path if File.exist?(full_path)
+      end
     end
-    paths << File.join(@versions_dir, version_id, "#{version_id}.jar")
-    paths.join(":")
+
+    # Add this version's JAR if it exists
+    jar = File.join(@versions_dir, version_id, "#{version_id}.jar")
+    paths << jar if File.exist?(jar)
+
+    # Follow inheritsFrom chain (Fabric/Quilt loaders point to base MC version)
+    if meta["inheritsFrom"]
+      base_id = meta["inheritsFrom"]
+      base_json = File.join(@versions_dir, base_id, "#{base_id}.json")
+      if File.exist?(base_json)
+        base_meta = JSON.parse(File.read(base_json)) rescue nil
+        resolve_classpath_chain(base_id, base_meta, paths, seen)
+      end
+    end
+  end
+
+  def maven_coord_to_path(coord)
+    parts = coord.split(":")
+    group = parts[0]
+    artifact = parts[1]
+    version = parts[2]
+    classifier = parts[3]
+    group_path = group.tr(".", "/")
+    filename = classifier ? "#{artifact}-#{version}-#{classifier}.jar" : "#{artifact}-#{version}.jar"
+    File.join(group_path, artifact, version, filename)
   end
 
   def build_launch_args(version_meta:, version_id:, username:, uuid:, mc_access_token:, classpath:, ram_mb:, server_address: nil, java_path_for_detection: "java", game_directory: nil)
@@ -482,17 +615,22 @@ class MinecraftManager
 
     java_ver = java_major_version(java_path: java_path_for_detection)
 
-    if version_meta.dig("arguments", "jvm")
-      version_meta["arguments"]["jvm"].each do |a|
-        next unless a.is_a?(String)
-        arg = apply_r(a, r)
-        # --sun-misc-unsafe-memory-access requer Java 23+; ignora em versões antigas
-        next if arg.start_with?("--sun-misc-unsafe-memory-access") && java_ver < 23
-        jvm << arg
+      if version_meta.dig("arguments", "jvm")
+        version_meta["arguments"]["jvm"].each do |a|
+          next unless a.is_a?(String)
+          arg = apply_r(a, r)
+          # --sun-misc-unsafe-memory-access requer Java 23+; ignora em versões antigas
+          next if arg.start_with?("--sun-misc-unsafe-memory-access") && java_ver < 23
+          jvm << arg
+        end
       end
-    end
 
-    main = version_meta["mainClass"]
+      # Garantir que -cp esteja presente (Fabric/Quilt JSON omitem -cp nos arguments.jvm)
+      unless jvm.any? { |a| a == '-cp' || a == '-classpath' }
+        jvm << '-cp' << classpath
+      end
+
+      main = version_meta["mainClass"]
     raise "mainClass não encontrada." unless main
 
     game = []
@@ -539,7 +677,7 @@ class MinecraftManager
   end
 
   def download_file(url, dest)
-    res = HTTParty.get(url, timeout: 60)
+    res = HTTParty.get(url, timeout: 30)
     raise "HTTP #{res.code}: #{url}" unless res.success?
     File.binwrite(dest, res.body)
   rescue => e

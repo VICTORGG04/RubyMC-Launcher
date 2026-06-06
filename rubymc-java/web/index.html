@@ -37,15 +37,22 @@
                   <h1 class="dash-hero-title">BEM-VINDO(A)!</h1>
                   <p class="dash-hero-sub">Pronto para jogar?</p>
                 </div>
+                <div class="launch-settings">
+                  <div class="launch-field">
+                    <label class="launch-label" for="profile-select">Perfil / Modpack</label>
+                    <select id="profile-select"><option value="vanilla">Vanilla / sem modpack</option></select>
+                  </div>
+                  <div class="launch-field">
+                    <label class="launch-label" for="home-version-select">Versão do jogo</label>
+                    <select id="home-version-select"><option value="">Selecione uma versão</option></select>
+                  </div>
+                </div>
                 <p class="dash-hero-desc">Gerencie suas contas, modpacks, servidores e muito mais.</p>
                 <div class="dash-actions">
-                  <button class="btn btn-red" data-action="play">▶ Jogar Minecraft</button>
+                  <button class="btn btn-red" data-action="play_online">▶ Jogar Online</button>
+                  <button class="btn btn-glass" data-action="play_offline">🔌 Jogar Offline</button>
                   <button class="btn btn-glass" data-action="enter_server">🚪 Entrar no servidor</button>
                 </div>
-              </div>
-              <div class="dash-hero-right">
-                <label class="dash-profile-label" for="profile-select">Perfil ativo</label>
-                <select id="profile-select"><option value="vanilla">Vanilla / sem modpack</option></select>
               </div>
             </div>
 
@@ -407,6 +414,35 @@
               <button class="btn btn-dark" id="ai-refresh-context" style="margin-top:12px;width:100%">Atualizar contexto</button>
             </aside>
           </div>
+
+          <div class="lm-panel">
+            <div class="lm-header">
+              <h3>🤖 IA Local — LM Studio</h3>
+              <span id="lm-status" class="lm-status">Verificando IA…</span>
+            </div>
+
+            <div class="lm-controls">
+              <label for="lm-skill">Modo de análise</label>
+              <select id="lm-skill">
+                <option value="knowledge-work">📄 Documentação / resumo</option>
+                <option value="code-review">🔍 Revisão de código</option>
+                <option value="taste-skill">🎨 Interface / layout</option>
+                <option value="stop-slop">✏️ Melhorar texto</option>
+                <option value="cyber-defensivo">🛡️ Segurança defensiva</option>
+              </select>
+            </div>
+
+            <textarea id="lm-input" class="lm-input" placeholder="Cole aqui logs, código, texto, HTML/CSS ou documentação…"></textarea>
+
+            <div class="lm-actions">
+              <button id="lm-send-btn" type="button" class="btn btn-red">📤 Enviar para IA</button>
+              <button id="lm-log-btn" type="button" class="btn btn-dark">📋 Analisar Log</button>
+              <button id="lm-ui-btn" type="button" class="btn btn-dark">🖥️ Revisar Interface</button>
+              <button id="lm-text-btn" type="button" class="btn btn-dark">✏️ Melhorar Texto</button>
+            </div>
+
+            <pre id="lm-output" class="lm-output">A resposta da IA aparecerá aqui.</pre>
+          </div>
         </section>
         <section id="tab-vip" class="tab-panel" data-panel-title="VIP">
           <header class="panel-heading"><h2>💎 Plano VIP</h2><p>Desbloqueie cargos exclusivos no servidor com benefícios especiais.</p></header>
@@ -637,5 +673,6 @@
   <script src="/assets/js/launcher.js?v=rubymc-bg-unified-3"></script>
   <script src="/assets/js/server-runtime-selector.js?v=1"></script>
   <script src="/assets/js/rubymc-ai-support.js?v=rubymc-ai-embedded-1"></script>
+  <script src="/assets/js/ai-panel.js?v=1"></script>
 </body>
 </html>
