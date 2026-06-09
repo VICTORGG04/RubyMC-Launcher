@@ -15,6 +15,34 @@
 
 ---
 
+## 📋 Histórico de Alterações
+
+### v1.2 — Gerenciamento Multi-Servidor
+
+- **Gerenciamento de 9 servidores simultâneos** — `ServerManager` refatorado em `lib/rubymc/server_manager.rb` para suportar múltiplos servidores (realms, vanilla, forge, fabric, community, devlab, hardcore, arcade, bedrock). Cada servidor possui próprio JAR, mundo, configuração, PID independente e suporte aos tipos Java e Bedrock.
+- **API REST multi-servidor** — `GET /api/servers` (lista), `POST /api/servers/start` com `{server_id}`, `POST /api/servers/stop` com `{server_id}`, `GET /api/servers/status` (status de todos). Permite controle individual de cada servidor.
+- **Grid de servidores no painel** — `#server-grid` na aba Servidor com polling a cada 5s. Cartões individuais mostram nome, badge (Java/Bedrock), IP:porta, status 🟢/🔴 e botões Iniciar/Parar.
+- **Painel antigo removido** — `#server-admin-panel` e `server-runtime-selector.js` substituídos pelo grid multi-servidor.
+- **Comandos do bot Discord atualizados** — `!iniciar <id>`, `!parar <id>`, `!restart <id>`, `!log <id>`, `!backup <id>` aceitam ID do servidor (ex: `!iniciar vanilla`). `!servidores` lista todos com status.
+- **Geração automática de `servers.dat`** — Novo `NBTWriter` em `lib/rubymc/nbt_writer.rb` escreve o arquivo NBT binário do Minecraft com todos os servidores do projeto antes de cada launch. O arquivo é gravado tanto em `~/.minecraft/` quanto no diretório personalizado do modpack (quando aplicável).
+- **Download automático de server.jar** — `install_if_needed` baixa a versão Vanilla mais recente do manifest da Mojang quando o diretório do servidor não existe e `auto_install: true`.
+- **Botão "Adicionar servidores ao Multiplayer"** — Membros podem adicionar todos os servidores da comunidade à própria lista Multiplayer do Minecraft com um clique, sem precisar iniciar o jogo. Ação disponível para role `:player`.
+
+### v1.1.1 — Melhorias na UI e Correções
+
+- **Imagens da barra lateral redimensionadas** — 10 PNGs em `web/assets/img/Sidebar/` reduzidas de ~1254×1254 para 40×40px via PIL LANCZOS (total ~20KB vs ~14MB original).
+- **CSS `.nav-icon` atualizado** — `width` e `height` alterados de 28px para 40px em `web/assets/css/launcher.css`.
+- **Link do Discord configurável** — URL do convite movida para `settings.yml discord.invite_url`. Botão no painel chama `handleDiscordServerJoin()`.
+- **Card da comunidade reformulado** — banner 64px, avatar 56px, layout compactado.
+- **Badges de cargos Ruby Packs** — 15 imagens de badge em `web/assets/img/ruby-packs/`. Exibidas na barra lateral, configurações e card de membro via `roleBadgeUrl()`.
+- **Layout geral compactado** — padding do hero, títulos, estatísticas, cards, grid gap e msc-body reduzidos.
+- **Instalador Fabric/Quilt** — tratativa de código de saída 1 (não zero) quando o JSON do loader já foi escrito.
+- **Redirecionamento de stdout/stderr do Java** — saída do processo Minecraft capturada para `~/.minecraft/logs/launch-*.log`.
+- **Classpath `-cp` automático** — adicionado aos argumentos JVM quando o JSON da versão omite a entrada.
+- **Servidores da comunidade no `settings.yml`** — Lista de 9 servidores adicionada em `discord.servers` com configuração completa (id, name, address, type, dir, jar, java, memory, motd, online_mode, max_players, auto_install).
+
+---
+
 ## 📸 Screenshots
 
 <div align="center">
@@ -74,6 +102,16 @@
 - **Servidor da Comunidade** — status ao vivo com MOTD, jogadores online, versão e ping
 - **Modpacks** — importação de `.mrpack` e `.zip` com criação automática de perfil
 - **Simulação** — modo de teste com 20 jogadores simulados + Discord mock
+- **Geração automática de `servers.dat`** — antes de cada launch, o launcher escreve o arquivo NBT do Minecraft com todos os servidores do projeto, tanto em `~/.minecraft/` quanto no diretório do modpack
+- **Botão "Adicionar servidores ao Multiplayer"** — membros podem adicionar os servidores da comunidade à própria lista Multiplayer com um clique
+
+### Gerenciamento Multi-Servidor
+
+- **9 servidores simultâneos** — realms, vanilla, forge, fabric, community, devlab, hardcore, arcade e bedrock. Cada um com próprio JAR, mundo, configuração e PID independente.
+- **Painel web** — grid com status em tempo real, badges Java/Bedrock, IP:porta e botões Iniciar/Parar para cada servidor.
+- **API REST** — `GET /api/servers`, `POST /api/servers/start`, `POST /api/servers/stop`, `GET /api/servers/status` — controle individual por `server_id`.
+- **Bot Discord** — comandos `!iniciar <id>`, `!parar <id>`, `!restart <id>`, `!log <id>`, `!backup <id>`, `!servidores`.
+- **Auto-instalação** — servidores Vanilla baixam o `server.jar` automaticamente quando `auto_install: true`.
 
 ### Segurança
 
@@ -292,7 +330,8 @@ rubymc-java/
 │       ├── rubymc_bot_config_bridge.rb # Bridge bot-config
 │       ├── rubymc_discord_panel_actions.rb # Ações do painel Discord
 │       ├── rubymc_settings.rb  # Gerenciamento de configurações
-│       ├── server_manager.rb   # Gerenciamento do servidor Java
+│       ├── nbt_writer.rb       # Escrita NBT para servers.dat
+│       ├── server_manager.rb   # Gerenciamento multi-servidor
 │       └── server_version_manager.rb # Versões do servidor
 │
 ├── config/
@@ -339,6 +378,7 @@ discord:
   client_secret: "seu_client_secret"
   guild_id: "id_do_servidor"
   server_address: "ip:porta"
+  invite_url: "https://discord.gg/seuconvite"
 
   channels:
     welcome_channel_id: "..."
@@ -351,6 +391,21 @@ discord:
     staff_role_id: "..."
     admin_role_id: "..."
     bot_role_id: "..."
+
+  servers:
+    - id: realms
+      name: Ruby Realms
+      address: 192.168.0.9:25565
+      description: Servidor principal
+      type: java
+      dir: "/caminho/para/servidor"
+      jar: server.jar
+      java: "/usr/lib/jvm/java-21/bin/java"
+      memory: "-Xmx4G -Xms2G"
+      motd: "§c§lRubyMC Servidor"
+      online_mode: true
+      max_players: 20
+      auto_install: true
 
 ai_support:
   enabled: true
@@ -409,7 +464,19 @@ bundle check
 - [x] Modo simulação (20 jogadores + Discord mock)
 - [x] Segurança: SSRF, command injection, rate limiting, HMAC, OAuth state
 
-### 🔜 v1.2
+### ✅ v1.2 — Gerenciamento Multi-Servidor e UI
+- [x] Gerenciamento de 9 servidores simultâneos (realms, vanilla, forge, fabric, community, devlab, hardcore, arcade, bedrock)
+- [x] API REST multi-servidor + grid no painel web com status em tempo real
+- [x] `servers.dat` gerado automaticamente via NBTWriter antes de cada launch
+- [x] Botão "Adicionar servidores ao Multiplayer" para membros (role player)
+- [x] Bot Discord com comandos multi-servidor (`!iniciar <id>`, `!parar <id>`, etc.)
+- [x] Badges de cargos Ruby Packs (15 imagens)
+- [x] Imagens da barra lateral redimensionadas para 40×40px
+- [x] Link do Discord configurável via `settings.yml`
+- [x] Layout compactado e card da comunidade reformulado
+- [x] Auto-instalação de server.jar (Vanilla)
+
+### 🔜 v1.3
 - [ ] IA premium (OpenAI/Anthropic)
 - [ ] Integração Modrinth/CurseForge API
 - [ ] Autenticação de usuários no painel

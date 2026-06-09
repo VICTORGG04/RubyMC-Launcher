@@ -75,6 +75,48 @@ module RubyMC
       { ok: false, answer: "O serviço de IA está temporariamente indisponível: #{e.message}", error: e.message }
     end
 
+    def support_answer_stream(message, context: nil, &block)
+      return block.call({ error: true, message: 'IA desabilitada.' }.to_json) unless @settings[:enabled]
+
+      full_prompt = build_full_prompt(message, context)
+
+      body = {
+        model: @settings[:model],
+        prompt: full_prompt,
+        stream: true,
+        options: {
+          temperature: @settings[:temperature],
+          num_ctx: @settings[:num_ctx]
+        }
+      }
+
+      uri = URI("#{@settings[:host]}/api/generate")
+      http = build_http(uri)
+      request = Net::HTTP::Post.new(uri)
+      request['Content-Type'] = 'application/json'
+      request.body = JSON.generate(body)
+
+      http.request(request) do |response|
+        response.read_body do |chunk|
+          chunk.split("\n").each do |line|
+            next if line.strip.empty?
+            begin
+              data = JSON.parse(line)
+              if data['done']
+                block.call({ done: true }.to_json)
+              elsif data['response']
+                block.call({ token: data['response'] }.to_json)
+              end
+            rescue JSON::ParserError
+              next
+            end
+          end
+        end
+      end
+    rescue => e
+      block.call({ error: true, message: e.message }.to_json)
+    end
+
     def health
       return { ok: false, enabled: false, message: 'IA desabilitada nas configurações.' } unless @settings[:enabled]
 
@@ -156,7 +198,7 @@ module RubyMC
         logs = context['logs'] || context[:logs]
         if logs.is_a?(Array) && !logs.empty?
           ctx_lines << "## Eventos/erros recentes do display"
-          logs.last(10).each do |line|
+          logs.last(5).each do |line|
             ctx_lines << "- #{line}"
           end
           ctx_lines << ""

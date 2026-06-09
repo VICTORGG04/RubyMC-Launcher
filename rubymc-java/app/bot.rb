@@ -687,43 +687,47 @@ def command_topics
 end
 
 def command_start_server(text)
-  result = RubyMC::ServerManager.start(:java)
+  sid = text.to_s.strip.split.first || 'realms'
+  result = RubyMC::ServerManager.start(sid)
   if result[:ok]
-    simple_reply("✅ Servidor **#{key}** iniciado (PID: #{result[:pid]}).", title: "Servidor Iniciado")
+    simple_reply("✅ Servidor **#{sid}** iniciado (PID: #{result[:pid]}).", title: "Servidor Iniciado")
   else
-    simple_reply("❌ Erro ao iniciar #{key}: #{result[:error]}", color: 0xE74C3C, title: "Erro")
+    simple_reply("❌ Erro ao iniciar #{sid}: #{result[:error]}", color: 0xE74C3C, title: "Erro")
   end
 end
 
 def command_stop_server(text)
-  result = RubyMC::ServerManager.stop(:java)
+  sid = text.to_s.strip.split.first || 'realms'
+  result = RubyMC::ServerManager.stop(sid)
   if result[:ok]
-    simple_reply("⏹️ Servidor **#{key}** parado (#{result[:status]}).", title: "Servidor Parado")
+    simple_reply("⏹️ Servidor **#{sid}** parado.", title: "Servidor Parado")
   else
-    simple_reply("❌ Erro ao parar #{key}: #{result[:error]}", color: 0xE74C3C, title: "Erro")
+    simple_reply("❌ Erro ao parar #{sid}: #{result[:error]}", color: 0xE74C3C, title: "Erro")
   end
 end
 
 def command_restart_server(text)
-  result = RubyMC::ServerManager.restart(:java)
+  sid = text.to_s.strip.split.first || 'realms'
+  result = RubyMC::ServerManager.restart(sid)
   if result[:ok]
-    simple_reply("🔄 Servidor **#{key}** reiniciado (PID: #{result[:pid]}).", title: "Servidor Reiniciado")
+    simple_reply("🔄 Servidor **#{sid}** reiniciado (PID: #{result[:pid]}).", title: "Servidor Reiniciado")
   else
-    simple_reply("❌ Erro ao reiniciar #{key}: #{result[:error]}", color: 0xE74C3C, title: "Erro")
+    simple_reply("❌ Erro ao reiniciar #{sid}: #{result[:error]}", color: 0xE74C3C, title: "Erro")
   end
 end
 
 def command_server_log(text)
-  t = text.to_s.downcase.strip
-  count = t[/\d+/]&.to_i || 20
+  parts = text.to_s.strip.split(/\s+/, 2)
+  sid = parts[0] || 'realms'
+  count = (parts[1] || '20')[/\d+/]&.to_i || 20
 
-  result = RubyMC::ServerManager.console(:java, lines: count)
+  result = RubyMC::ServerManager.console(sid, lines: count)
   if result[:ok]
     log_text = result[:log].empty? ? "(log vazio)" : result[:log]
     log_text = log_text[-1500..] || log_text if log_text.length > 1500
     simple_reply(
-      "📋 **#{key.to_s.capitalize}** — últimas #{[count, result[:total_lines]].min} linhas:\n```\n#{log_text}\n```",
-      title: "Console #{key.to_s.capitalize}"
+      "📋 **#{sid.capitalize}** — últimas #{[count, result[:total_lines]].min} linhas:\n```\n#{log_text}\n```",
+      title: "Console #{sid.capitalize}"
     )
   else
     simple_reply("❌ Erro ao ler log: #{result[:error]}", color: 0xE74C3C, title: "Erro")
@@ -731,10 +735,11 @@ def command_server_log(text)
 end
 
 def command_backup_server(text)
-  result = RubyMC::ServerManager.backup(:java)
+  sid = text.to_s.strip.split.first || 'realms'
+  result = RubyMC::ServerManager.backup(sid)
   if result[:ok]
     simple_reply(
-      "✅ Backup do servidor **#{key}** concluído!\n" \
+      "✅ Backup do servidor **#{sid}** concluído!\n" \
         "📁 `#{result[:path]}`\n📦 #{result[:size_kb]} KB",
       title: "Backup Realizado"
     )
@@ -744,14 +749,16 @@ def command_backup_server(text)
 end
 
 def command_servidores
-  status = RubyMC::ServerManager.status(:java)
-  emoji = status[:running] ? '🟢' : '🔴'
-  pid_info = status[:pid] ? " (PID: #{status[:pid]})" : ''
-
+  servers = RubyMC::ServerManager.all_status rescue []
+  lines = servers.map do |s|
+    emoji = s[:running] ? '🟢' : '🔴'
+    pid = s[:pid] ? " (PID: #{s[:pid]})" : ''
+    "  #{emoji} **#{s[:name]}** — #{s[:running] ? 'Online' : 'Offline'}#{pid}"
+  end
   simple_reply(
-    "📡 **Servidor Java** — #{status[:running] ? 'Online' : 'Offline'}#{pid_info}\n\n" \
-      "Use `!iniciar`, `!parar`, `!restart`, `!log` ou `!backup`.\n" \
-      "Use `!servidor` para ver status do Minecraft.",
+    "📡 **Servidores RubyMC:**\n#{lines.join("\n")}\n\n" \
+      "Use `!iniciar <id>`, `!parar <id>`, `!restart <id>`.\n" \
+      "IDs: realms, vanilla, forge, fabric, community, devlab, hardcore, arcade, bedrock",
     title: "Gerenciamento de Servidores"
   )
 end
@@ -1214,9 +1221,9 @@ def connect_to_gateway
         end
         track_thread(name: 'server_manager_refresh') do
           loop do
-            RubyMC::ServerManager::SERVERS.each_key do |key|
-              s = RubyMC::ServerManager.status(key)
-              puts "[BOT] 📡 Servidor #{s[:name]}: #{s[:running] ? '🟢 Online' : '🔴 Offline'}" if s[:ok]
+            statuses = RubyMC::ServerManager.all_status rescue []
+            statuses.each do |s|
+              puts "[BOT] 📡 #{s[:name]}: #{s[:running] ? '🟢 Online' : '🔴 Offline'}" if s[:ok]
             end
             sleep(600)
           rescue => e

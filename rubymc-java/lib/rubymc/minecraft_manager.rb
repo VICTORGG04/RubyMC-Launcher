@@ -201,6 +201,8 @@ class MinecraftManager
     java  = java_path.to_s.strip.empty? ? detect_java : java_path
     raise "Java não encontrado. Instale Java 17+." unless java
 
+    generate_servers_dat(game_dir: game_directory)
+
     classpath = build_classpath(version_id, meta)
     
     # Usar game_directory customizado se fornecido (para modpacks)
@@ -222,6 +224,33 @@ class MinecraftManager
     log_file.close
     Process.detach(pid)
     pid
+  end
+
+  def generate_servers_dat(game_dir: nil)
+    require 'yaml'
+
+    settings_path = File.expand_path('../../config/settings.yml', __dir__)
+    return unless File.file?(settings_path)
+
+    settings = YAML.safe_load(File.read(settings_path), permitted_classes: [Symbol], aliases: true) || {}
+    servers = settings.dig('discord', 'servers') || []
+    return if servers.empty?
+
+    require_relative 'nbt_writer'
+
+    entries = servers.map do |s|
+      { name: s['name'], ip: s['address'], accept_textures: 1, hidden: 0 }
+    end
+
+    data = NBTWriter.write_server_dat(entries)
+
+    dirs = [@mc_dir, game_dir].compact.uniq
+    dirs.each do |dir|
+      dat_path = File.join(dir, 'servers.dat')
+      File.binwrite(dat_path, data)
+    end
+  rescue => e
+    $stderr.puts "[WARN] Falha ao gerar servers.dat: #{e.message}"
   end
 
   def detect_java

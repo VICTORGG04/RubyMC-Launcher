@@ -11,17 +11,17 @@
       <aside class="app-sidebar">
         <div class="app-title"><span>💎</span><strong>RUBYMC LAUNCHER</strong></div>
         <nav class="tab-nav" aria-label="Abas do RubyMC Launcher">
-          <button class="tab-link active" data-tab="home">🏠 <span>Início</span></button>
-          <button class="tab-link" data-tab="modpacks"><img class="nav-modpack-icon" src="/assets/img/rubymc-modpack-box-icon.png" alt=""> <span>Modpacks</span></button>
-          <button class="tab-link" data-tab="server">🌐 <span>Servidor</span></button>
-          <button class="tab-link" data-tab="versions">📦 <span>Versões</span></button>
-          <button class="tab-link" data-tab="ai">🧠 <span>IA</span></button>
-          <button class="tab-link" data-tab="vip">💎 <span>VIP</span></button>
-          <button class="tab-link" data-tab="db" id="tab-btn-db" style="display:none">📊 <span>DB</span></button>
-          <button class="tab-link" data-tab="display">▣ <span>Display</span></button>
-          <button class="tab-link" data-tab="project">🧪 <span>Projeto</span></button>
+          <button class="tab-link active" data-tab="home"><img class="nav-icon" src="/assets/img/Sidebar/Inicio.png" alt=""> <span>Início</span></button>
+          <button class="tab-link" data-tab="modpacks"><img class="nav-icon" src="/assets/img/Sidebar/modpacks.png" alt=""> <span>Modpacks</span></button>
+          <button class="tab-link" data-tab="server"><img class="nav-icon" src="/assets/img/Sidebar/Servidor.png" alt=""> <span>Servidor</span></button>
+          <button class="tab-link" data-tab="versions"><img class="nav-icon" src="/assets/img/Sidebar/versoes.png" alt=""> <span>Versões</span></button>
+          <button class="tab-link" data-tab="ai"><img class="nav-icon" src="/assets/img/Sidebar/IA.png" alt=""> <span>IA</span></button>
+          <button class="tab-link" data-tab="vip"><img class="nav-icon" src="/assets/img/Sidebar/VIP.png" alt=""> <span>VIP</span></button>
+          <button class="tab-link" data-tab="db" id="tab-btn-db" style="display:none"><img class="nav-icon" src="/assets/img/Sidebar/DB.png" alt=""> <span>DB</span></button>
+          <button class="tab-link" data-tab="display"><img class="nav-icon" src="/assets/img/Sidebar/display.png" alt=""> <span>Display</span></button>
+          <button class="tab-link" data-tab="project"><img class="nav-icon" src="/assets/img/Sidebar/projeto.png" alt=""> <span>Projeto</span></button>
         </nav>
-        <button class="tab-link settings-link" data-tab="settings">⚙️ <span>Configurações</span></button>
+        <button class="tab-link settings-link" data-tab="settings"><img class="nav-icon" src="/assets/img/Sidebar/Configuracoes.png" alt=""> <span>Configurações</span></button>
         <footer class="sidebar-status"><span></span><small id="connection-status">Você está conectado</small><span id="role-badge" class="role-badge" style="display:none"></span></footer>
       </aside>
       <main class="app-content">
@@ -118,7 +118,9 @@
                   <div class="dash-guild-banner"></div>
                   <div class="dash-guild-info">
                     <div class="dash-guild-avatar">
-                      <svg viewBox="0 0 28 28" width="28" height="28" fill="none"><path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#5865f2"/><path d="M15.5 8.5h-7a.5.5 0 0 0-.5.5v6a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V9a.5.5 0 0 0-.5-.5z" fill="#fff"/><circle cx="12" cy="12" r="2.5" fill="#5865f2"/></svg>
+                      <svg viewBox="0 0 127.14 96.36" width="34" height="34" fill="#5865f2">
+                        <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,56.6,124.42,32.65,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
+                      </svg>
                       <span class="dash-guild-dot"></span>
                     </div>
                     <div class="dash-guild-meta">
@@ -145,6 +147,25 @@
                   <button class="btn btn-discord dash-invite-btn" onclick="handleDiscordServerJoin()" id="discord-join-btn">
                     🚪 Entrar na Comunidade Discord
                   </button>
+                </div>
+              </div>
+
+              <!-- ── Badge Showcase ── -->
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <span class="dash-card-header-icon">🏷️</span>
+                  <h3>Cargos Ruby</h3>
+                </div>
+                <div class="dash-card-body">
+                  <div class="badge-showcase-grid">
+                    <div class="badge-showcase-item"><img src="/assets/img/ruby-packs/99882-owner-ruby-shiny.png" alt="Dono"><span>Dono</span></div>
+                    <div class="badge-showcase-item"><img src="/assets/img/ruby-packs/29168-admin-ruby-shiny.png" alt="Admin"><span>Admin</span></div>
+                    <div class="badge-showcase-item"><img src="/assets/img/ruby-packs/53875-moderator-ruby-shiny.png" alt="Moderador"><span>Moderador</span></div>
+                    <div class="badge-showcase-item"><img src="/assets/img/ruby-packs/68223-developer-ruby-shiny.png" alt="Desenvolvedor"><span>Desenvolvedor</span></div>
+                    <div class="badge-showcase-item"><img src="/assets/img/ruby-packs/15447-support-ruby-shiny.png" alt="Suporte"><span>Suporte</span></div>
+                    <div class="badge-showcase-item"><img src="/assets/img/ruby-packs/62392-vip-ruby-shiny.png" alt="VIP"><span>VIP</span></div>
+                    <div class="badge-showcase-item"><img src="/assets/img/ruby-packs/95929-member-ruby-shiny.png" alt="Membro"><span>Membro</span></div>
+                  </div>
                 </div>
               </div>
 
@@ -182,7 +203,7 @@
                       <div class="dash-vstep-desc">Entre no servidor e receba um código no DM.</div>
                       <div id="vstep-discord-join" class="dash-vstep-box">
                         <div class="dash-vstep-box-row">
-                          <button class="btn btn-discord-sm" onclick="handleDiscordServerJoin()" id="discord-join-verify-btn">▶ Entrar no Servidor</button>
+                          <button class="btn btn-discord-sm" id="discord-join-verify-btn">▶ Entrar no Servidor</button>
                           <button class="btn btn-dark-sm" id="discord-check-guild-btn">Verificar presença</button>
                         </div>
                         <div id="discordGuildMsg" class="dash-msg" style="display:none;"></div>
@@ -245,7 +266,7 @@
                       </div>
                     </div>
                   </div>
-                  <button class="btn btn-discord dash-invite-btn" data-action="join_server">
+                  <button class="btn btn-discord dash-invite-btn" data-action="enter_server">
                     🚪 Entrar no Servidor
                   </button>
                 </div>
@@ -256,9 +277,9 @@
           </div>
         </section>
         <section id="tab-modpacks" class="tab-panel" data-panel-title="Modpacks">
-          <header class="panel-heading"><h2><img class="title-modpack-icon" src="/assets/img/rubymc-modpack-box-icon.png" alt="">Modpacks</h2><p>Importe e gerencie seus perfis de modpack em uma única tela.</p></header>
+          <header class="panel-heading"><h2><img class="title-modpack-icon" src="/assets/img/Sidebar/modpacks.png" alt="">Modpacks</h2><p>Importe e gerencie seus perfis de modpack em uma única tela.</p></header>
           <div class="panel-grid"><article class="panel-copy"><div class="modpack-box-badge">
-                <img src="/assets/img/rubymc-modpack-box-icon.png" alt="Caixa 3D RubyMC para modpacks">
+                <img src="/assets/img/Sidebar/modpacks.png" alt="Caixa 3D RubyMC para modpacks">
                 <div>
                   <strong>RubyMC Modpack Box</strong>
                   <small>Pacotes, perfis e imports organizados no padrão visual RubyMC.</small>
@@ -272,8 +293,10 @@
           <div class="panel-grid">
             <article class="panel-copy">
               <h3>Servidor da comunidade</h3>
-              <p>Endereço configurado:</p>
-              <input id="server-address" type="text" value="não configurado" readonly>
+              <p>Servidor:</p>
+              <select id="server-address">
+                <option value="">Carregando servidores...</option>
+              </select>
               <div class="actions" style="margin-top:8px;">
                 <button class="btn btn-red" data-action="enter_server">Entrar no servidor</button>
                 <button class="btn btn-dark" data-action="test_server">Testar servidor</button>
@@ -299,23 +322,11 @@
                 <div id="server-motd" class="server-motd">A descrição do servidor aparecerá aqui quando a API responder.</div>
               </div>
             </article>
-            <article class="panel-copy" id="server-admin-panel" style="display:none;">
-              <h3>Gerenciamento do Servidor</h3>
-              <p>Controles de administração do servidor Minecraft.</p>
-              <div class="server-version-control">
-                <label for="server-version-select">Versão do servidor para iniciar</label>
-                <div class="server-version-row">
-                  <select id="server-version-select">
-                    <option value="">Carregando versões instaladas...</option>
-                  </select>
-                  <button class="btn btn-dark btn-sm" id="server-version-refresh" type="button">Atualizar</button>
-                </div>
-                <small id="server-version-hint" class="server-version-hint">Escolha uma versão instalada. Ao iniciar ou reiniciar, ela será ativada antes de subir o servidor.</small>
-              </div>
-              <div class="actions" style="margin-top:16px;">
-                <button class="btn btn-server-start" data-action="start_server" id="server-start-btn" style="display:inline-flex">▶ Iniciar Servidor</button>
-                <button class="btn btn-server-stop" data-action="stop_server" id="server-stop-btn" style="display:inline-flex">⏹ Parar Servidor</button>
-                <button class="btn btn-dark" data-action="restart_server" id="server-restart-btn" style="display:inline-flex">🔄 Reiniciar</button>
+            <article class="panel-copy">
+              <h3>Gerenciar Servidores</h3>
+              <p>Inicie ou pare cada servidor individualmente.</p>
+              <div id="server-grid" class="server-grid">
+                <div class="server-grid-placeholder">Carregando servidores...</div>
               </div>
             </article>
           </div>
@@ -413,35 +424,6 @@
               <div id="ai-context-display"><span class="loading-dots">Carregando</span></div>
               <button class="btn btn-dark" id="ai-refresh-context" style="margin-top:12px;width:100%">Atualizar contexto</button>
             </aside>
-          </div>
-
-          <div class="lm-panel">
-            <div class="lm-header">
-              <h3>🤖 IA Local — LM Studio</h3>
-              <span id="lm-status" class="lm-status">Verificando IA…</span>
-            </div>
-
-            <div class="lm-controls">
-              <label for="lm-skill">Modo de análise</label>
-              <select id="lm-skill">
-                <option value="knowledge-work">📄 Documentação / resumo</option>
-                <option value="code-review">🔍 Revisão de código</option>
-                <option value="taste-skill">🎨 Interface / layout</option>
-                <option value="stop-slop">✏️ Melhorar texto</option>
-                <option value="cyber-defensivo">🛡️ Segurança defensiva</option>
-              </select>
-            </div>
-
-            <textarea id="lm-input" class="lm-input" placeholder="Cole aqui logs, código, texto, HTML/CSS ou documentação…"></textarea>
-
-            <div class="lm-actions">
-              <button id="lm-send-btn" type="button" class="btn btn-red">📤 Enviar para IA</button>
-              <button id="lm-log-btn" type="button" class="btn btn-dark">📋 Analisar Log</button>
-              <button id="lm-ui-btn" type="button" class="btn btn-dark">🖥️ Revisar Interface</button>
-              <button id="lm-text-btn" type="button" class="btn btn-dark">✏️ Melhorar Texto</button>
-            </div>
-
-            <pre id="lm-output" class="lm-output">A resposta da IA aparecerá aqui.</pre>
           </div>
         </section>
         <section id="tab-vip" class="tab-panel" data-panel-title="VIP">
@@ -671,8 +653,6 @@
   </div>
   <script src="/assets/js/utils.js?v=1"></script>
   <script src="/assets/js/launcher.js?v=rubymc-bg-unified-3"></script>
-  <script src="/assets/js/server-runtime-selector.js?v=1"></script>
   <script src="/assets/js/rubymc-ai-support.js?v=rubymc-ai-embedded-1"></script>
-  <script src="/assets/js/ai-panel.js?v=1"></script>
 </body>
 </html>

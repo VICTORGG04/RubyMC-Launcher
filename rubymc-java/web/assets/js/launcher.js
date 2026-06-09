@@ -242,6 +242,16 @@
     throw lastError;
   }
 
+  window.handleDiscordServerJoin = async function() {
+    try {
+      const res = await backendAction('discord_invite');
+      const url = (res && res.url) || 'https://discord.gg/MnrSXTF4qx';
+      window.open(url, '_blank');
+    } catch (e) {
+      log('ERROR', 'Falha ao obter link do Discord: ' + e.message);
+    }
+  };
+
   async function runAction(action) {
     if (!action || busy) return;
 
@@ -363,7 +373,7 @@
     setText("server-players", status.server_players || status.players);
     setText("launcher-state", status.launcher_status || status.status);
     setText("launcher-version", status.launcher_version || status.version);
-    setValue("server-address", serverAddress);
+    populateServerSelect(serverObj.servers, serverAddress);
 
     if (status.modpacks_count !== undefined) setText("home-modpacks-count", status.modpacks_count);
 
@@ -442,6 +452,140 @@
     }
     select.innerHTML = html;
     if (current && [...select.options].some((o) => o.value === current)) select.value = current;
+  }
+
+  function populateServerSelect(servers, activeAddress) {
+    const select = $("#server-address");
+    if (!select) return;
+
+    if (Array.isArray(servers) && servers.length) {
+      const current = select.value;
+      let html = '<option value="">Selecione um servidor...</option>';
+      servers.forEach((s) => {
+        const selected = s.address === activeAddress ? ' selected' : '';
+        html += `<option value="${esc(s.address)}"${selected}>${esc(s.name)}</option>`;
+      });
+      select.innerHTML = html;
+      if (current && [...select.options].some((o) => o.value === current)) select.value = current;
+    }
+  }
+
+  async function loadServerList() {
+    try {
+      const data = await apiGet("/api/servers");
+      if (data.ok && Array.isArray(data.servers)) {
+        const select = $("#server-address");
+        if (select && !select.options.length) {
+          populateServerSelect(data.servers, data.servers[0]?.address || "");
+        }
+      }
+    } catch (_) {}
+  }
+
+  async function renderServerGrid() {
+    const grid = $("#server-grid");
+    if (!grid) return;
+
+    try {
+      const [statusData, verData] = await Promise.all([
+        apiGet("/api/servers/status"),
+        apiGet("/api/user/version-status")
+      ]);
+      if (!statusData.ok || !Array.isArray(statusData.servers)) {
+        grid.innerHTML = '<div class="server-grid-placeholder">Erro ao carregar status</div>';
+        return;
+      }
+
+      const installed = (verData.ok && Array.isArray(verData.installed)) ? verData.installed : [];
+
+      grid.innerHTML = statusData.servers.map((s) => {
+        const running = s.running;
+        const dotClass = running ? 'online' : 'offline';
+        const statusText = running ? 'Online' : 'Offline';
+        const btn = running
+          ? `<button class="server-card-btn stop" data-sid="${esc(s.key)}">Parar</button>`
+          : `<button class="server-card-btn start" data-sid="${esc(s.key)}">Iniciar</button>`;
+        const badgeClass = s.type === 'bedrock' ? 'bedrock' : 'java';
+        const badgeLabel = s.type === 'bedrock' ? 'Bedrock' : 'Java';
+        const isBedrock = s.type === 'bedrock';
+
+        const serverLoader = s.loader || 'vanilla';
+        const matchingInstalled = installed.filter(v => v.loader === serverLoader);
+        const versionOptions = matchingInstalled.map(v =>
+          `<option value="${esc(v.id)}">${esc(v.id)}</option>`
+        ).join("");
+
+        const versionRow = isBedrock ? '' : `
+          <div class="server-card-version-row">
+            <select class="server-card-version-select" data-sid="${esc(s.key)}">
+              ${versionOptions || `<option value="" disabled>---</option>`}
+            </select>
+            <button class="server-card-version-btn" data-sid="${esc(s.key)}" ${versionOptions ? '' : 'disabled'}>OK</button>
+          </div>`;
+        return `<div class="server-card" data-sid="${esc(s.key)}">
+          <div class="server-card-header">
+            <span class="server-card-name">${esc(s.name)}</span>
+            <span class="server-card-badge ${badgeClass}">${badgeLabel}</span>
+          </div>
+          <div class="server-card-desc">${esc(s.address)}</div>
+          ${versionRow}
+          <div class="server-card-footer">
+            <div class="server-card-status">
+              <span class="server-card-dot ${dotClass}"></span>
+              ${statusText}
+            </div>
+            <div class="server-card-actions">${btn}</div>
+          </div>
+        </div>`;
+      }).join("");
+
+      statusData.servers.forEach((s) => {
+        const select = grid.querySelector(`.server-card-version-select[data-sid="${s.key}"]`);
+        if (select && s.version) {
+          select.value = s.version;
+        }
+      });
+
+      grid.querySelectorAll(".server-card-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const sid = btn.dataset.sid;
+          const action = btn.classList.contains("start") ? "start" : "stop";
+          btn.disabled = true;
+          try {
+            const ep = action === "start" ? "/api/servers/start" : "/api/servers/stop";
+            await apiPost(ep, { server_id: sid });
+          } catch (_) {}
+          setTimeout(renderServerGrid, 1000);
+        });
+      });
+
+      grid.querySelectorAll(".server-card-version-btn").forEach((btn) => {
+        btn.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          const sid = btn.dataset.sid;
+          const select = grid.querySelector(`.server-card-version-select[data-sid="${sid}"]`);
+          if (!select) return;
+          const version = select.value;
+          btn.disabled = true;
+          btn.textContent = "...";
+          try {
+            const result = await apiPost("/api/servers/version", { server_id: sid, version });
+            if (result.ok) {
+              btn.textContent = "✓";
+            } else {
+              btn.textContent = "✗";
+            }
+          } catch (_) {
+            btn.textContent = "✗";
+          }
+          setTimeout(() => { btn.disabled = false; btn.textContent = "OK"; }, 1500);
+          setTimeout(renderServerGrid, 1200);
+        });
+      });
+    } catch (_) {
+      grid.innerHTML = '<div class="server-grid-placeholder">Erro ao carregar servidores</div>';
+    }
   }
 
   async function refreshStatus() {
@@ -2119,6 +2263,7 @@
         applyRoleFilter(data.role);
         updateRoleBadge(data.role, data.user);
         updateSettingsUserInfo(data.user, data.role);
+        updateMemberCardRole(data.role);
         return true;
       }
     } catch (_) {}
@@ -2142,7 +2287,8 @@
     if (nameEl) nameEl.textContent = user?.username || '---';
     if (roleEl) {
       const labels = { admin: 'Admin', staff: 'Staff', player: 'Membro Ruby', member: 'Membro' };
-      roleEl.textContent = labels[role] || role;
+      roleEl.className = 'sui-role-row';
+      roleEl.innerHTML = '<img src="' + roleBadgeUrl(role) + '" class="role-badge-img" alt=""> ' + (labels[role] || role);
     }
     if (avatarEl && user?.avatar) {
       avatarEl.style.backgroundImage = "url(https://cdn.discordapp.com/avatars/" + user.id + "/" + user.avatar + ".png)";
@@ -2184,11 +2330,22 @@
     }
   }
 
+  function roleBadgeUrl(role) {
+    const map = {
+      admin: '99882-owner-ruby-shiny.png',
+      staff: '29168-admin-ruby-shiny.png',
+      player: '62392-vip-ruby-shiny.png',
+      member: '95929-member-ruby-shiny.png'
+    };
+    return '/assets/img/ruby-packs/' + (map[role] || '65091-rubymember.png');
+  }
+
   function updateRoleBadge(role, user) {
     const badge = document.getElementById('role-badge');
     if (!badge) return;
     const labels = { admin: 'Admin', staff: 'Staff', player: 'Membro Ruby', member: 'Membro' };
-    badge.textContent = labels[role] || 'Jogador';
+    const label = labels[role] || 'Jogador';
+    badge.innerHTML = '<img src="' + roleBadgeUrl(role) + '" alt=""> ' + label;
     badge.className = 'role-badge ' + (role === 'admin' ? 'role-badge-admin' : 'role-badge-player');
     badge.style.display = '';
   }
@@ -2215,6 +2372,13 @@
   }
 
   /* ── Discord Info Loader ──────────────────────────── */
+  function updateMemberCardRole(role) {
+    const el = document.getElementById('msc-member-role');
+    if (!el) return;
+    const labels = { admin: 'Admin', staff: 'Staff', player: 'Membro Ruby', member: 'Membro' };
+    el.innerHTML = '<img src="' + roleBadgeUrl(role) + '" class="role-badge-img" alt=""> ' + (labels[role] || role);
+  }
+
   async function loadDiscordInfo() {
     try {
       const data = await apiFetch('/api/discord/members');
@@ -2320,9 +2484,15 @@
 
     // Join Discord server (opens invite link in new tab)
     if (discordJoinBtn) {
-      discordJoinBtn.addEventListener('click', () => {
-        window.open('https://discord.gg/MnrSXTF4qx', '_blank');
-        setDiscordMsg(discordGuildMsg, '🔗 Link do Discord aberto! Entre no servidor e depois clique em "Verificar presença".', '#ffc107');
+      discordJoinBtn.addEventListener('click', async () => {
+        try {
+          const res = await backendAction('discord_invite');
+          const url = (res && res.url) || 'https://discord.gg/MnrSXTF4qx';
+          window.open(url, '_blank');
+          setDiscordMsg(discordGuildMsg, '🔗 Link do Discord aberto! Entre no servidor e depois clique em "Verificar presença".', '#ffc107');
+        } catch (e) {
+          setDiscordMsg(discordGuildMsg, 'Erro ao obter link: ' + e.message, '#e74c3c');
+        }
       });
     }
 
@@ -2413,6 +2583,8 @@
           if (res.ok) {
             window._userRole = res.role || 'player';
             applyRoleFilter(window._userRole);
+            updateRoleBadge(window._userRole, window._userData);
+            updateMemberCardRole(window._userRole);
             if (verBox) verBox.style.display = 'none';
             if (memberStatusCard) {
               memberStatusCard.style.display = '';
@@ -2502,7 +2674,10 @@
       updateModpacks(false).catch(() => {});
       setTimeout(loadVersions, 350);
       setTimeout(loadAccounts, 500);
+      setTimeout(loadServerList, 200);
+      setTimeout(renderServerGrid, 300);
       startServerPolling();
+      setInterval(renderServerGrid, 5000);
 
       setInterval(pollLogs, 4000);
 

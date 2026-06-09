@@ -92,6 +92,10 @@
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
         body: JSON.stringify(payload)
       });
+      if (!resp.ok || !resp.headers.get('content-type')?.includes('json')) {
+        var text = await resp.text().catch(function() { return ''; });
+        throw new Error('Servidor retornou ' + resp.status + (text ? ': ' + text.slice(0, 80) : ''));
+      }
       var data = await resp.json();
 
       hideTyping();
@@ -149,9 +153,18 @@
     var logs = data.logs;
     if (logs && logs.length > 0) {
       var errors = logs.filter(function(l) { return l.indexOf('ERROR') >= 0 || l.indexOf('WARN') >= 0; });
-      if (errors.length > 0) {
-        lines.push('\u26A0\uFE0F ' + errors.length + ' avisos/erros no display');
-        errors.slice(0, 3).forEach(function(e) {
+      var seen = {};
+      var unique = [];
+      errors.forEach(function(e) {
+        var key = e.replace(/\[.*?\]/, '').replace(/\d+/, '#').trim();
+        if (!seen[key] && key.length > 0) {
+          seen[key] = true;
+          unique.push(e);
+        }
+      });
+      if (unique.length > 0) {
+        lines.push('\u26A0\uFE0F ' + errors.length + ' avisos/erros (' + unique.length + ' distintos)');
+        unique.slice(0, 3).forEach(function(e) {
           e = e.replace(/\[.*?\]/, '').trim();
           if (e.length > 60) e = e.substring(0, 60) + '...';
           lines.push('  ' + e);
@@ -174,6 +187,9 @@
       var resp = await fetch('/api/ai/context?t=' + Date.now(), {
         headers: { 'Accept': 'application/json' }
       });
+      if (!resp.ok || !resp.headers.get('content-type')?.includes('json')) {
+        throw new Error('Servidor retornou ' + resp.status);
+      }
       var data = await resp.json();
       updateContextDisplay(data);
     } catch (err) {

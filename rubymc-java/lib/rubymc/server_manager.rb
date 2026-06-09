@@ -6,12 +6,13 @@ require 'timeout'
 require 'yaml'
 require 'shellwords'
 require 'tmpdir'
+require 'open-uri'
+require 'net/http'
 
 module RubyMC
   class ServerManager
     SETTINGS_PATH = File.expand_path('../../config/settings.yml', __dir__)
-    DEFAULT_SERVER_DIR = File.join(Dir.home, 'Servidores', 'ServidorMinecraftJava')
-    DEFAULT_BACKUP_DIR = File.join(Dir.home, 'Servidores', 'backups')
+    STORE_PATH = File.join(Dir.home, '.minecraft_ruby_launcher', 'servers')
 
     class << self
       def start(key)
@@ -19,17 +20,20 @@ module RubyMC
         return { ok: false, error: "Servidor '#{key}' não encontrado" } unless cfg
         return { ok: false, error: 'Já está rodando' } if running?(key)
 
+        install_if_needed(key, cfg)
+
         settings = load_settings
         ensure_server_dir(cfg)
-        ensure_eula(cfg)
-        ensure_server_properties(cfg, settings)
-
-        java_bin, args = build_cmd_parts(key)
-        return { ok: false, error: 'Comando de inicialização não disponível' } unless java_bin
+        ensure_eula(cfg) unless cfg[:type] == 'bedrock'
+        ensure_server_properties(cfg, settings) unless cfg[:type] == 'bedrock'
 
         Dir.chdir(cfg[:dir]) do
-          pid = Process.spawn(java_bin, *args, pgroup: true, out: ['log.txt', 'a'], err: [:child, :out])
-          File.write(cfg[:pidfile], pid.to_s)
+          pid = if cfg[:type] == 'bedrock'
+                  spawn_bedrock(cfg)
+                else
+                  spawn_java(cfg)
+                end
+          write_pid(key, pid)
           sleep(1)
           return { ok: true, pid: pid, key: key, status: 'started' }
         end
@@ -38,10 +42,7 @@ module RubyMC
       end
 
       def stop(key)
-        cfg = server_config(key)
-        return { ok: false, error: "Servidor '#{key}' não encontrado" } unless cfg
-
-        pid = read_pid(cfg)
+        pid = read_pid(key)
         return { ok: false, error: 'Não está rodando' } unless pid && process_alive?(pid)
 
         Process.kill('TERM', pid)
@@ -57,10 +58,10 @@ module RubyMC
           Process.kill('KILL', pid) rescue nil
         end
 
-        File.delete(cfg[:pidfile]) if File.file?(cfg[:pidfile])
+        delete_pid(key)
         { ok: true, key: key, status: 'stopped' }
       rescue Errno::ESRCH
-        File.delete(cfg[:pidfile]) if cfg && File.file?(cfg[:pidfile])
+        delete_pid(key)
         { ok: true, key: key, status: 'stopped' }
       rescue StandardError => e
         { ok: false, error: e.message }
@@ -73,18 +74,56 @@ module RubyMC
       end
 
       def running?(key)
-        cfg = server_config(key)
-        return false unless cfg
-
-        pid = read_pid(cfg)
+        pid = read_pid(key)
         pid ? process_alive?(pid) : false
+      end
+
+      def status(key)
+        cfg = server_config(key)
+        return { ok: false, error: "Servidor '#{key}' não encontrado" } unless cfg
+
+        running = running?(key)
+        pid = read_pid(key) if running
+
+        { ok: true, key: key, name: cfg[:name], running: running, pid: pid, port: cfg[:port], address: cfg[:address], type: cfg[:type], loader: cfg[:loader], version: cfg[:version] }
+      rescue StandardError => e
+        { ok: false, error: e.message }
+      end
+
+      def all_status
+        servers = load_servers_list
+        servers.map { |s| status(s) }
+      end
+
+      def set_version(key, new_version)
+        settings = load_settings
+        servers = settings['discord']&.dig('servers') || []
+        entry = servers.find { |s| s['id'] == key.to_s }
+        return { ok: false, error: "Servidor '#{key}' não encontrado" } unless entry
+
+        entry['version'] = new_version.to_s
+        save_settings(settings)
+
+        cfg = server_config(key)
+        if cfg[:auto_install] && cfg[:loader] == :vanilla && cfg[:type] != 'bedrock'
+          jar_path = File.join(cfg[:dir], cfg[:jar])
+          FileUtils.mkdir_p(cfg[:dir])
+          begin
+            download_vanilla_jar(jar_path, new_version)
+            return { ok: true, version: new_version, downloaded: true, message: "Versão alterada para #{new_version} e server.jar baixado." }
+          rescue StandardError => e
+            return { ok: true, version: new_version, downloaded: false, message: "Versão alterada para #{new_version}, mas download falhou: #{e.message}" }
+          end
+        end
+
+        { ok: true, version: new_version, downloaded: false, message: "Versão alterada para #{new_version}. O download será feito na próxima inicialização." }
       end
 
       def console(key, lines: 20)
         cfg = server_config(key)
         return { ok: false, error: "Servidor '#{key}' não encontrado" } unless cfg
 
-        log_path = File.join(cfg[:dir], cfg[:log_rel])
+        log_path = File.join(cfg[:dir], 'logs', 'latest.log')
         unless File.file?(log_path)
           alt_path = File.join(cfg[:dir], 'log.txt')
           log_path = alt_path if File.file?(alt_path)
@@ -98,79 +137,90 @@ module RubyMC
         { ok: false, error: e.message }
       end
 
-      def backup(key)
-        cfg = server_config(key)
-        return { ok: false, error: "Servidor '#{key}' não encontrado" } unless cfg
-
-        world_dir = File.join(cfg[:dir], cfg[:world])
-        return { ok: false, error: "Diretório world não encontrado: #{world_dir}" } unless Dir.exist?(world_dir)
-
-        backup_dir = load_settings.dig('servers', 'java', 'backup_dir') || DEFAULT_BACKUP_DIR
-        FileUtils.mkdir_p(backup_dir)
-
-        timestamp = Time.now.strftime('%Y%m%d_%H%M%S')
-        backup_name = "#{key}_world_#{timestamp}.tar.gz"
-        backup_path = File.join(backup_dir, backup_name)
-
-        Dir.chdir(File.dirname(world_dir)) do
-          system('tar', 'czf', backup_path, File.basename(world_dir))
-        end
-
-        size_kb = File.size(backup_path) / 1024
-        { ok: true, key: key, path: backup_path, size_kb: size_kb, timestamp: timestamp }
-      rescue StandardError => e
-        { ok: false, error: e.message }
-      end
-
-      def status(key)
-        cfg = server_config(key)
-        return { ok: false, error: "Servidor '#{key}' não encontrado" } unless cfg
-
-        running = running?(key)
-        pid = read_pid(cfg) if running
-        log_info = console(key, lines: 3)
-        last_log = log_info[:ok] ? log_info[:log].lines.last(3).join.strip : ''
-
-        { ok: true, key: key, name: cfg[:name], running: running, pid: pid, port: cfg[:port], dir: cfg[:dir], last_log: last_log }
-      rescue StandardError => e
-        { ok: false, error: e.message }
-      end
-
-      def all_status
-        { java: status(:java) }
-      end
-
       private
 
       def server_config(key)
-        return nil unless key.to_s.to_sym == :java
-
         settings = load_settings
-        java = settings.dig('servers', 'java') || {}
+        servers = settings.dig('discord', 'servers') || []
+        entry = servers.find { |s| s['id'] == key.to_s }
+        return nil unless entry
+
+        dir = expand_path(entry['dir'] || File.join(Dir.home, 'Servidores', "Ruby#{entry['name']}"))
 
         {
-          name: 'Java',
-          dir: expand_path(java['path'] || DEFAULT_SERVER_DIR),
-          world: java['world'] || 'world',
-          log_rel: java['log_rel'] || 'logs/latest.log',
-          pidfile: java['pidfile'] || File.join(Dir.tmpdir, 'rubymc_java.pid'),
-          port: Integer(java['port'] || 25_565),
-          protocol: :java
+          id: entry['id'],
+          name: entry['name'],
+          address: entry['address'],
+          type: entry['type'] || 'java',
+          loader: (entry['loader'] || 'vanilla').to_sym,
+          version: entry['version'] || nil,
+          dir: dir,
+          jar: entry['jar'] || 'server.jar',
+          binary: entry['binary'] || 'bedrock_server',
+          java: entry['java'] || default_java,
+          memory: entry['memory'] || '-Xmx2G -Xms1G',
+          port: parse_port(entry['address']),
+          motd: entry['motd'] || "RubyMC #{entry['name']}",
+          online_mode: entry['online_mode'] != false,
+          max_players: entry['max_players'] || 20,
+          auto_install: entry['auto_install'] != false
         }
       end
 
-      def build_cmd_parts(key)
-        return nil unless key.to_s.to_sym == :java
-
+      def load_servers_list
         settings = load_settings
-        java_bin = settings.dig('servers', 'java', 'active_java')
-        java_bin = default_java if java_bin.to_s.strip.empty?
-        memory = settings.dig('servers', 'java', 'memory') || '-Xmx2G -Xms1G'
-        args = Shellwords.split(memory) + ['-jar', 'server.jar', 'nogui']
+        (settings.dig('discord', 'servers') || []).map { |s| s['id'] }
+      end
 
-        [java_bin, args]
-      rescue StandardError
-        [default_java, ['-Xmx2G', '-Xms1G', '-jar', 'server.jar', 'nogui']]
+      def install_if_needed(key, cfg)
+        return unless cfg[:auto_install]
+        return if cfg[:type] == 'bedrock'
+        return unless cfg[:loader] == :vanilla
+
+        jar_path = File.join(cfg[:dir], cfg[:jar])
+        return if File.file?(jar_path)
+
+        FileUtils.mkdir_p(cfg[:dir])
+        download_vanilla_jar(jar_path, cfg[:version])
+      end
+
+      def download_vanilla_jar(jar_path, version = nil)
+        manifest_uri = URI('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json')
+        manifest = JSON.parse(Net::HTTP.get(manifest_uri))
+        target = version || manifest['latest']['release']
+        version_entry = manifest['versions'].find { |v| v['id'] == target }
+        unless version_entry
+          fallback = manifest['latest']['release']
+          log('WARN', "Versão #{target} não encontrada no manifest, usando #{fallback}")
+          target = fallback
+          version_entry = manifest['versions'].find { |v| v['id'] == target }
+        end
+        raise "Versão #{target} não encontrada no manifest" unless version_entry
+
+        version_uri = URI(version_entry['url'])
+        version_data = JSON.parse(Net::HTTP.get(version_uri))
+        jar_url = version_data['downloads']['server']['url']
+        raise 'URL do server.jar não encontrada' unless jar_url
+
+        jar_uri = URI(jar_url)
+        log('OK', "Baixando server.jar da versão #{target}...")
+        IO.copy_stream(URI.open(jar_uri), jar_path)
+        log('OK', "server.jar salvo em #{jar_path}")
+      rescue StandardError => e
+        log('ERROR', "Falha ao baixar server.jar: #{e.message}")
+        raise
+      end
+
+      def spawn_java(cfg)
+        java_bin = cfg[:java]
+        memory = cfg[:memory]
+        args = Shellwords.split(memory) + ['-jar', cfg[:jar], 'nogui']
+        Process.spawn(java_bin, *args, pgroup: true, out: ['log.txt', 'a'], err: [:child, :out])
+      end
+
+      def spawn_bedrock(cfg)
+        binary = File.join(cfg[:dir], cfg[:binary])
+        Process.spawn(binary, pgroup: true, out: ['log.txt', 'a'], err: [:child, :out])
       end
 
       def default_java
@@ -185,6 +235,47 @@ module RubyMC
         ].compact
 
         candidates.find { |p| p == 'java' || File.executable?(p) } || 'java'
+      end
+
+      def parse_port(address)
+        return 25565 unless address
+        parts = address.to_s.split(':')
+        parts[1] ? Integer(parts[1]) : 25565
+      rescue
+        25565
+      end
+
+      def pid_path(key)
+        File.join(STORE_PATH, "#{key}.pid")
+      end
+
+      def write_pid(key, pid)
+        FileUtils.mkdir_p(STORE_PATH)
+        File.write(pid_path(key), pid.to_s)
+      end
+
+      def read_pid(key)
+        path = pid_path(key)
+        return nil unless File.file?(path)
+
+        pid = File.read(path).strip.to_i
+        pid.positive? ? pid : nil
+      rescue StandardError
+        nil
+      end
+
+      def delete_pid(key)
+        path = pid_path(key)
+        File.delete(path) if File.file?(path)
+      end
+
+      def process_alive?(pid)
+        Process.kill(0, pid)
+        true
+      rescue Errno::ESRCH
+        false
+      rescue Errno::EPERM
+        true
       end
 
       def ensure_server_dir(cfg)
@@ -212,12 +303,11 @@ module RubyMC
           end
         end
 
-        props['online-mode'] ||= settings.dig('servers', 'java', 'online_mode').to_s
-        props['online-mode'] = 'false' if props['online-mode'].empty?
+        props['online-mode'] = cfg[:online_mode].to_s
         props['server-port'] = cfg[:port].to_s
         props['enable-status'] ||= 'true'
-        props['motd'] = settings.dig('servers', 'java', 'motd') || props['motd'] || 'RubyMC JAVA'
-        props['max-players'] ||= (settings.dig('servers', 'java', 'max_players') || 20).to_s
+        props['motd'] = cfg[:motd] || props['motd'] || 'RubyMC Server'
+        props['max-players'] = cfg[:max_players].to_s
 
         content = props.map { |k, v| "#{k}=#{v}" }.join("\n") + "\n"
         File.open(path, 'w:ISO-8859-1') { |f| f.write(latin1_escape(content)) }
@@ -235,26 +325,19 @@ module RubyMC
         {}
       end
 
+      def save_settings(data)
+        File.write(SETTINGS_PATH, YAML.dump(data))
+      rescue StandardError => e
+        log('ERROR', "Falha ao salvar settings: #{e.message}")
+      end
+
       def expand_path(path)
         File.expand_path(path.to_s.gsub(/\A~/, Dir.home))
       end
 
-      def read_pid(cfg)
-        return nil unless File.file?(cfg[:pidfile])
-
-        pid = File.read(cfg[:pidfile]).strip.to_i
-        pid.positive? ? pid : nil
-      rescue StandardError
-        nil
-      end
-
-      def process_alive?(pid)
-        Process.kill(0, pid)
-        true
-      rescue Errno::ESRCH
-        false
-      rescue Errno::EPERM
-        true
+      def log(level, msg)
+        timestamp = Time.now.strftime('%Y-%m-%d %H:%M:%S')
+        $stdout.puts "[#{timestamp}] [#{level}] #{msg}"
       end
     end
   end

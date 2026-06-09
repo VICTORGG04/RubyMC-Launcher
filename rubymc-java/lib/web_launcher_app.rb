@@ -90,13 +90,6 @@ rescue LoadError => e
   warn "RubyMC módulos de autenticação/launch não carregados: #{e.message}"
 end
 
-begin
-  require_relative 'rubymc/lm_studio_service'
-  require_relative 'rubymc/ai_skill_service'
-rescue LoadError => e
-  warn "RubyMC LM Studio / AI Skill não carregados: #{e.message}"
-end
-
 # ── Criptografia AES-256-GCM ─────────────────────────
 module EncryptedVault
   ALGO = 'aes-256-gcm'.freeze
@@ -287,10 +280,14 @@ module RubyMC
       when '/api/server/status', '/api/server/live'
         json(res, live_server_status_payload)
       when '/api/ai/support'
-        request_body = req.body.to_s
-        payload = request_body.empty? ? {} : JSON.parse(request_body)
-        service = RubyMC::AISupportService.new(root: project_root)
-        json(res, service.support_answer(payload['message'], context: payload['context']))
+        begin
+          request_body = req.body.to_s
+          payload = request_body.empty? ? {} : JSON.parse(request_body)
+          service = RubyMC::AISupportService.new(root: project_root)
+          json(res, service.support_answer(payload['message'], context: payload['context']))
+        rescue => e
+          json(res, { ok: false, answer: "Erro interno: #{e.message}" })
+        end
 
       when '/api/ai/health'
         service = RubyMC::AISupportService.new(root: project_root)
@@ -304,139 +301,6 @@ module RubyMC
           server: server_info,
           logs: read_logs.last(20)
         })
-
-      when '/api/ai/lm/status'
-        settings = load_settings
-        json(res, RubyMC::LMStudioService.status(settings).merge(
-          skills: RubyMC::AISkillService.available_skills
-        ))
-
-      when '/api/ai/lm/chat'
-        settings = load_settings
-        payload = parse_json(req.body)
-        message = payload["message"].to_s.strip
-        skill = payload["skill"].to_s.strip
-        model = payload["model"].to_s.strip
-
-        if message.empty?
-          res.status = 400
-          return json(res, { ok: false, error: "Mensagem vazia." })
-        end
-
-        skill = "knowledge-work" if skill.empty?
-        system_prompt = RubyMC::AISkillService.system_prompt_for(skill)
-
-        result = RubyMC::LMStudioService.chat(
-          user_message: message,
-          system_prompt: system_prompt,
-          model: model,
-          temperature: 0.6,
-          max_tokens: 900,
-          settings: settings
-        )
-
-        json(res, result)
-
-      when '/api/ai/lm/analyze-log'
-        settings = load_settings
-        payload = parse_json(req.body)
-        log = payload["log"].to_s.strip
-        model = payload["model"].to_s.strip
-
-        if log.empty?
-          res.status = 400
-          return json(res, { ok: false, error: "Log vazio." })
-        end
-
-        system_prompt = RubyMC::AISkillService.system_prompt_for("code-review")
-        prompt = <<~PROMPT
-          Analise o log abaixo de um servidor Minecraft/BDS/RubyMC.
-
-          Faça:
-          1. resumo do problema;
-          2. provável causa;
-          3. comandos seguros para diagnóstico;
-          4. possíveis correções;
-          5. riscos antes de alterar arquivos.
-
-          LOG:
-          #{log}
-        PROMPT
-
-        result = RubyMC::LMStudioService.chat(
-          user_message: prompt,
-          system_prompt: system_prompt,
-          model: model,
-          temperature: 0.5,
-          max_tokens: 1000,
-          settings: settings
-        )
-
-        json(res, result)
-
-      when '/api/ai/lm/review-ui'
-        settings = load_settings
-        payload = parse_json(req.body)
-        code = payload["code"].to_s.strip
-        model = payload["model"].to_s.strip
-
-        if code.empty?
-          res.status = 400
-          return json(res, { ok: false, error: "Código vazio." })
-        end
-
-        system_prompt = RubyMC::AISkillService.system_prompt_for("taste-skill")
-        prompt = <<~PROMPT
-          Analise este código de interface do painel RubyMC.
-
-          Quero melhorar:
-          - alinhamento;
-          - larguras;
-          - espaçamento;
-          - responsividade;
-          - aparência geral;
-          - organização visual.
-
-          Preserve a lógica existente.
-
-          CÓDIGO:
-          #{code}
-        PROMPT
-
-        result = RubyMC::LMStudioService.chat(
-          user_message: prompt,
-          system_prompt: system_prompt,
-          model: model,
-          temperature: 0.5,
-          max_tokens: 1200,
-          settings: settings
-        )
-
-        json(res, result)
-
-      when '/api/ai/lm/improve-text'
-        settings = load_settings
-        payload = parse_json(req.body)
-        text = payload["text"].to_s.strip
-        model = payload["model"].to_s.strip
-
-        if text.empty?
-          res.status = 400
-          return json(res, { ok: false, error: "Texto vazio." })
-        end
-
-        system_prompt = RubyMC::AISkillService.system_prompt_for("stop-slop")
-
-        result = RubyMC::LMStudioService.chat(
-          user_message: text,
-          system_prompt: system_prompt,
-          model: model,
-          temperature: 0.6,
-          max_tokens: 900,
-          settings: settings
-        )
-
-        json(res, result)
 
       when '/api/action'
         handle_action(req, res)
@@ -487,6 +351,33 @@ module RubyMC
         json(res, { ok: true, message: "Instalação de #{version_id} (#{loader}) iniciada." })
       when '/api/user/version-status'
         json(res, user_version_status_payload)
+      when '/api/servers'
+        settings = load_settings
+        servers = settings.dig('discord', 'servers') || []
+        json(res, { ok: true, servers: servers })
+      when '/api/servers/status'
+        statuses = RubyMC::ServerManager.all_status rescue []
+        json(res, { ok: true, servers: statuses })
+      when '/api/servers/start'
+        params = parse_json(req.body) || {}
+        sid = params['server_id'] || 'realms'
+        result = RubyMC::ServerManager.start(sid)
+        json(res, { ok: result[:ok], message: result[:ok] ? "Servidor #{sid} iniciado" : result[:error], server: result })
+      when '/api/servers/stop'
+        params = parse_json(req.body) || {}
+        sid = params['server_id'] || 'realms'
+        result = RubyMC::ServerManager.stop(sid)
+        json(res, { ok: result[:ok], message: result[:ok] ? "Servidor #{sid} parado" : result[:error], server: result })
+      when '/api/servers/version'
+        params = parse_json(req.body) || {}
+        sid = params['server_id']
+        version = params['version']
+        if sid && version
+          result = RubyMC::ServerManager.set_version(sid, version)
+          json(res, result)
+        else
+          json(res, { ok: false, error: 'server_id e version são obrigatórios' })
+        end
       when '/api/versions'
         json(res, versions_payload)
       when '/api/versions/available'
@@ -641,7 +532,7 @@ module RubyMC
       case action
 
         # ── Painel UI: ações inline (rubymc_handle_ui_action) ────────────────
-      when 'join_server', 'server_join'
+      when 'server_join'
         user = authenticated_user(req)
         json(res, rubymc_handle_ui_action(action, discord_user_id: user&.dig(:user_id)))
 
@@ -651,7 +542,8 @@ module RubyMC
         'test_all_channels', 'discord_test_channels', 'test_channels',
         'create_invite', 'discord_create_invite', 'generate_invite',
         'open_docs', 'open_documentation',
-        'check_updates', 'update_check'
+        'check_updates', 'update_check',
+        'discord_invite'
         json(res, rubymc_handle_ui_action(action))
 
         # ── Log interno ───────────────────────────────────────────────────────
@@ -686,10 +578,10 @@ module RubyMC
         json(res, { ok: true, message: 'Pasta do projeto aberta.', path: target })
 
         # ── Launcher Minecraft (via /api/launch) ─────────────────────────────
-      when 'launch_classic', 'play', 'start_minecraft', 'launch_minecraft', 'enter_server'
+      when 'launch_classic', 'play', 'start_minecraft', 'launch_minecraft', 'enter_server', 'join_server'
         params = parse_json(req.body) || {}
         account_id = params.dig('settings', 'account') || params['account_id']
-        server_mode = (action == 'enter_server')
+        server_mode = (action == 'enter_server' || action == 'join_server')
         ram = (params.dig('settings', 'ram') || 2048).to_i
         
         # Extrair profile/version_id do payload
@@ -757,6 +649,10 @@ module RubyMC
         # Se ainda não tem target_version, usar o default
         target_version ||= (version_manager&.active_version&.dig(:id) || resolve_launch_version)
 
+        server_address_param = if server_mode
+          params['server_address'].to_s.strip
+        end
+
         if account_id && !account_id.to_s.empty?
           # Launch com conta Microsoft
           result = with_server_mutex('launch_minecraft') do
@@ -767,7 +663,8 @@ module RubyMC
               version_id: target_version,
               game_directory: game_directory,
               loader: loader,
-              loader_version: loader_version
+              loader_version: loader_version,
+              server_address: server_address_param
             )
           end
         else
@@ -784,7 +681,8 @@ module RubyMC
               version_id: target_version,
               game_directory: game_directory,
               loader: loader,
-              loader_version: loader_version
+              loader_version: loader_version,
+              server_address: server_address_param
             )
           end
         end
@@ -799,39 +697,45 @@ module RubyMC
         run_async('Testar servidor') { test_community_server }
         json(res, { ok: true, message: 'Teste do servidor iniciado. Veja o Display.' })
 
-        # ── Gerenciamento do Servidor (start/stop/restart) ───────────────────
+        # ── Gerenciamento Multi-Servidor (start/stop/restart) ──────────────
       when 'start_server', 'server_start'
-        run_async('Iniciar servidor') do
-          result = with_server_mutex('start') { RubyMC::ServerManager.start(:java) }
+        params = parse_json(req.body) || {}
+        sid = params['server_id'] || 'realms'
+        run_async("Iniciar #{sid}") do
+          result = RubyMC::ServerManager.start(sid)
           if result[:ok]
-            log('OK', "Servidor Java iniciado (PID #{result[:pid]})")
+            log('OK', "Servidor #{sid} iniciado (PID #{result[:pid]})")
           else
-            log('ERROR', "Falha ao iniciar servidor: #{result[:error]}")
+            log('ERROR', "Falha ao iniciar #{sid}: #{result[:error]}")
           end
         end
-        json(res, { ok: true, message: 'Iniciando servidor...' })
+        json(res, { ok: true, message: "Iniciando #{sid}..." })
 
       when 'stop_server', 'server_stop'
-        run_async('Parar servidor') do
-          result = with_server_mutex('stop') { RubyMC::ServerManager.stop(:java) }
+        params = parse_json(req.body) || {}
+        sid = params['server_id'] || 'realms'
+        run_async("Parar #{sid}") do
+          result = RubyMC::ServerManager.stop(sid)
           if result[:ok]
-            log('OK', 'Servidor Java parado.')
+            log('OK', "Servidor #{sid} parado.")
           else
-            log('ERROR', "Falha ao parar servidor: #{result[:error]}")
+            log('ERROR', "Falha ao parar #{sid}: #{result[:error]}")
           end
         end
-        json(res, { ok: true, message: 'Parando servidor...' })
+        json(res, { ok: true, message: "Parando #{sid}..." })
 
       when 'restart_server', 'server_restart'
-        run_async('Reiniciar servidor') do
-          result = with_server_mutex('restart') { RubyMC::ServerManager.restart(:java) }
+        params = parse_json(req.body) || {}
+        sid = params['server_id'] || 'realms'
+        run_async("Reiniciar #{sid}") do
+          result = RubyMC::ServerManager.restart(sid)
           if result[:ok]
-            log('OK', 'Servidor Java reiniciado.')
+            log('OK', "Servidor #{sid} reiniciado (PID #{result[:pid]})")
           else
-            log('ERROR', "Falha ao reiniciar servidor: #{result[:error]}")
+            log('ERROR', "Falha ao reiniciar #{sid}: #{result[:error]}")
           end
         end
-        json(res, { ok: true, message: 'Reiniciando servidor...' })
+        json(res, { ok: true, message: "Reiniciando #{sid}..." })
 
         # ── Discord: simulação (sempre mock, independente de --simulate) ──────
       when 'simular_discord', 'discord_simulate'
@@ -1276,7 +1180,15 @@ module RubyMC
                 settings.dig('minecraft', 'server_address') ||
                 'não configurado'
 
-      { address: address, status: address == 'não configurado' ? 'pendente' : 'configurado' }
+      servers = settings.dig('discord', 'servers') || []
+      server_statuses = servers.map do |s|
+        sid = s['id']
+        running = RubyMC::ServerManager.running?(sid) rescue false
+        pid = nil
+        { id: sid, name: s['name'], address: s['address'], type: s['type'] || 'java', running: running }
+      end
+
+      { address: address, status: address == 'não configurado' ? 'pendente' : 'configurado', servers: servers, server_statuses: server_statuses }
     end
 
     def discord_config
@@ -1393,8 +1305,11 @@ module RubyMC
       when 'check_updates', 'update_check'
         rubymc_check_updates_final
 
-      when 'join_server', 'server_join'
+      when 'server_join'
         rubymc_join_server_final(discord_user_id: discord_user_id)
+
+      when 'discord_invite'
+        { ok: true, url: load_settings.dig('discord', 'invite_url') || 'https://discord.gg/MnrSXTF4qx' }
 
       else
         nil
@@ -2109,7 +2024,7 @@ module RubyMC
       json(res, { ok: false, error: e.message })
     end
 
-    def launch_with_account(account_id:, ram_mb: 2048, server_mode: false, version_id: nil, game_directory: nil, loader: nil, loader_version: nil)
+    def launch_with_account(account_id:, ram_mb: 2048, server_mode: false, version_id: nil, game_directory: nil, loader: nil, loader_version: nil, server_address: nil)
       bank = AccountBank.new
       account = bank.find(account_id)
       raise "Conta '#{account_id}' não encontrada." unless account
@@ -2143,7 +2058,7 @@ module RubyMC
       java = detect_java_for_client(version_id)
       raise "Java não encontrado para a versão #{version_id}" unless java
 
-      server_address = server_mode ? load_settings.dig('discord', 'server_address') : nil
+      server_address ||= (server_mode ? load_settings.dig('discord', 'server_address') : nil)
 
       pid = mc_mgr.launch(
         version_id: version_id, username: username, uuid: uuid,
@@ -2162,7 +2077,7 @@ module RubyMC
       { error: e.message }
     end
 
-    def launch_offline(username:, ram_mb: 2048, server_mode: false, version_id: nil, game_directory: nil, loader: nil, loader_version: nil)
+    def launch_offline(username:, ram_mb: 2048, server_mode: false, version_id: nil, game_directory: nil, loader: nil, loader_version: nil, server_address: nil)
       uuid = SecureRandom.uuid.gsub('-', '')
       token = '0'
       version_id ||= resolve_launch_version
@@ -2172,7 +2087,7 @@ module RubyMC
       java = detect_java_for_client(version_id)
       raise "Java não encontrado para a versão #{version_id}" unless java
 
-      server_address = server_mode ? load_settings.dig('discord', 'server_address') : nil
+      server_address ||= (server_mode ? load_settings.dig('discord', 'server_address') : nil)
 
       pid = mc_mgr.launch(
         version_id: version_id, username: username, uuid: uuid,
