@@ -444,6 +444,10 @@ module RubyMC
         handle_admin_db_memberships(req, res)
       when '/termos'
         serve_file(res, File.join(root, 'web', 'termos.html'))
+      when '/bot-terms'
+        serve_file(res, File.join(root, 'web', 'bot-terms.html'))
+      when '/bot-privacy'
+        serve_file(res, File.join(root, 'web', 'bot-privacy.html'))
       else
         res.status = 404
         json(res, { ok: false, error: 'Rota não encontrada', path: req.path })
@@ -1283,8 +1287,8 @@ module RubyMC
 
       case normalized
       when 'clear_display', 'display_clear'
-        @logs.clear if defined?(@logs) && @logs.respond_to?(:clear)
-        log('OK', 'Display limpo pelo painel.') if respond_to?(:log)
+        File.write(log_file, '')
+        log('SYSTEM', 'Display limpo. Aguardando novos eventos...')
         { ok: true, message: 'Display limpo.' }
 
       when 'validate_discord', 'discord_validate', 'validate_discord_settings'

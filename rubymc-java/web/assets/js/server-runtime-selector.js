@@ -129,11 +129,20 @@
         return;
       }
 
-      select.innerHTML = installed.map((version) => {
-        const id = version.id || "";
-        const loader = version.loader_label || version.loader || "vanilla";
-        const selected = previous === id || (!previous && active && active.id === id) ? "selected" : "";
-        return `<option value="${esc(id)}" data-loader="${esc(version.loader || "vanilla")}" ${selected}>${esc(id)} (${esc(loader)})</option>`;
+      const grouped = installed.reduce((acc, v) => {
+        const loader = v.loader || "vanilla";
+        if (!acc[loader]) acc[loader] = [];
+        acc[loader].push(v);
+        return acc;
+      }, {});
+      const loaderLabels = { vanilla: "Vanilla", paper: "Paper", fabric: "Fabric", forge: "Forge", neoforge: "NeoForge", quilt: "Quilt" };
+      select.innerHTML = Object.entries(grouped).map(([loader, versions]) => {
+        const label = loaderLabels[loader] || loader.charAt(0).toUpperCase() + loader.slice(1);
+        return `<optgroup label="${esc(label)}">${versions.map(v => {
+          const id = v.id || "";
+          const selected = previous === id || (!previous && active && active.id === id) ? "selected" : "";
+          return `<option value="${esc(id)}" data-loader="${esc(v.loader || "vanilla")}" ${selected}>${esc(id)}</option>`;
+        }).join("")}</optgroup>`;
       }).join("");
 
       if (help) {

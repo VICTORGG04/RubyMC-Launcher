@@ -3087,11 +3087,18 @@ button.is-loading,
 }
 
 /* ── Client Version Grid ──────────────────────────────── */
-.client-versions-grid {
+#client-versions-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
   gap: 10px;
-  margin-top: 12px;
+  height: 340px;
+  overflow-y: auto;
+  padding-right: 4px;
+  align-content: start;
+}
+
+#client-versions-grid:empty {
+  height: auto;
 }
 .client-version-card {
   display: flex;
@@ -3671,7 +3678,7 @@ button.is-loading,
    ========================================================= */
 
 :root {
-  --versions-max-width: 620px;
+  --versions-max-width: 960px;
   --versions-card-gap: 8px;
   --panel-padding: 10px;
   --panel-gap: 8px;
@@ -3711,8 +3718,21 @@ button.is-loading,
 }
 
 /* ---- Cards ---- */
+.versions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 900px) {
+  .versions-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 #tab-versions .version-active-box,
-#tab-versions .version-section {
+#tab-versions .version-section,
+#tab-versions .versions-grid > .version-section {
   border: 1px solid rgba(53, 234, 255, .20);
   border-radius: 12px;
   background:
@@ -3753,16 +3773,20 @@ button.is-loading,
 /* ---- Install form ---- */
 #tab-versions .version-install-form {
   display: grid;
-  grid-template-columns: auto minmax(100px, 1fr) auto minmax(100px, 1fr) auto;
-  gap: 8px;
-  align-items: end;
+  grid-template-columns: 1fr;
+  gap: 6px;
   width: 100%;
 }
 
 #tab-versions .version-install-form label {
-  margin: 0 0 4px;
   font-size: 11px;
-  white-space: nowrap;
+  font-weight: 600;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+#tab-versions .version-install-form label:first-of-type {
+  margin-top: 0;
 }
 
 #tab-versions .version-install-form select,
@@ -3771,14 +3795,13 @@ button.is-loading,
   min-width: 0;
 }
 
-#tab-versions .version-install-form select {
-  min-width: 0;
+#tab-versions #version-id {
+  max-height: 180px;
 }
 
 #tab-versions #version-install-btn {
-  width: auto;
-  min-width: 0;
-  height: 36px;
+  width: 100%;
+  margin-top: 4px;
 }
 
 /* ---- Client loader selector ---- */
@@ -4020,7 +4043,7 @@ button.is-loading,
 /* ---- Desktop wide ---- */
 @media (min-width: 1280px) {
   :root {
-    --versions-max-width: 580px;
+    --versions-max-width: 1100px;
   }
 }
 
@@ -4051,11 +4074,11 @@ button.is-loading,
   }
 
   #tab-versions .version-active-box,
-  #tab-versions .version-section,
+  #tab-versions .version-section {
     padding: 8px;
   }
 
-  #tab-versions #version-install-btn,
+  #tab-versions #version-install-btn {
     width: 100%;
   }
 
@@ -4063,7 +4086,7 @@ button.is-loading,
     justify-content: stretch;
   }
 
-  #tab-versions .version-item-actions .btn,
+  #tab-versions .version-item-actions .btn {
     flex: 1 1 140px;
   }
 }
@@ -6389,6 +6412,7 @@ button.is-loading,
 .server-card-actions {
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
 }
 .server-card-btn {
   font-size: 11px;
@@ -6413,6 +6437,8 @@ button.is-loading,
   display: flex;
   align-items: center;
   gap: 3px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
 }
 .server-card-version-select {
   flex: 1;
@@ -6449,4 +6475,318 @@ button.is-loading,
 .server-card-version-btn:disabled {
   opacity: .5;
   cursor: not-allowed;
+}
+
+.version-scroll-list {
+  height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.version-filter-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  padding: 6px 0;
+}
+
+.version-filter-bar .btn-filter {
+  font-size: 11px;
+  padding: 3px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: #b8c6dd;
+  cursor: pointer;
+  transition: all .15s;
+}
+
+.version-filter-bar .btn-filter:hover {
+  background: rgba(53,234,255,.12);
+  border-color: rgba(53,234,255,.30);
+}
+
+.version-filter-bar .btn-filter.active {
+  background: rgba(53,234,255,.18);
+  border-color: #35eaff;
+  color: #fff;
+}
+
+/* ── Server Tab Restructure ──────────────────────────── */
+#tab-server .panel-grid {
+  grid-template-columns: 1fr 1fr !important;
+}
+
+#tab-server .panel-copy h3 {
+  font-size: 14px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--cyan, #35eaff);
+  margin: 0 0 12px;
+}
+
+/* Access bar */
+.server-access-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.server-access-bar select {
+  flex: 1;
+  min-width: 0;
+}
+
+.server-access-bar .btn {
+  white-space: nowrap;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+/* Status card */
+.server-status-card {
+  border: 1px solid rgba(53,234,255,.18);
+  border-radius: 12px;
+  background: linear-gradient(145deg, rgba(5,7,16,.82), rgba(7,10,22,.60));
+  padding: 14px 18px;
+  margin-bottom: 14px;
+}
+
+.server-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 2px;
+}
+
+#server-test-state {
+  font-size: 16px;
+  color: var(--muted, #9ca8bd);
+}
+
+#server-test-state.server-live-error {
+  color: var(--red, #ff174f) !important;
+}
+
+.server-status-card em {
+  display: block;
+  color: var(--muted, #9ca8bd);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* Compact live grid */
+#tab-server .server-live-grid {
+  margin-top: 0;
+}
+
+#tab-server .server-live-grid div {
+  min-height: 52px;
+  padding: 8px 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+#tab-server .server-live-grid span {
+  font-size: 10px;
+  letter-spacing: .5px;
+  margin-bottom: 1px;
+}
+
+#tab-server .server-live-grid strong {
+  font-size: 15px;
+  margin-top: 0;
+}
+
+/* Management toolbar */
+.server-management-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.server-count {
+  color: var(--muted, #9ca8bd);
+  font-size: 12px;
+  font-weight: 700;
+  margin-right: auto;
+}
+
+.server-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-filter-label {
+  color: var(--muted, #9ca8bd);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-right: 2px;
+}
+
+.server-filter-group .btn-filter {
+  font-size: 11px;
+  padding: 3px 10px;
+  min-height: 26px;
+  border-radius: 5px;
+}
+
+.server-bulk-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.server-bulk-actions .btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  min-height: 26px;
+}
+
+/* Player list */
+.server-player-list {
+  margin-top: 14px;
+  padding: 12px;
+}
+
+.server-player-list-title {
+  font-size: 11px;
+  letter-spacing: .6px;
+}
+
+/* Responsive */
+@media (max-width: 1000px) {
+  #tab-server .panel-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 700px) {
+  .server-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .server-card-footer {
+    margin-left: 0;
+  }
+}
+
+/* ── Server Card Buttons Improvement ─────────────────── */
+.server-card-btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border: 0;
+  cursor: pointer;
+  transition: all .15s ease;
+  position: relative;
+}
+
+.server-card-btn.start::before { content: "\25B6"; font-size: 9px; }
+.server-card-btn.stop::before  { content: "\25A0"; font-size: 11px; }
+
+.server-card-btn.start { background: var(--green); color: #000; }
+.server-card-btn.start:hover { background: #4de67a; box-shadow: 0 0 12px rgba(98,255,143,.4); }
+.server-card-btn.stop { background: var(--red); color: #fff; }
+.server-card-btn.stop:hover { background: #e0135c; box-shadow: 0 0 12px rgba(255,23,79,.4); }
+
+.server-card-btn:active { transform: scale(.96); }
+.server-card-btn:disabled { opacity: .4; cursor: not-allowed; transform: none !important; }
+
+.server-card-version-btn {
+  padding: 4px 10px;
+  font-size: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  border-radius: 5px;
+  border: 0;
+  cursor: pointer;
+  font-weight: 700;
+  background: var(--cyan);
+  color: #000;
+  line-height: 1.3;
+  transition: all .15s ease;
+}
+.server-card-version-btn::before { content: "\2713"; font-size: 11px; font-weight: 900; }
+.server-card-version-btn:hover { background: #5eeaff; box-shadow: 0 0 10px rgba(53,234,255,.35); }
+.server-card-version-btn:active { transform: scale(.95); }
+.server-card-version-btn:disabled { opacity: .5; cursor: not-allowed; transform: none !important; }
+
+/* ── Server Card Horizontal Layout ───────────────────── */
+#tab-server .server-grid {
+  grid-template-columns: 1fr;
+}
+
+.server-card {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 8px 14px;
+  gap: 10px;
+}
+
+.server-card-header {
+  flex-shrink: 0;
+  min-width: 0;
+  gap: 6px;
+}
+
+.server-card-name {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.server-card-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.server-card-desc {
+  font-size: 12px;
+  flex-shrink: 0;
+  font-family: monospace;
+  min-width: 110px;
+}
+
+.server-card-version-row {
+  flex-shrink: 0;
+}
+
+.server-card-version-select {
+  max-width: 90px;
+  font-size: 10px;
+}
+
+.server-card-footer {
+  margin-left: auto;
+  margin-top: 0;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.server-card-version-btn {
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+.server-card-btn {
+  font-size: 11px;
+  padding: 5px 12px;
 }

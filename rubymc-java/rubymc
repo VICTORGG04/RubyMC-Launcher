@@ -90,6 +90,21 @@ require_curl() {
   fi
 }
 
+require_node() {
+  if ! command -v node >/dev/null 2>&1; then
+    err "Node.js não encontrado. Instale Node.js para usar Discord RPC."
+    err "  https://nodejs.org/"
+    return 1
+  fi
+}
+
+require_npm() {
+  if ! command -v npm >/dev/null 2>&1; then
+    err "npm não encontrado. Instale npm para usar Discord RPC."
+    return 1
+  fi
+}
+
 web_pid_running() {
   if [ -f "$PID_FILE" ]; then
     pid="$(cat "$PID_FILE" 2>/dev/null || true)"
@@ -200,6 +215,13 @@ stop_game_servers_for_project() {
   fi
 }
 
+install_discord_rpc_deps() {
+  if [ ! -d "$RPC_DIR/node_modules" ]; then
+    say "Instalando dependências do Discord RPC..."
+    (cd "$RPC_DIR" && npm install)
+  fi
+}
+
 status_game_servers() {
   echo
   echo "Servidor Java:"
@@ -251,6 +273,7 @@ stop_server() {
 
   ok "Servidor web parado/liberado."
   stop_bot
+  stop_discord_rpc
 }
 
 start_server() {
@@ -307,6 +330,7 @@ start_server() {
   fi
 
   start_bot
+  start_discord_rpc
 
   start_game_servers_for_project
 
@@ -350,6 +374,7 @@ status_server() {
 
   echo
   status_bot
+  status_discord_rpc
   status_game_servers
 }
 
@@ -399,6 +424,10 @@ ai_chat() {
 
 BOT_PID_FILE="$RUN_DIR/bot.pid"
 BOT_LOG_FILE="$RUN_DIR/bot.log"
+
+RPC_DIR="$ROOT/discord-rpc"
+RPC_PID_FILE="$RUN_DIR/rpc.pid"
+RPC_LOG_FILE="$RUN_DIR/rpc.log"
 
 start_bot() {
   install_deps
@@ -466,6 +495,74 @@ bot_logs() {
   tail -f "$BOT_LOG_FILE"
 }
 
+start_discord_rpc() {
+  require_node || return 1
+  require_npm || return 1
+  install_discord_rpc_deps
+
+  if [ -f "$RPC_PID_FILE" ]; then
+    pid="$(cat "$RPC_PID_FILE" 2>/dev/null || true)"
+    if [ -n "$pid" ] && kill -0 "$pid" >/dev/null 2>&1; then
+      say "Discord RPC já está rodando (PID $pid). Use './rubymc rpc restart' para reiniciar."
+      return
+    fi
+    rm -f "$RPC_PID_FILE"
+  fi
+
+  say "Iniciando Discord RPC..."
+
+  nohup node "$RPC_DIR/presence.js" > "$RPC_LOG_FILE" 2>&1 &
+  new_pid="$!"
+  echo "$new_pid" > "$RPC_PID_FILE"
+
+  sleep 2
+
+  if ! kill -0 "$new_pid" >/dev/null 2>&1; then
+    echo "[ERRO] Discord RPC não iniciou. Últimos logs:"
+    tail -n 20 "$RPC_LOG_FILE" || true
+    return 1
+  fi
+
+  ok "Discord RPC iniciado. PID: $new_pid"
+  say "Use './rubymc rpc logs' para ver logs."
+  say "Use './rubymc rpc stop' para parar."
+}
+
+stop_discord_rpc() {
+  say "Parando Discord RPC..."
+
+  if [ -f "$RPC_PID_FILE" ]; then
+    pid="$(cat "$RPC_PID_FILE" 2>/dev/null || true)"
+    if [ -n "$pid" ]; then
+      kill "$pid" >/dev/null 2>&1 || true
+      sleep 1
+      kill -9 "$pid" >/dev/null 2>&1 || true
+    fi
+    rm -f "$RPC_PID_FILE"
+  fi
+
+  pkill -f "presence.js" >/dev/null 2>&1 || true
+  ok "Discord RPC parado."
+}
+
+status_discord_rpc() {
+  if [ -f "$RPC_PID_FILE" ]; then
+    pid="$(cat "$RPC_PID_FILE")"
+    if kill -0 "$pid" >/dev/null 2>&1; then
+      echo "Discord RPC: rodando (PID $pid)"
+    else
+      echo "Discord RPC: PID salvo, mas processo morto"
+    fi
+  else
+    echo "Discord RPC: parado"
+  fi
+}
+
+rpc_logs() {
+  touch "$RPC_LOG_FILE"
+  tail -f "$RPC_LOG_FILE"
+}
+
 server_cli() {
   local action="${1:-status}"
 
@@ -519,6 +616,9 @@ Servidor de Jogo (Java):
 
 Bot:
   bot [start|stop|restart|status|logs]
+
+RPC (Rich Presence):
+  rpc [start|stop|restart|status|logs]
 
 IA:
   ai "pergunta"
@@ -599,6 +699,31 @@ case "${1:-start}" in
         ;;
       *)
         echo "Uso: ./rubymc bot [start|stop|restart|status|logs]"
+        exit 1
+        ;;
+    esac
+    ;;
+  rpc)
+    cmd="${2:-start}"
+    case "$cmd" in
+      start)
+        start_discord_rpc
+        ;;
+      stop)
+        stop_discord_rpc
+        ;;
+      restart)
+        stop_discord_rpc
+        start_discord_rpc
+        ;;
+      status)
+        status_discord_rpc
+        ;;
+      logs)
+        rpc_logs
+        ;;
+      *)
+        echo "Uso: ./rubymc rpc [start|stop|restart|status|logs]"
         exit 1
         ;;
     esac

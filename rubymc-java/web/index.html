@@ -289,42 +289,54 @@
               <h3>Importar Modpack</h3><p>Selecione um arquivo <strong>.mrpack</strong> ou <strong>.zip</strong>.</p><label for="modpack-name">Nome do perfil</label><input id="modpack-name" type="text" placeholder="Ex.: RubyMC Survival"><label for="modpack-file">Arquivo do modpack</label><label class="dropzone modpack-dropzone" for="modpack-file"><span id="modpack-file-label">Clique para escolher ou arraste o arquivo aqui</span><small>Formatos suportados: .mrpack, .zip</small><input id="modpack-file" type="file" accept=".mrpack,.zip" hidden></label><div class="actions"><button class="btn btn-red" data-action="import_modpack">Importar modpack</button><button class="btn btn-dark" data-action="update_modpacks">Atualizar lista</button></div><h3 class="section-subtitle">Modpacks disponíveis</h3><div id="modpack-list" class="list-box">Nenhum modpack importado ainda.</div></article></div>
         </section>
         <section id="tab-server" class="tab-panel" data-panel-title="Servidor">
-          <header class="panel-heading"><h2>🌐 Servidor da Comunidade</h2><p>Teste conexão e entre diretamente no servidor configurado.</p></header>
+          <header class="panel-heading"><h2>🌐 Servidor</h2><p>Acesse, monitore e gerencie seus servidores Minecraft.</p></header>
           <div class="panel-grid">
             <article class="panel-copy">
-              <h3>Servidor da comunidade</h3>
-              <p>Servidor:</p>
-              <select id="server-address">
-                <option value="">Carregando servidores...</option>
-              </select>
-              <div class="actions" style="margin-top:8px;">
-                <button class="btn btn-red" data-action="enter_server">Entrar no servidor</button>
-                <button class="btn btn-dark" data-action="test_server">Testar servidor</button>
+              <h3>Conexão</h3>
+              <div class="server-access-bar">
+                <select id="server-address">
+                  <option value="">Carregando servidores...</option>
+                </select>
+                <button class="btn btn-red" data-action="enter_server">Entrar</button>
+                <button class="btn btn-dark" data-action="test_server">Testar</button>
               </div>
-              <div class="status-box" style="margin-top:20px;">
-                <span>Status do servidor</span>
-                <strong id="server-test-state">Aguardando teste</strong>
-                <em id="server-test-detail">Use o botão para validar a conexão.</em>
+              <div class="server-status-card">
+                <div class="server-status-indicator">
+                  <strong id="server-test-state">Aguardando teste</strong>
+                </div>
+                <em id="server-test-detail">Use o botao para validar a conexao.</em>
               </div>
               <div class="server-live-grid">
-                <div><span>Online agora</span><strong id="server-live-online">--</strong></div>
+                <div><span>Online</span><strong id="server-live-online">--</strong></div>
                 <div><span>Capacidade</span><strong id="server-live-max">--</strong></div>
                 <div><span>Ping</span><strong id="server-live-latency">--</strong></div>
-                <div><span>Versão</span><strong id="server-live-version">--</strong></div>
+                <div><span>Versao</span><strong id="server-live-version">--</strong></div>
                 <div><span>Atualizado</span><strong id="server-live-checked">--</strong></div>
                 <div><span>Sinal</span><strong><span class="server-bars"><i></i><i></i><i></i><i></i><i></i></span></strong></div>
               </div>
               <div class="server-player-list">
-                <div class="server-player-list-title">Jogadores visíveis</div>
+                <div class="server-player-list-title">Jogadores Online</div>
                 <div id="server-player-tags" class="server-player-tags">
                   <span class="server-player-tag">Aguardando consulta</span>
                 </div>
-                <div id="server-motd" class="server-motd">A descrição do servidor aparecerá aqui quando a API responder.</div>
+                <div id="server-motd" class="server-motd">A descricao do servidor aparecera aqui quando a API responder.</div>
               </div>
             </article>
             <article class="panel-copy">
-              <h3>Gerenciar Servidores</h3>
-              <p>Inicie ou pare cada servidor individualmente.</p>
+              <h3>Servidores</h3>
+              <div class="server-management-toolbar">
+                <span class="server-count" id="server-count">0 ativos</span>
+                <div class="server-filter-group">
+                  <span class="btn-filter-label">Filtrar:</span>
+                  <button class="btn btn-sm btn-filter active" data-filter="all">Todos</button>
+                  <button class="btn btn-sm btn-filter" data-filter="online">Online</button>
+                  <button class="btn btn-sm btn-filter" data-filter="offline">Offline</button>
+                </div>
+                <div class="server-bulk-actions">
+                  <button class="btn btn-sm btn-green" data-action="start_all">Iniciar todos</button>
+                  <button class="btn btn-sm btn-red" data-action="stop_all">Parar todos</button>
+                </div>
+              </div>
               <div id="server-grid" class="server-grid">
                 <div class="server-grid-placeholder">Carregando servidores...</div>
               </div>
@@ -349,58 +361,62 @@
                 </div>
               </div>
 
-              <div class="version-section" id="server-install-section">
-                <h3>Instalar Nova Versão</h3>
-                <div class="version-install-form">
-                  <label for="version-loader">Loader</label>
-                  <select id="version-loader">
-                    <option value="vanilla">Vanilla</option>
-                    <option value="paper">Paper</option>
-                    <option value="fabric">Fabric</option>
-                    <option value="forge">Forge</option>
-                    <option value="neoforge">NeoForge</option>
-                    <option value="quilt">Quilt</option>
-                  </select>
-                  <label for="version-id">Versão</label>
-                  <select id="version-id"><option>Selecione um loader primeiro</option></select>
-                  <button class="btn btn-red" data-action="version_install" id="version-install-btn" disabled>Instalar</button>
+              <div class="versions-grid">
+                <div class="version-section" id="server-install-section">
+                  <h3>Instalar Nova Versão</h3>
+                  <div class="version-install-form">
+                    <label for="version-loader">Loader</label>
+                    <select id="version-loader">
+                      <option value="vanilla">Vanilla</option>
+                      <option value="paper">Paper</option>
+                      <option value="fabric">Fabric</option>
+                      <option value="forge">Forge</option>
+                      <option value="neoforge">NeoForge</option>
+                      <option value="quilt">Quilt</option>
+                    </select>
+                    <label for="version-id">Versão</label>
+                    <select id="version-id" size="8"><option>Selecione um loader primeiro</option></select>
+                    <button class="btn btn-red" data-action="version_install" id="version-install-btn" disabled>Instalar</button>
+                  </div>
                 </div>
-              </div>
 
-              <div class="version-section">
-                <h3>Versões Instaladas</h3>
-                <div id="version-installed-list" class="list-box">
-                  <span class="loading-dots">Carregando</span>
+                <div class="version-section">
+                  <h3>Versões Instaladas</h3>
+                  <div id="version-installed-list" class="list-box">
+                    <span class="loading-dots">Carregando</span>
+                  </div>
                 </div>
               </div>
             </article>
 
             <!-- === Client versions (player) === -->
             <article class="panel-copy" id="version-client-panel" style="display:none;">
-              <div class="version-section">
-                <h3>Versões Disponíveis</h3>
-                <div class="client-loader-select">
-                  <label for="client-loader">Loader</label>
-                  <select id="client-loader">
-                    <option value="vanilla">Vanilla</option>
-                    <option value="fabric">Fabric</option>
-                    <option value="quilt">Quilt</option>
-                    <option value="neoforge">NeoForge</option>
-                  </select>
-                </div>
-                <div class="version-client-filter">
-                  <button class="btn btn-sm btn-filter active" data-type="release">Release</button>
-                  <button class="btn btn-sm btn-filter" data-type="snapshot">Snapshot</button>
-                  <button class="btn btn-sm btn-filter" data-type="all">Todas</button>
-                </div>
-                <div id="client-versions-grid" class="client-versions-grid">
-                  <span class="loading-dots">Carregando...</span>
-                </div>
+              <div class="client-loader-select">
+                <label for="client-loader">Loader</label>
+                <select id="client-loader">
+                  <option value="vanilla">Vanilla</option>
+                  <option value="fabric">Fabric</option>
+                  <option value="quilt">Quilt</option>
+                  <option value="neoforge">NeoForge</option>
+                </select>
               </div>
-              <div class="version-section">
-                <h3>Instaladas</h3>
-                <div id="client-installed-list" class="list-box">
-                  <span class="loading-dots">Carregando...</span>
+              <div class="version-client-filter">
+                <button class="btn btn-sm btn-filter active" data-type="release">Release</button>
+                <button class="btn btn-sm btn-filter" data-type="snapshot">Snapshot</button>
+                <button class="btn btn-sm btn-filter" data-type="all">Todas</button>
+              </div>
+              <div class="versions-grid">
+                <div class="version-section">
+                  <h3>Versões Disponíveis</h3>
+                  <div id="client-versions-grid" class="client-versions-grid">
+                    <span class="loading-dots">Carregando...</span>
+                  </div>
+                </div>
+                <div class="version-section">
+                  <h3>Instaladas</h3>
+                  <div id="client-installed-list" class="list-box">
+                    <span class="loading-dots">Carregando...</span>
+                  </div>
                 </div>
               </div>
             </article>

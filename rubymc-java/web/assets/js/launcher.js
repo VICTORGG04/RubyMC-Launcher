@@ -522,7 +522,7 @@
             </select>
             <button class="server-card-version-btn" data-sid="${esc(s.key)}" ${versionOptions ? '' : 'disabled'}>OK</button>
           </div>`;
-        return `<div class="server-card" data-sid="${esc(s.key)}">
+        return `<div class="server-card" data-sid="${esc(s.key)}" data-address="${esc(s.address)}">
           <div class="server-card-header">
             <span class="server-card-name">${esc(s.name)}</span>
             <span class="server-card-badge ${badgeClass}">${badgeLabel}</span>
@@ -539,6 +539,9 @@
         </div>`;
       }).join("");
 
+      const onlineCount = statusData.servers.filter(s => s.running).length;
+      setText("server-count", `${onlineCount} de ${statusData.servers.length} ativos`);
+
       statusData.servers.forEach((s) => {
         const select = grid.querySelector(`.server-card-version-select[data-sid="${s.key}"]`);
         if (select && s.version) {
@@ -552,11 +555,32 @@
           const sid = btn.dataset.sid;
           const action = btn.classList.contains("start") ? "start" : "stop";
           btn.disabled = true;
+
+          if (action === "start") {
+            const addr = btn.closest(".server-card")?.dataset?.address;
+            if (addr) {
+              const select = $("#server-address");
+              if (select) select.value = addr;
+            }
+          }
+
           try {
             const ep = action === "start" ? "/api/servers/start" : "/api/servers/stop";
             await apiPost(ep, { server_id: sid });
           } catch (_) {}
+
           setTimeout(renderServerGrid, 1000);
+
+          if (action === "start") {
+            refreshServerLiveStatus();
+            let attempts = 0;
+            const poll = () => {
+              attempts += 1;
+              refreshServerLiveStatus();
+              if (attempts < 15) setTimeout(poll, 3000);
+            };
+            setTimeout(poll, 2000);
+          }
         });
       });
 
@@ -961,7 +985,7 @@
       grid.innerHTML = '<span class="empty-state">Nenhuma versão encontrada.</span>';
       return;
     }
-    grid.innerHTML = available.map(v => {
+    const cardsHtml = available.map(v => {
       const isInstalled = installedSet.has(v.id);
       return `
         <div class="client-version-card ${isInstalled ? 'installed' : ''}">
@@ -976,6 +1000,7 @@
         </div>
       `;
     }).join('');
+    grid.innerHTML = cardsHtml;
     grid.querySelectorAll('[data-client-install]').forEach(btn => {
       btn.addEventListener('click', () => installClientVersion(btn.dataset.clientInstall));
     });
@@ -988,7 +1013,7 @@
       list.innerHTML = '<span class="empty-state">Nenhuma versão instalada.</span>';
       return;
     }
-    list.innerHTML = clientInstalledVersions.map(v => {
+    const itemsHtml = clientInstalledVersions.map(v => {
       const id = typeof v === 'string' ? v : v.id;
       const loader = typeof v === 'string' ? '' : (v.loader || '');
       const inherits = typeof v === 'string' ? '' : (v.inheritsFrom || '');
@@ -1008,6 +1033,7 @@
         </div>
       `;
     }).join('');
+    list.innerHTML = `<div class="version-scroll-list">${itemsHtml}</div>`;
   }
 
   async function installClientVersion(versionId) {
@@ -1079,10 +1105,19 @@
     }
 
     const isAdmin = window._userRole === 'admin';
-    element.innerHTML = installedVersions.map((version) => {
+    const loaderLabels = { vanilla: "Vanilla", paper: "Paper", fabric: "Fabric", forge: "Forge", neoforge: "NeoForge", quilt: "Quilt" };
+    const loaders = ["all", ...new Set(installedVersions.map(v => (v.loader || "vanilla").toLowerCase()))];
+
+    const filterBar = `
+      <div class="version-filter-bar">
+        ${loaders.map(l => `<button class="btn btn-sm btn-filter ${l === "all" ? "active" : ""}" data-filter="${esc(l)}">${l === "all" ? "Todas" : (loaderLabels[l] || l.charAt(0).toUpperCase() + l.slice(1))}</button>`).join("")}
+      </div>`;
+
+    const itemsHtml = installedVersions.map((version) => {
       const isActive = activeVersion && activeVersion.id === version.id;
+      const loader = (version.loader || "vanilla").toLowerCase();
       return `
-        <div class="version-item ${isActive ? "version-active" : ""}">
+        <div class="version-item ${isActive ? "version-active" : ""}" data-loader="${esc(loader)}">
           <div class="version-item-info">
             <strong>${esc(version.id)}</strong>
             <span class="version-item-loader">${esc(version.loader_label || version.loader || "vanilla")}</span>
@@ -1101,6 +1136,19 @@
         </div>
       `;
     }).join("");
+
+    element.innerHTML = filterBar + `<div class="version-scroll-list">${itemsHtml}</div>`;
+
+    element.querySelectorAll(".version-filter-bar .btn-filter").forEach(btn => {
+      btn.addEventListener("click", () => {
+        element.querySelectorAll(".version-filter-bar .btn-filter").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        const filter = btn.dataset.filter;
+        element.querySelectorAll(".version-scroll-list .version-item").forEach(item => {
+          item.style.display = filter === "all" || item.dataset.loader === filter ? "" : "none";
+        });
+      });
+    });
   }
 
   function renderServerVersionSelect() {
