@@ -379,6 +379,35 @@ module RubyMC
         handle_vip_serve_receipt(req, res, $1)
       when '/api/vip/pix/reject'
         handle_vip_pix_reject(req, res)
+
+      # ── Auth ──────────────────────────────────────
+      when '/api/auth/status'
+        handle_auth_status(req, res)
+      when '/api/auth/logout'
+        handle_auth_logout(req, res)
+      when '/api/auth/discord/login'
+        handle_discord_login(req, res)
+      when '/api/auth/discord/callback'
+        handle_discord_callback(req, res)
+
+      # ── Verification ──────────────────────────────
+      when '/api/auth/verify/status'
+        handle_verify_status(req, res)
+      when '/api/auth/verify/accept-terms'
+        handle_verify_accept_terms(req, res)
+      when '/api/auth/verify/check-guild-membership'
+        handle_verify_check_guild(req, res)
+      when '/api/auth/verify/send-discord-code'
+        handle_verify_send_discord_code(req, res)
+      when '/api/auth/verify/confirm-discord-code'
+        handle_verify_confirm_discord_code(req, res)
+      when '/api/auth/verify/complete'
+        handle_verify_complete(req, res)
+
+      # ── Discord ──────────────────────────────────
+      when '/api/discord/members'
+        handle_discord_members(req, res)
+
       else
         res.status = 404
         json(res, { ok: false, error: 'Rota não encontrada', path: req.path })
@@ -1845,6 +1874,400 @@ module RubyMC
       end
 
       nil
+    end
+
+    # ── Auth handlers ────────────────────────────────────
+
+    DISCORD_CALLBACK_URL = 'http://127.0.0.1:4567/api/auth/discord/callback'.freeze
+
+    def clear_session_cookie(res)
+      res['Set-Cookie'] = "rubymc_session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"
+    end
+
+    def oauth_config
+      cfg = discord_config
+      return nil unless cfg
+
+      settings = load_settings
+      {
+        client_id: settings.dig('discord', 'oauth', 'client_id').to_s.strip,
+        client_secret: settings.dig('discord', 'oauth', 'client_secret').to_s.strip,
+        bot_token: settings.dig('discord', 'bot', 'token').to_s.strip,
+        guild_id: settings.dig('discord', 'guild_id').to_s.strip,
+        redirect_uri: settings.dig('discord', 'oauth', 'redirect_uri').to_s.strip
+      }
+    end
+
+    def handle_auth_status(req, res)
+      user = authenticated_user(req)
+      if user
+        json(res, {
+          ok: true, authenticated: true,
+          user: { id: user[:user_id], username: user[:username], avatar: user[:avatar] },
+          role: user[:role]
+        })
+      else
+        json(res, { ok: true, authenticated: false })
+      end
+    end
+
+    def handle_auth_logout(req, res)
+      cookie = parse_cookie(req)
+      session_id = cookie['rubymc_session']
+      if session_id
+        @sessions.delete(session_id)
+        save_sessions
+      end
+      clear_session_cookie(res)
+      json(res, { ok: true })
+    end
+
+    def handle_discord_login(req, res)
+      oauth = oauth_config
+      unless oauth && oauth[:client_id] && !oauth[:client_id].empty?
+        res.status = 400
+        return json(res, { ok: false, error: 'Discord OAuth não configurado.' })
+      end
+
+      state = SecureRandom.hex(16)
+      (@oauth_states ||= {})[state] = { expires: Time.now + 300 }
+
+      cb = oauth[:redirect_uri].to_s.strip
+      cb = DISCORD_CALLBACK_URL if cb.empty?
+
+      url = "https://discord.com/api/oauth2/authorize?client_id=#{oauth[:client_id]}&redirect_uri=#{CGI.escape(cb)}&response_type=code&scope=#{CGI.escape('identify')}&state=#{state}"
+      res.status = 302
+      res['Location'] = url
+    end
+
+    def handle_discord_callback(req, res)
+      code = req.query['code']
+      error = req.query['error']
+      state = req.query['state']
+
+      if error || !code
+        res.status = 302
+        res['Location'] = "/?login=error&reason=#{CGI.escape(error || 'no_code')}"
+        return
+      end
+
+      state_data = (@oauth_states ||= {})[state]
+      if state.nil? || !state_data || state_data[:expires] < Time.now
+        res.status = 302
+        res['Location'] = '/?login=error&reason=invalid_state'
+        return
+      end
+      @oauth_states.delete(state)
+
+      oauth = oauth_config
+      unless oauth && oauth[:client_id] && oauth[:client_secret]
+        res.status = 302
+        res['Location'] = '/?login=error&reason=missing_config'
+        return
+      end
+
+      cb = oauth[:redirect_uri].to_s.strip
+      cb = DISCORD_CALLBACK_URL if cb.empty?
+
+      token_uri = URI('https://discord.com/api/v10/oauth2/token')
+      token_resp = Net::HTTP.post_form(token_uri, {
+        client_id: oauth[:client_id],
+        client_secret: oauth[:client_secret],
+        grant_type: 'authorization_code',
+        code: code,
+        redirect_uri: cb
+      })
+
+      unless token_resp.code.to_i == 200
+        res.status = 302
+        res['Location'] = '/?login=error&reason=token_exchange_failed'
+        return
+      end
+
+      token_data = JSON.parse(token_resp.body)
+      access_token = token_data['access_token']
+
+      user_uri = URI('https://discord.com/api/v10/users/@me')
+      user_req = Net::HTTP::Get.new(user_uri)
+      user_req['Authorization'] = "Bearer #{access_token}"
+      user_resp = Net::HTTP.start(user_uri.hostname, user_uri.port, use_ssl: true) { |http| http.request(user_req) }
+
+      unless user_resp.code.to_i == 200
+        res.status = 302
+        res['Location'] = '/?login=error&reason=userinfo_failed'
+        return
+      end
+
+      user_data = JSON.parse(user_resp.body)
+      user_id = user_data['id']
+
+      guild_id = oauth[:guild_id]
+      bot_token = oauth[:bot_token]
+      discord_roles = []
+
+      if guild_id && !guild_id.empty? && bot_token && !bot_token.empty?
+        begin
+          member_uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{user_id}")
+          member_req = Net::HTTP::Get.new(member_uri)
+          member_req['Authorization'] = "Bot #{bot_token}"
+          member_resp = Net::HTTP.start(member_uri.hostname, member_uri.port, use_ssl: true) { |http| http.request(member_req) }
+          if member_resp.code.to_i == 200
+            member_data = JSON.parse(member_resp.body)
+            discord_roles = member_data['roles'] || []
+          end
+        rescue => e
+          log('WARN', "Erro ao verificar guild member para #{user_id}: #{e.message}")
+        end
+      end
+
+      role = launcher_role_for(discord_roles)
+
+      session_id = SecureRandom.hex(32)
+      @sessions[session_id] = {
+        user_id: user_id,
+        username: user_data['username'],
+        avatar: user_data['avatar'],
+        role: role,
+        expires_at: Time.now + 86400
+      }
+      save_sessions
+
+      set_session_cookie(res, session_id)
+      res.status = 302
+      res['Location'] = '/?login=success'
+    end
+
+    def launcher_role_for(discord_role_ids)
+      settings = load_settings
+      admin_ids = settings.dig('launcher', 'roles', 'admin_ids') || []
+      staff_ids = settings.dig('launcher', 'roles', 'staff_ids') || []
+      player_ids = settings.dig('launcher', 'roles', 'player_ids') || []
+      member_ids = settings.dig('launcher', 'roles', 'member_ids') || []
+      return :admin unless (discord_role_ids & admin_ids).empty?
+      return :staff unless (discord_role_ids & staff_ids).empty?
+      return :player unless (discord_role_ids & player_ids).empty?
+      return :member unless (discord_role_ids & member_ids).empty?
+      :member
+    end
+
+    # ── Discord info ────────────────────────────────────
+
+    def handle_discord_members(req, res)
+      members = discord_members_payload
+      json(res, { ok: true, members: { members_count: members.size, presence_count: 0, guild_name: 'RubyMC' } })
+    end
+
+    # ── Verification handlers ────────────────────────────
+
+    def verification_data_file
+      File.join(@root, 'tmp', 'verification_data.json')
+    end
+
+    def compute_vdata_hmac(json)
+      secret = load_settings.dig('discord', 'oauth', 'client_secret') || ''
+      OpenSSL::HMAC.hexdigest('SHA256', secret, json)
+    end
+
+    def load_verification_data
+      file = verification_data_file
+      return {} unless File.exist?(file)
+
+      envelope = JSON.parse(File.read(file))
+      raw_json = envelope['data']
+      stored_hmac = envelope['hmac']
+
+      return {} unless raw_json.is_a?(String) && stored_hmac.is_a?(String)
+      expected = compute_vdata_hmac(raw_json)
+      return {} unless OpenSSL.secure_compare(expected, stored_hmac)
+
+      JSON.parse(raw_json)
+    rescue
+      {}
+    end
+
+    def save_verification_data(data)
+      file = verification_data_file
+      FileUtils.mkdir_p(File.dirname(file))
+      json = JSON.generate(data)
+      hmac = compute_vdata_hmac(json)
+      File.write(file, JSON.generate(data: json, hmac: hmac))
+    end
+
+    def handle_verify_status(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      state = vdata[uid] || {}
+
+      json(res, {
+        ok: true,
+        terms_accepted: state['terms_accepted'] == true,
+        discord_verified: state['discord_verified'] == true,
+        overall_complete: state['terms_accepted'] == true && state['discord_verified'] == true
+      })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_verify_accept_terms(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+      unless user[:role] == :member
+        return json(res, { ok: false, error: 'Apenas Membros podem se verificar.' })
+      end
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      vdata[uid] ||= {}
+      vdata[uid]['terms_accepted'] = true
+      save_verification_data(vdata)
+
+      json(res, { ok: true, terms_accepted: true })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_verify_check_guild(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+
+      oauth = oauth_config
+      guild_id = oauth[:guild_id]
+      bot_token = oauth[:bot_token]
+
+      unless guild_id && !guild_id.empty? && bot_token && !bot_token.empty?
+        return json(res, { ok: true, in_guild: false, error: 'Discord não configurado.' })
+      end
+
+      uid = user[:user_id].to_s
+      uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{uid}")
+      req_check = Net::HTTP::Get.new(uri)
+      req_check['Authorization'] = "Bot #{bot_token}"
+      resp = Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req_check) }
+
+      json(res, { ok: true, in_guild: resp.code.to_i == 200 })
+    rescue => e
+      json(res, { ok: true, in_guild: false })
+    end
+
+    def handle_verify_send_discord_code(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+      unless user[:role] == :member
+        return json(res, { ok: false, error: 'Apenas Membros podem se verificar.' })
+      end
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      unless vdata.dig(uid, 'terms_accepted')
+        return json(res, { ok: false, error: 'Aceite os Termos de Uso primeiro.' })
+      end
+
+      oauth = oauth_config
+      guild_id = oauth[:guild_id]
+      bot_token = oauth[:bot_token]
+      if guild_id && !guild_id.empty? && bot_token && !bot_token.empty?
+        member_uri = URI("https://discord.com/api/v10/guilds/#{guild_id}/members/#{uid}")
+        member_req = Net::HTTP::Get.new(member_uri)
+        member_req['Authorization'] = "Bot #{bot_token}"
+        member_resp = Net::HTTP.start(member_uri.hostname, member_uri.port, use_ssl: true) { |http| http.request(member_req) }
+        unless member_resp.code.to_i == 200
+          return json(res, { ok: false, error: 'Você precisa entrar no servidor Discord da RubyMC primeiro para receber o código.' })
+        end
+      end
+
+      code = format('%06d', rand(1_000_00..999_999))
+      expires = (Time.now + 300).to_i
+
+      vdata[uid] ||= {}
+      vdata[uid]['discord_code'] = code
+      vdata[uid]['discord_code_expires'] = expires
+      save_verification_data(vdata)
+
+      # Try to send DM via bot
+      if defined?(RubyMC::DiscordBotService) && guild_id && !guild_id.empty? && bot_token && !bot_token.empty?
+        begin
+          service = RubyMC::DiscordBotService.new(load_settings, simulate: ARGV.include?('--simulate'))
+          service.send_dm(uid, "🔐 Seu código de verificação RubyMC é: **#{code}**\nEle expira em 5 minutos. Insira-o no launcher para completar a verificação.")
+        rescue => e
+          log('WARN', "Falha ao enviar DM: #{e.message}")
+          return json(res, { ok: false, error: "Falha ao enviar DM: #{e.message}" })
+        end
+      else
+        log('WARN', "DiscordBotService não disponível. Código gerado: #{code}")
+      end
+
+      json(res, { ok: true, message: 'Código enviado via DM no Discord.' })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_verify_confirm_discord_code(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+
+      params = parse_json(req.body) || {}
+      code = params['code'].to_s.strip
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      entry = vdata[uid] || {}
+
+      unless entry['discord_code']
+        return json(res, { ok: false, error: 'Nenhum código foi solicitado. Clique em "Enviar código" primeiro.' })
+      end
+
+      if entry['discord_code_expires'].to_i < Time.now.to_i
+        return json(res, { ok: false, error: 'Código expirado. Solicite um novo.' })
+      end
+
+      unless entry['discord_code'] == code
+        return json(res, { ok: false, error: 'Código inválido. Tente novamente.' })
+      end
+
+      vdata[uid]['discord_verified'] = true
+      save_verification_data(vdata)
+
+      json(res, { ok: true, discord_verified: true })
+    rescue => e
+      json(res, { ok: false, error: e.message })
+    end
+
+    def handle_verify_complete(req, res)
+      user = authenticated_user(req)
+      unless user
+        return json(res, { ok: false, error: 'Não autenticado.' })
+      end
+      unless user[:role] == :member
+        return json(res, { ok: false, error: 'Apenas Membros podem se verificar.' })
+      end
+
+      vdata = load_verification_data
+      uid = user[:user_id].to_s
+      state = vdata[uid] || {}
+
+      unless state['terms_accepted'] && state['discord_verified']
+        return json(res, { ok: false, error: 'Complete todas as etapas de verificação primeiro.' })
+      end
+
+      @sessions.each { |_, v| v[:role] = :player if v[:user_id] == uid }
+      save_sessions
+
+      json(res, { ok: true, role: 'player', message: 'Verificação completa! Agora você é Membro Ruby.' })
+    rescue => e
+      json(res, { ok: false, error: e.message })
     end
   end
 end

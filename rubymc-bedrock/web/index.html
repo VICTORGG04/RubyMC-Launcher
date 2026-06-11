@@ -517,6 +517,34 @@
     </section>
   </div>
 
+  <div id="login-overlay">
+    <div id="login-prompt" style="display:none">
+      <img src="/assets/img/rubymc-discord-ruby-icon-64.png" alt="RubyMC">
+      <h2>Bem-vindo ao RubyMC</h2>
+      <p>Conecte-se com sua conta Discord para acessar o launcher.</p>
+      <div id="login-error-msg" style="display:none"></div>
+      <button class="btn btn-discord" id="login-discord-btn">Entrar com Discord</button>
+    </div>
+    <div id="login-loading" style="display:none">
+      <span class="loading-dots">Autenticando...</span>
+    </div>
+  </div>
+
+  <div id="terms-overlay" class="terms-overlay" style="display:none">
+    <div class="terms-modal">
+      <div class="terms-modal-header">
+        <h3>Termos de Uso do RubyMC</h3>
+        <button class="terms-modal-close" id="terms-modal-close">&times;</button>
+      </div>
+      <div class="terms-modal-content">
+        <iframe src="/termos" title="Termos de Uso"></iframe>
+      </div>
+      <div class="terms-modal-footer">
+        <button class="btn btn-dark" id="terms-modal-back">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="/assets/js/launcher.js?v=rubymc-ui-logic-fix-1"></script>
   <script src="/assets/js/bedrock-game-version-fix.js?v=rubymc-ui-logic-fix-1"></script>
 </body>

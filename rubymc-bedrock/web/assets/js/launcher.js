@@ -12,6 +12,13 @@
     modpacks: ["/api/modpacks", "/api/modpacks/list"]
   };
 
+  const ROLE_TABS = {
+    admin: ['home', 'server', 'versions', 'modpacks', 'discord', 'vip', 'display', 'project', 'settings'],
+    staff: ['home', 'server', 'versions', 'modpacks', 'discord', 'vip', 'display', 'project', 'settings'],
+    player: ['home', 'server', 'versions', 'modpacks', 'discord', 'vip', 'display', 'project', 'settings'],
+    member: ['home', 'modpacks', 'display', 'settings']
+  };
+
   const ACTION_ALIASES = {
     update_modpacks: ["update_modpacks", "refresh_modpacks", "list_modpacks"],
     validate_discord: ["validate_discord", "discord_validate", "validate_discord_settings"],
@@ -88,7 +95,8 @@
       server_address: $("#server-address")?.value || "",
       settings: {
         version: $("#settings-version")?.value || "",
-        ram: $("#settings-ram")?.value || ""
+        ram: $("#settings-ram")?.value || "",
+        username: $("#settings-username")?.value || ""
       }
     };
   }
@@ -701,17 +709,408 @@
     }
   }
 
+  /* ── Auth ─────────────────────────────────────────── */
+
+  async function checkAuth() {
+    const overlay = document.getElementById('login-overlay');
+    const prompt = document.getElementById('login-prompt');
+    const loading = document.getElementById('login-loading');
+
+    try {
+      const data = await fetchJson('/api/auth/status');
+      if (data.authenticated) {
+        window._userRole = data.role;
+        window._userData = data.user;
+        if (overlay) overlay.style.display = 'none';
+        applyRoleFilter(data.role);
+        updateRoleBadge(data.role, data.user);
+        updateSettingsUserInfo(data.user, data.role);
+        updateMemberCardRole(data.role);
+        return true;
+      }
+    } catch (_) {}
+
+    if (loading) loading.style.display = 'none';
+    if (overlay) overlay.style.display = 'flex';
+    if (prompt) prompt.style.display = '';
+    handleLoginRedirect();
+    return false;
+  }
+
+  function updateSettingsUserInfo(user, role) {
+    const box = document.getElementById('settings-user-info');
+    if (!box) return;
+    box.style.display = '';
+
+    const nameEl = document.getElementById('sui-name');
+    const roleEl = document.getElementById('sui-role');
+    const avatarEl = document.getElementById('sui-avatar');
+
+    if (nameEl) nameEl.textContent = user?.username || '---';
+    if (roleEl) {
+      const labels = { admin: 'Admin', staff: 'Staff', player: 'Membro Ruby', member: 'Membro' };
+      roleEl.innerHTML = '<img src="' + roleBadgeUrl(role) + '" class="role-badge-img" alt=""> ' + (labels[role] || role);
+    }
+    if (avatarEl && user?.avatar) {
+      avatarEl.style.backgroundImage = "url(https://cdn.discordapp.com/avatars/" + user.id + "/" + user.avatar + ".png)";
+    } else if (avatarEl) {
+      avatarEl.style.backgroundImage = '';
+      avatarEl.textContent = (user?.username || '?')[0].toUpperCase();
+    }
+  }
+
+  function applyRoleFilter(role) {
+    const allowedTabs = ROLE_TABS[role] || ROLE_TABS.player;
+    document.querySelectorAll('.tab-link').forEach((btn) => {
+      const tab = btn.dataset.tab;
+      btn.style.display = (allowedTabs.includes(tab) || !tab) ? '' : 'none';
+    });
+    const currentTab = document.body.dataset.currentTab || 'home';
+    if (!allowedTabs.includes(currentTab)) {
+      activateTab('home');
+    }
+  }
+
+  function roleBadgeUrl(role) {
+    const map = {
+      admin: '99882-owner-ruby-shiny.png',
+      staff: '29168-admin-ruby-shiny.png',
+      player: '62392-vip-ruby-shiny.png',
+      member: '95929-member-ruby-shiny.png'
+    };
+    return '/assets/img/ruby-packs/' + (map[role] || '65091-rubymember.png');
+  }
+
+  function updateRoleBadge(role, user) {
+    const badge = document.getElementById('role-badge');
+    if (!badge) return;
+    const labels = { admin: 'Admin', staff: 'Staff', player: 'Membro Ruby', member: 'Membro' };
+    const label = labels[role] || 'Jogador';
+    badge.innerHTML = '<img src="' + roleBadgeUrl(role) + '" alt=""> ' + label;
+    badge.style.display = '';
+  }
+
+  function handleLoginRedirect() {
+    const params = new URLSearchParams(window.location.search);
+    const errorMsg = document.getElementById('login-error-msg');
+    if (!params.get('login')) return;
+    if (params.get('login') === 'error') {
+      const reason = params.get('reason') || 'unknown';
+      const messages = {
+        no_code: 'Código de autorização não recebido.',
+        missing_config: 'Configuração do Discord incompleta.',
+        token_exchange_failed: 'Falha ao autenticar com Discord.',
+        userinfo_failed: 'Falha ao obter informações do usuário.'
+      };
+      if (errorMsg) {
+        errorMsg.textContent = messages[reason] || 'Erro ao autenticar. Tente novamente.';
+        errorMsg.style.display = '';
+      }
+    }
+    window.history.replaceState({}, '', '/');
+  }
+
+  function updateMemberCardRole(role) {
+    const el = document.getElementById('msc-member-role');
+    if (!el) return;
+    const labels = { admin: 'Admin', staff: 'Staff', player: 'Membro Ruby', member: 'Membro' };
+    el.innerHTML = '<img src="' + roleBadgeUrl(role) + '" class="role-badge-img" alt=""> ' + (labels[role] || role);
+  }
+
+  async function loadDiscordInfo() {
+    try {
+      const data = await fetchJson('/api/discord/members');
+      if (data.ok && data.members) {
+        setText('discord-guild-name', data.members.guild_name || '---');
+        setText('msc-guild-name', data.members.guild_name || 'RubyMC');
+        setText('discord-member-count', data.members.members_count);
+        setText('discord-online-count', data.members.presence_count);
+        setText('home-discord-members', data.members.members_count);
+      }
+    } catch (_) {}
+  }
+
+  /* ── Verification ────────────────────────────────── */
+
+  async function loadVerificationStatus() {
+    try {
+      const res = await fetchJson('/api/auth/verify/status');
+      if (!res.ok) return;
+
+      if (res.terms_accepted) {
+        const st = document.getElementById('vstep-terms-status');
+        if (st) { st.textContent = '✓ aceito'; st.style.color = '#00c853'; }
+        const ds = document.getElementById('vstep-discord');
+        if (ds) { ds.style.opacity = '1'; ds.style.pointerEvents = 'auto'; }
+      }
+
+      if (res.discord_verified) {
+        const st = document.getElementById('vstep-discord-status');
+        if (st) { st.textContent = '✓ verificado'; st.style.color = '#00c853'; }
+      }
+
+      if (res.overall_complete) {
+        const btn = document.getElementById('complete-verification-btn');
+        if (btn) btn.disabled = false;
+      }
+    } catch (_) {}
+  }
+
+  async function checkVerificationComplete() {
+    try {
+      const res = await fetchJson('/api/auth/verify/status');
+      if (res.ok && res.overall_complete) {
+        const btn = document.getElementById('complete-verification-btn');
+        if (btn) btn.disabled = false;
+      }
+    } catch (_) {}
+  }
+
+  function initVerification() {
+    const verBox = document.getElementById('verification-box');
+    const memberStatusCard = document.getElementById('member-status-card');
+    if (!verBox) return;
+    if (window._userRole !== 'member') {
+      verBox.style.display = 'none';
+      if (memberStatusCard) memberStatusCard.style.display = '';
+      return;
+    }
+    verBox.style.display = '';
+
+    const termsCheckbox = document.getElementById('terms-checkbox');
+    const termsAcceptBtn = document.getElementById('terms-accept-btn');
+    const discordStep = document.getElementById('vstep-discord');
+    const discordJoinBtn = document.getElementById('discord-join-verify-btn') || document.getElementById('discord-join-btn');
+    const discordCheckGuildBtn = document.getElementById('discord-check-guild-btn');
+    const discordJoinDiv = document.getElementById('vstep-discord-join');
+    const discordCodeDiv = document.getElementById('vstep-discord-code');
+    const discordSendBtn = document.getElementById('discord-send-code-btn');
+    const discordCodeInput = document.getElementById('discord-code-input');
+    const discordConfirmBtn = document.getElementById('discord-confirm-code-btn');
+    const discordMsg = document.getElementById('discord-code-msg');
+    const discordGuildMsg = document.getElementById('discordGuildMsg');
+    const completeBtn = document.getElementById('complete-verification-btn');
+    const termsOverlay = document.getElementById('terms-overlay');
+    const termsShowBtn = document.getElementById('terms-show-btn');
+    const termsModalClose = document.getElementById('terms-modal-close');
+    const termsModalBack = document.getElementById('terms-modal-back');
+
+    function showTermsOverlay(show) {
+      if (!termsOverlay) return;
+      termsOverlay.style.display = show ? 'flex' : 'none';
+    }
+
+    if (termsShowBtn) {
+      termsShowBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        showTermsOverlay(true);
+      });
+    }
+
+    function closeTermsOverlay() { showTermsOverlay(false); }
+    if (termsModalClose) termsModalClose.addEventListener('click', closeTermsOverlay);
+    if (termsModalBack) termsModalBack.addEventListener('click', closeTermsOverlay);
+    if (termsOverlay) termsOverlay.addEventListener('click', (e) => {
+      if (e.target === termsOverlay) closeTermsOverlay();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && termsOverlay && termsOverlay.style.display === 'flex') closeTermsOverlay();
+    });
+
+    function setDiscordMsg(el, text, color) {
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = color || 'var(--muted)';
+    }
+
+    if (termsCheckbox && termsAcceptBtn) {
+      termsCheckbox.addEventListener('change', () => {
+        termsAcceptBtn.disabled = !termsCheckbox.checked;
+      });
+    }
+
+    if (termsAcceptBtn) {
+      termsAcceptBtn.addEventListener('click', async () => {
+        try {
+          const res = await postJson('/api/auth/verify/accept-terms', {});
+          if (res.ok) {
+            const st = document.getElementById('vstep-terms-status');
+            if (st) { st.textContent = '✓ aceito'; st.style.color = '#00c853'; }
+            if (discordStep) {
+              discordStep.style.opacity = '1';
+              discordStep.style.pointerEvents = 'auto';
+              const ds = document.getElementById('vstep-discord-status');
+              if (ds) { ds.textContent = 'pendente'; ds.style.color = '#ffc107'; }
+            }
+          } else {
+            setDiscordMsg(discordGuildMsg, res.error || 'Erro ao aceitar termos.', '#e74c3c');
+          }
+        } catch (e) {
+          setDiscordMsg(discordGuildMsg, 'Erro de rede: ' + e.message, '#e74c3c');
+        }
+      });
+    }
+
+    if (discordJoinBtn) {
+      discordJoinBtn.addEventListener('click', async () => {
+        window.open('https://discord.gg/MnrSXTF4qx', '_blank');
+        setDiscordMsg(discordGuildMsg, '🔗 Link do Discord aberto! Entre no servidor e depois clique em "Verificar presença".', '#ffc107');
+      });
+    }
+
+    if (discordCheckGuildBtn) {
+      discordCheckGuildBtn.addEventListener('click', async () => {
+        discordCheckGuildBtn.disabled = true;
+        discordCheckGuildBtn.textContent = 'Verificando...';
+        try {
+          const res = await postJson('/api/auth/verify/check-guild-membership', {});
+          if (res.ok && res.in_guild) {
+            setDiscordMsg(discordGuildMsg, '✅ Você está no servidor! Agora envie o código.', '#00c853');
+            if (discordJoinDiv) discordJoinDiv.style.display = 'none';
+            if (discordCodeDiv) discordCodeDiv.style.display = '';
+            const ds = document.getElementById('vstep-discord-status');
+            if (ds) { ds.textContent = 'pendente'; ds.style.color = '#ffc107'; }
+          } else {
+            setDiscordMsg(discordGuildMsg, '❌ Você não está no servidor. Entre e tente novamente.', '#e74c3c');
+          }
+        } catch (e) {
+          setDiscordMsg(discordGuildMsg, 'Erro de rede: ' + e.message, '#e74c3c');
+        } finally {
+          discordCheckGuildBtn.disabled = false;
+          discordCheckGuildBtn.textContent = 'Verificar presença';
+        }
+      });
+    }
+
+    if (discordSendBtn) {
+      discordSendBtn.addEventListener('click', async () => {
+        discordSendBtn.disabled = true;
+        discordSendBtn.textContent = 'Enviando...';
+        try {
+          const res = await postJson('/api/auth/verify/send-discord-code', {});
+          if (res.ok) {
+            setDiscordMsg(discordMsg, '✅ Código enviado! Verifique seu DM no Discord.', '#00c853');
+            if (discordCodeInput) discordCodeInput.disabled = false;
+            if (discordConfirmBtn) discordConfirmBtn.disabled = false;
+          } else {
+            setDiscordMsg(discordMsg, res.error || 'Erro ao enviar código.', '#e74c3c');
+          }
+        } catch (e) {
+          setDiscordMsg(discordMsg, 'Erro de rede: ' + e.message, '#e74c3c');
+        } finally {
+          discordSendBtn.disabled = false;
+          discordSendBtn.textContent = 'Enviar código';
+        }
+      });
+    }
+
+    if (discordConfirmBtn) {
+      discordConfirmBtn.addEventListener('click', async () => {
+        const code = discordCodeInput ? discordCodeInput.value.trim() : '';
+        if (!code || code.length < 6) {
+          setDiscordMsg(discordMsg, 'Insira o código de 6 dígitos recebido no Discord.', '#e74c3c');
+          return;
+        }
+        discordConfirmBtn.disabled = true;
+        discordConfirmBtn.textContent = 'Confirmando...';
+        try {
+          const res = await postJson('/api/auth/verify/confirm-discord-code', { code: code });
+          if (res.ok) {
+            const ds = document.getElementById('vstep-discord-status');
+            if (ds) { ds.textContent = '✓ verificado'; ds.style.color = '#00c853'; }
+            setDiscordMsg(discordMsg, '✅ Código confirmado!', '#00c853');
+            checkVerificationComplete();
+          } else {
+            setDiscordMsg(discordMsg, res.error || 'Código inválido.', '#e74c3c');
+          }
+        } catch (e) {
+          setDiscordMsg(discordMsg, 'Erro de rede: ' + e.message, '#e74c3c');
+        } finally {
+          discordConfirmBtn.disabled = false;
+          discordConfirmBtn.textContent = 'Confirmar';
+        }
+      });
+    }
+
+    if (completeBtn) {
+      completeBtn.addEventListener('click', async () => {
+        completeBtn.disabled = true;
+        completeBtn.textContent = 'Processando...';
+        try {
+          const res = await postJson('/api/auth/verify/complete', {});
+          if (res.ok) {
+            window._userRole = res.role || 'player';
+            applyRoleFilter(window._userRole);
+            updateRoleBadge(window._userRole, window._userData);
+            updateMemberCardRole(window._userRole);
+            if (verBox) verBox.style.display = 'none';
+            if (memberStatusCard) {
+              memberStatusCard.style.display = '';
+              memberStatusCard.querySelectorAll('button').forEach((btn) => {
+                btn.disabled = false;
+                btn.removeAttribute('disabled');
+              });
+            }
+            loadDiscordInfo();
+            writeLog('OK', '🎉 Parabéns! Você agora é Membro Ruby!');
+            alert('Parabéns! Agora você é Membro Ruby. As funcionalidades completas foram liberadas.');
+          } else {
+            alert(res.error || 'Erro ao completar verificação.');
+          }
+        } catch (e) {
+          alert('Erro de rede: ' + e.message);
+        } finally {
+          completeBtn.disabled = false;
+          completeBtn.textContent = 'Tornar-se Membro Ruby';
+        }
+      });
+    }
+
+    loadVerificationStatus();
+  }
+
   /* ── Expose global handlers for inline onclick ── */
 
   window.confirmPendingPayment = confirmPendingPayment;
   window.rejectPendingPayment = rejectPendingPayment;
   window.closePixModal = closePixModal;
 
+  window.handleDiscordServerJoin = function() {
+    window.open('https://discord.gg/MnrSXTF4qx', '_blank');
+  };
+
+  window.refreshServerLiveStatus = refreshStatus;
+
   document.addEventListener("DOMContentLoaded", () => {
     bindEvents();
     writeLog("SYSTEM", "Correção de lógica e imagens carregada. Interface pronta.");
     refreshStatus();
     updateModpacks(false).catch(() => {});
+
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", async () => {
+        try {
+          await postJson("/api/auth/logout", {});
+          location.reload();
+        } catch (e) {
+          writeLog("ERROR", "Logout: " + e.message);
+        }
+      });
+    }
+
+    const loginBtn = document.getElementById('login-discord-btn');
+    if (loginBtn) {
+      loginBtn.addEventListener('click', () => { window.location.href = '/api/auth/discord/login'; });
+    }
+
+    checkAuth().then((authenticated) => {
+      if (!authenticated) return;
+      document.body.dataset.currentTab = document.body.dataset.currentTab || 'home';
+      initVerification();
+      setTimeout(loadDiscordInfo, 600);
+    });
+
     setInterval(pollLogs, 4000);
   });
 })();
