@@ -33,14 +33,6 @@
 |---|---|
 | <img src="rubymc-java/docs/assets/screenshots/rubymc-ia.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-configuracoes.png" width="100%"> |
 
-| 🗄️ DB | 🖥️ Display |
-|---|---|
-| <img src="rubymc-java/docs/assets/screenshots/rubymc-db.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-display.png" width="100%"> |
-
-| 📋 Versões | 👑 VIP |
-|---|---|
-| <img src="rubymc-java/docs/assets/screenshots/rubymc-versoes.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-vip.png" width="100%"> |
-
 </div>
 
 ---
