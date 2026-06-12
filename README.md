@@ -19,19 +19,31 @@
 
 <div align="center">
 
-| 🏠 Java — Dashboard | 📦 Java — Modpacks |
+### 💎 RubyMC Java
+
+| 🏠 Dashboard | 📦 Modpacks |
 |---|---|
 | <img src="rubymc-java/docs/assets/screenshots/rubymc-tela-inicio.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-modpacks.png" width="100%"> |
 
-| 🌐 Java — Servidor | 💬 Java — Discord |
+| 🌐 Servidor | 💬 Discord |
 |---|---|
 | <img src="rubymc-java/docs/assets/screenshots/rubymc-servidor-comunidade.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-discord-bot.png" width="100%"> |
 
-| 🧠 Java — IA | ⚙️ Java — Configurações |
+| 🧠 IA | ⚙️ Configurações |
 |---|---|
 | <img src="rubymc-java/docs/assets/screenshots/rubymc-ia.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-configuracoes.png" width="100%"> |
 
-| 🏠 Bedrock — Início | 🌐 Bedrock — Servidor |
+| 🗄️ DB | 🖥️ Display |
+|---|---|
+| <img src="rubymc-java/docs/assets/screenshots/DB-rubymc.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/display-rubymc.png" width="100%"> |
+
+| 📋 Versões | 👑 VIP |
+|---|---|
+| <img src="rubymc-java/docs/assets/screenshots/versões-rubymc.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/VIP-rubymc.png" width="100%"> |
+
+### 💎 RubyMC Bedrock
+
+| 🏠 Início | 🌐 Servidor BDS |
 |---|---|
 | <img src="docs/assets/bedrock/bedrock-home-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-server-panel.png" width="100%"> |
 

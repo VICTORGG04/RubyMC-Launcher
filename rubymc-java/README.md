@@ -59,6 +59,14 @@
 |---|---|
 | <img src="docs/assets/screenshots/rubymc-ia.png" width="100%"> | <img src="docs/assets/screenshots/rubymc-configuracoes.png" width="100%"> |
 
+| 🗄️ DB | 🖥️ Display |
+|---|---|
+| <img src="docs/assets/screenshots/DB-rubymc.png" width="100%"> | <img src="docs/assets/screenshots/display-rubymc.png" width="100%"> |
+
+| 📋 Versões | 👑 VIP |
+|---|---|
+| <img src="docs/assets/screenshots/versões-rubymc.png" width="100%"> | <img src="docs/assets/screenshots/VIP-rubymc.png" width="100%"> |
+
 </div>
 
 ---
@@ -340,7 +348,8 @@ rubymc-java/
 │
 ├── web/                        # Frontend
 │   ├── index.html              # Página principal do painel
-│   ├── termos.html             # Termos de uso
+│   ├── bot-terms.html          # Termos de serviço do bot Discord
+│   ├── bot-privacy.html        # Política de privacidade do bot Discord
 │   └── assets/
 │       ├── css/
 │       │   ├── launcher.css    # Estilos principais
@@ -351,7 +360,7 @@ rubymc-java/
 │       │   ├── rubymc-ai-support.js
 │       │   ├── server-runtime-selector.js
 │       │   └── utils.js
-│       └── img/                # Imagens e backgrounds
+│       └── img/                # Imagens, backgrounds e assets do bot
 │
 ├── archive/scripts/            # Scripts auxiliares legados
 ├── docs/                       # Documentação
