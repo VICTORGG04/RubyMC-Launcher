@@ -61,11 +61,11 @@
 
 | 🗄️ DB | 🖥️ Display |
 |---|---|
-| <img src="docs/assets/screenshots/DB-rubymc.png" width="100%"> | <img src="docs/assets/screenshots/display-rubymc.png" width="100%"> |
+| <img src="docs/assets/screenshots/rubymc-db.png" width="100%"> | <img src="docs/assets/screenshots/rubymc-display.png" width="100%"> |
 
 | 📋 Versões | 👑 VIP |
 |---|---|
-| <img src="docs/assets/screenshots/versoes-rubymc.png" width="100%"> | <img src="docs/assets/screenshots/VIP-rubymc.png" width="100%"> |
+| <img src="docs/assets/screenshots/rubymc-versoes.png" width="100%"> | <img src="docs/assets/screenshots/rubymc-vip.png" width="100%"> |
 
 </div>
 

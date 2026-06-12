@@ -35,17 +35,11 @@
 
 | 🗄️ DB | 🖥️ Display |
 |---|---|
-| <img src="rubymc-java/docs/assets/screenshots/DB-rubymc.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/display-rubymc.png" width="100%"> |
+| <img src="rubymc-java/docs/assets/screenshots/rubymc-db.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-display.png" width="100%"> |
 
 | 📋 Versões | 👑 VIP |
 |---|---|
-| <img src="rubymc-java/docs/assets/screenshots/versoes-rubymc.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/VIP-rubymc.png" width="100%"> |
-
-### 💎 RubyMC Bedrock
-
-| 🏠 Início | 🌐 Servidor BDS |
-|---|---|
-| <img src="docs/assets/bedrock/bedrock-home-panel.png" width="100%"> | <img src="docs/assets/bedrock/bedrock-server-panel.png" width="100%"> |
+| <img src="rubymc-java/docs/assets/screenshots/rubymc-versoes.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/rubymc-vip.png" width="100%"> |
 
 </div>
 
