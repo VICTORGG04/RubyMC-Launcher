@@ -39,7 +39,7 @@
 
 | 📋 Versões | 👑 VIP |
 |---|---|
-| <img src="rubymc-java/docs/assets/screenshots/versões-rubymc.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/VIP-rubymc.png" width="100%"> |
+| <img src="rubymc-java/docs/assets/screenshots/versoes-rubymc.png" width="100%"> | <img src="rubymc-java/docs/assets/screenshots/VIP-rubymc.png" width="100%"> |
 
 ### 💎 RubyMC Bedrock
 

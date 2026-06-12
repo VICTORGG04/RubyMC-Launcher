@@ -65,7 +65,7 @@
 
 | 📋 Versões | 👑 VIP |
 |---|---|
-| <img src="docs/assets/screenshots/versões-rubymc.png" width="100%"> | <img src="docs/assets/screenshots/VIP-rubymc.png" width="100%"> |
+| <img src="docs/assets/screenshots/versoes-rubymc.png" width="100%"> | <img src="docs/assets/screenshots/VIP-rubymc.png" width="100%"> |
 
 </div>
 
